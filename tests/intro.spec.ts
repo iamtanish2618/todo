@@ -20,7 +20,14 @@ async function progress(page: Page, p: number) {
             .querySelector(".intro-experience")
             ?.getAttribute("data-scroll-progress"),
         ) - value,
-      ) < 0.0006,
+      ) <
+      Math.max(
+        0.0006,
+        1.1 /
+          (document.querySelector<HTMLElement>(".intro-experience")!
+            .offsetHeight -
+            innerHeight),
+      ),
     p,
   );
   // Numeric scrub catches up, then inspect exact layer styles, independent of the continuing particle positions.
@@ -37,8 +44,9 @@ async function snapshot(page: Page) {
     female: Number(
       (document.querySelector(".intro-female") as HTMLElement).style.opacity,
     ),
-    lid: (document.querySelector(".intro-male .intro-lid-upper") as HTMLElement)
-      .style.transform,
+    lid: (
+      document.querySelector(".intro-male .intro-closed-eye") as HTMLElement
+    ).style.opacity,
     density: Number(
       (document.querySelector(".intro-experience") as HTMLElement).dataset
         .density,
@@ -57,7 +65,7 @@ test("cinematic sequence: closed eyes, hidden swap, reveal, and identical revers
   page.on("pageerror", (e) => errors.push(e.message));
   await progress(page, 0.3);
   const closed = await snapshot(page);
-  expect(closed.lid).toContain("0%, 0px)");
+  expect(Number(closed.lid)).toBe(1);
   await expect(page.locator(".intro-cards-male")).toHaveCSS(
     "visibility",
     "hidden",
@@ -78,10 +86,10 @@ test("cinematic sequence: closed eyes, hidden swap, reveal, and identical revers
   );
   await progress(page, 0.83);
   const opening = await page
-    .locator(".intro-female .intro-lid-upper")
+    .locator(".intro-female .intro-pupil")
     .first()
     .getAttribute("style");
-  expect(Number(opening?.match(/,\s*(-?[\d.]+)%/)?.[1])).toBeLessThan(-70);
+  expect(Number(opening?.match(/scaleY\(([-\d.]+)\)/)?.[1])).toBeGreaterThan(1);
   await progress(page, 1);
   await expect(page.locator(root)).toHaveAttribute(
     "data-tracking-female",
@@ -128,8 +136,8 @@ test("fast scroll, resize at a stopped transition, and live timing controls do n
     }),
   );
   for (const eye of registration) {
-    expect(eye.cx).toBeCloseTo(0.262, 3);
-    expect(eye.cy).toBeCloseTo(0.416, 3);
+    expect(eye.cx).toBeCloseTo(0.372, 3);
+    expect(eye.cy).toBeCloseTo(0.58, 3);
   }
   await expect(page.locator(".intro-debug-readout")).toContainText("Snow");
   const timing = page.getByRole("slider", { name: "Eyes open · start" });
@@ -188,13 +196,45 @@ test("reduced motion uses the quiet crossfade without snow or scripted lids", as
   await page.waitForTimeout(700);
   await expect(page.locator(root)).toHaveAttribute("data-particles", "0");
   await expect(page.locator(".intro-female")).toHaveCSS("opacity", "1");
-  expect(
-    await page
-      .locator(".intro-female .intro-lid-upper")
-      .first()
-      .getAttribute("style"),
-  ).toContain("-70%");
+  await expect(
+    page.locator(".intro-female .intro-closed-eye").first(),
+  ).toHaveCSS("opacity", "0");
   await progress(page, 0.35);
   await page.waitForTimeout(700);
   await expect(page.locator(".intro-male")).toHaveCSS("opacity", "1");
+});
+
+test("one long wheel gesture completes the story; companions move up from separate winter artwork", async ({
+  page,
+}) => {
+  const range = await page
+    .locator(root)
+    .evaluate((e) => e.clientHeight - innerHeight);
+  expect(range).toBeLessThan(await page.evaluate(() => innerHeight));
+  const sources = await page
+    .locator(".intro-face > img")
+    .evaluateAll((images) =>
+      images.map((image) => (image as HTMLImageElement).getAttribute("src")),
+    );
+  expect(new Set(sources).size).toBe(2);
+  await expect(page.locator(".intro-headband")).toHaveCount(0);
+  const before = await page
+    .locator(".intro-male")
+    .evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+  await progress(page, 0.3);
+  const leaving = await page
+    .locator(".intro-male")
+    .evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+  expect(leaving).toBeLessThan(before - 30);
+  await progress(page, 0.66);
+  const arriving = await page
+    .locator(".intro-female")
+    .evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+  expect(arriving).toBeGreaterThan(20);
+  await progress(page, 0);
+  await page.mouse.wheel(0, await page.evaluate(() => innerHeight * 0.85));
+  await expect
+    .poll(() => page.locator(root).getAttribute("data-scroll-progress"))
+    .toBe("1.0000");
+  await expect(page.getByRole("button", { name: "Choose her" })).toBeVisible();
 });

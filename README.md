@@ -8,7 +8,7 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 - **Focus solo:** set your intention and start on the desk, or open Focus & tasks to add tasks, choose 15/25/45 minutes, pause, resume, and save progress. The timer continues when you close a tool or refresh.
 - **Ask Todo:** chat, make notes, summarize text, or ask about an image once an AI provider is connected. Attach `.txt`, `.md`, PNG, JPEG, or WebP files. Image input needs a vision-capable model.
 - **Your notes:** write and save notes and download real multi-page PDFs. This works without AI.
-- **Choose your companion:** scroll between the penguins or click the switch hint. Each character has its own choice cards. They fade away as he closes his eyes and snow fills the screen, then return as she opens hers. Blue and pink headbands distinguish the companions. Booping their beaks triggers a wink. Your choice is remembered.
+- **Choose your companion:** scroll between the penguins or click the switch hint. Each character has its own choice cards. They fade away as he closes his eyes and snow fills the screen, then return as she opens hers. The landing companions wear blue and pink knitted winter caps and mufflers, with rosier blush for her. The story now takes one long scroll, with him moving up and her arriving from below. Booping their beaks triggers a wink. Your choice is remembered.
 - **Settings:** turn on sound effects or gentler motion.
 
 Friends, microphone chat, and synchronized rooms are the next stage. The Friends panel says this explicitly. Games are on hold: there is no race or other game in this version. Breaks are simple rest periods; game ideas will be revisited later.

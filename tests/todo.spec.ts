@@ -42,7 +42,11 @@ test("homepage, live pupil tracking, glass hover, scroll handoff and character p
   await page.getByRole("button", { name: /scroll to meet her/i }).click();
   await expect(page.getByRole("button", { name: "Choose him" })).toBeVisible();
   await page.waitForFunction(
-    () => window.scrollY >= 4 * window.innerHeight - 2,
+    () =>
+      window.scrollY >=
+      document.querySelector<HTMLElement>(".intro-experience")!.offsetHeight -
+        window.innerHeight -
+        2,
   );
   await page.screenshot({ path: "outputs/todo-female.png" });
   await page.reload();
@@ -73,7 +77,7 @@ test("task create, complete, reload persistence, timer pause and saved history",
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.locator(".desk-clock")).toBeVisible();
   await page.reload();
-  await page.getByRole("button", {name: /Your room is waiting/}).click();
+  await page.getByRole("button", { name: /Your room is waiting/ }).click();
   await page
     .getByRole("button", { name: "Focus & tasks", exact: true })
     .click();

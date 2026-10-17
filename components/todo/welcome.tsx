@@ -23,29 +23,31 @@ import "lenis/dist/lenis.css";
 import "./welcome.css";
 
 /** All art-space coordinates are fractions of the natural image, not viewport pixels.
- * The existing companions share a texture deliberately: their eye/beak registration is exact.
+ * The winter companions are matched artwork variants; their knit colours and blush are baked into the real art.
  * Replace either src independently and adjust its framing if new artwork is supplied. */
 export const INTRO_CONFIG = {
   images: {
     male: {
-      src: "/art/todo-face.webp",
-      alt: "Todo, your blue-headband penguin companion",
+      src: "/art/todo-winter-male.webp",
+      closedSrc: "/art/todo-winter-male-closed.webp",
+      alt: "Todo, your blue winter-hat and scarf penguin companion",
       scale: 1,
       translateX: 0,
       translateY: 0,
     },
     female: {
-      src: "/art/todo-face.webp",
-      alt: "Todo, your pink-band penguin companion",
+      src: "/art/todo-winter-female.webp",
+      closedSrc: "/art/todo-winter-female-closed.webp",
+      alt: "Todo, your pink winter-hat and scarf penguin companion",
       scale: 1,
       translateX: 0,
       translateY: 0,
     },
   },
-  portrait: { maxImageWidth: 1.5, eyeHeight: 0.41 },
+  portrait: { maxImageWidth: 1.8, eyeHeight: 0.39 },
   eyes: {
-    leftEye: { cx: 0.262, cy: 0.416, rx: 0.085, ry: 0.114 },
-    rightEye: { cx: 0.739, cy: 0.416, rx: 0.085, ry: 0.114 },
+    leftEye: { cx: 0.372, cy: 0.58, rx: 0.035, ry: 0.052 },
+    rightEye: { cx: 0.603, cy: 0.585, rx: 0.035, ry: 0.052 },
   },
   snow: {
     desktop: 260,
@@ -72,16 +74,13 @@ export const INTRO_CONFIG = {
     settleStart: 0.88,
   },
   colors: {
-    lid: "#F5ECDF",
-    lidLight: "#FCF3E8",
-    lidShade: "#E8DCCD",
-    lash: "#665345",
     veilCenter: "#FFFFFF",
     veilEdge: "#E8F1F9",
   },
+  travel: { maleExit: -12, femaleEntry: 22 },
   caption: "or maybe you'd like me?",
-  sectionHeight: "500svh",
-  scrub: 0.8,
+  sectionHeight: "180svh",
+  scrub: 0.55,
   lenisLerp: 0.09,
 } as const;
 
@@ -135,73 +134,53 @@ function Eye({
   side: "leftEye" | "rightEye";
   character: Character;
 }) {
-  const e = INTRO_CONFIG.eyes[side],
-    id = `intro-${character}-${side}`;
+  const e = INTRO_CONFIG.eyes[side];
+  // A feathered patch from the registered, naturally closed artwork covers the entire eye rim.
+  // This avoids the hard circular outline of a flat, synthetic eyelid pasted over fluffy fur.
+  const patch = {
+    x: e.cx - e.rx * 2.8,
+    y: e.cy - e.ry * 2.6,
+    w: e.rx * 5.6,
+    h: e.ry * 5.2,
+  };
   return (
-    <div
-      className={`intro-eye ${side}`}
-      style={{
-        left: `${(e.cx - e.rx) * 100}%`,
-        top: `${(e.cy - e.ry) * 100}%`,
-        width: `${e.rx * 200}%`,
-        height: `${e.ry * 200}%`,
-      }}
-    >
-      <div className="intro-pupil">
-        <i />
-        <b />
+    <>
+      <div
+        className={`intro-eye ${side}`}
+        style={{
+          left: `${(e.cx - e.rx) * 100}%`,
+          top: `${(e.cy - e.ry) * 100}%`,
+          width: `${e.rx * 200}%`,
+          height: `${e.ry * 200}%`,
+        }}
+      >
+        <div className="intro-pupil">
+          <i />
+          <b />
+        </div>
       </div>
-      {/* These two complementary curves meet at 64% of the socket. The lower lid travels 25% of the eye height. */}
       <svg
-        className="intro-lid intro-lid-lower"
+        className={`intro-closed-eye ${side}`}
+        style={{
+          left: `${patch.x * 100}%`,
+          top: `${patch.y * 100}%`,
+          width: `${patch.w * 100}%`,
+          height: `${patch.h * 100}%`,
+        }}
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id={`${id}-lower`} x2="0" y2="1">
-            <stop stopColor={INTRO_CONFIG.colors.lidLight} />
-            <stop offset="1" stopColor={INTRO_CONFIG.colors.lidShade} />
-          </linearGradient>
-        </defs>
-        <path d="M-5 58 Q50 70 105 58 V108 H-5Z" fill={`url(#${id}-lower)`} />
-      </svg>
-      <svg
-        className="intro-lid intro-lid-upper"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <defs>
-          <linearGradient id={`${id}-upper`} x2="0" y2="1">
-            <stop stopColor={INTRO_CONFIG.colors.lid} />
-            <stop offset=".78" stopColor={INTRO_CONFIG.colors.lidLight} />
-            <stop offset="1" stopColor={INTRO_CONFIG.colors.lidShade} />
-          </linearGradient>
-        </defs>
-        <path d="M-5 -8 H105 V58 Q50 70 -5 58Z" fill={`url(#${id}-upper)`} />
-        <path
-          d="M-5 57 Q50 69 105 57"
-          fill="none"
-          stroke={INTRO_CONFIG.colors.lash}
-          strokeWidth="2.1"
-          opacity=".075"
-        />
-        <path
-          d="M-5 -8 H105 V58 Q50 70 -5 58Z"
-          fill="url(#intro-fur-grain)"
-          opacity=".07"
-        />
-        <path
-          className="intro-lash-edge"
-          d="M-5 58 Q50 70 105 58"
-          fill="none"
-          stroke={INTRO_CONFIG.colors.lash}
-          strokeWidth=".65"
-          opacity=".35"
+        <image
+          href={INTRO_CONFIG.images[character].closedSrc}
+          x={(-patch.x * 100) / patch.w}
+          y={(-patch.y * 100) / patch.h}
+          width={100 / patch.w}
+          height={100 / patch.h}
+          preserveAspectRatio="none"
         />
       </svg>
-    </div>
+    </>
   );
 }
 
@@ -254,8 +233,14 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const images = planes.map((plane) =>
           plane.querySelector<HTMLImageElement>("img")!,
         );
+        const closedImages = Object.values(INTRO_CONFIG.images).map((frame) => {
+          const image = new Image();
+          image.src = frame.closedSrc;
+          return image;
+        });
         await Promise.all([
           ...images.map((image) => image.decode()),
+          ...closedImages.map((image) => image.decode()),
           document.fonts.load("600 16px Nunito"),
         ]);
         if (cancelled) return;
@@ -289,12 +274,9 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const pupils = planes.flatMap((plane) =>
           Array.from(plane.querySelectorAll<HTMLElement>(".intro-pupil")),
         );
-        const uppers = planes.flatMap((plane) =>
-            Array.from(plane.querySelectorAll<SVGElement>(".intro-lid-upper")),
-          ),
-          lowers = planes.flatMap((plane) =>
-            Array.from(plane.querySelectorAll<SVGElement>(".intro-lid-lower")),
-          );
+        const closedPatches = planes.flatMap((plane) =>
+          Array.from(plane.querySelectorAll<SVGElement>(".intro-closed-eye")),
+        );
         const glass = trays.flatMap((tray) =>
           Array.from(tray.querySelectorAll<HTMLElement>(".intro-glass")),
         );
@@ -343,6 +325,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           maleLookY: 0,
           femaleLookX: 0,
           femaleLookY: 0,
+          travelMale: 0,
+          travelFemale: INTRO_CONFIG.travel.femaleEntry,
           breathMale: 1,
           breathFemale: 0,
         };
@@ -512,7 +496,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           lenis.scrollTo(character === "female" ? trigger.end : trigger.start, {
             force: true,
             immediate: immediate || reduced,
-            duration: 1.8,
+            duration: 1.2,
             lerp: 0,
           });
           if (immediate || reduced) {
@@ -526,11 +510,12 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           timeline?.kill();
           currentTimings = t;
           Object.assign(motion, initialMotion);
-          gsap.set(planes[0], { autoAlpha: 1, scale: 1, y: 0 });
+          gsap.set(planes[0], { autoAlpha: 1, scale: 1, y: 0, yPercent: 0 });
           gsap.set(planes[1], {
             autoAlpha: 0,
             scale: reduced ? 1 : 1.06,
             y: 0,
+            yPercent: reduced ? 0 : INTRO_CONFIG.travel.femaleEntry,
           });
           gsap.set([veil, caption, vignette, trays[1], ...pickers], {
             autoAlpha: 0,
@@ -596,6 +581,24 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 trays[0],
                 { autoAlpha: 0, y: 30, duration: 0.1, ease: "power2.inOut" },
                 t.closeStart,
+              )
+              .to(
+                motion,
+                {
+                  travelMale: INTRO_CONFIG.travel.maleExit,
+                  duration: t.whiteAt - t.closeStart,
+                  ease: "power2.inOut",
+                },
+                t.closeStart,
+              )
+              .to(
+                motion,
+                {
+                  travelFemale: 0,
+                  duration: t.openEnd - t.whiteUntil,
+                  ease: "power2.inOut",
+                },
+                t.whiteUntil,
               )
               .to(ui, { autoAlpha: 0, duration: 0.07 }, t.snowStart + 0.03)
               .to(
@@ -924,8 +927,6 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 eyeBoxes[j + 3];
             pupilOffsets[k] += (tx - pupilOffsets[k]) * lerp;
             pupilOffsets[k + 1] += (ty - pupilOffsets[k + 1]) * lerp;
-            pupils[i].style.transform =
-              `translate3d(calc(-50% + ${pupilOffsets[k].toFixed(2)}px),calc(-50% + ${pupilOffsets[k + 1].toFixed(2)}px),0)`;
             const scripted = reduced
               ? 0
               : female
@@ -939,16 +940,21 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             const blinkAmount = blink.leftOnly && i % 2 ? 0 : idleBlink;
             const close =
               blinkAmount > 0 ? Math.max(scripted, blinkAmount) : scripted;
-            uppers[i].style.transform =
-              `translate3d(0,${-70 * (1 - close)}%,0)`;
-            lowers[i].style.opacity = String(clamp(close));
-            lowers[i].style.transform = `translate3d(0,${25 * (1 - close)}%,0)`;
+            const amount = clamp(close);
+            closedPatches[i].style.opacity = String(
+              amount * amount * (3 - 2 * amount),
+            );
+            pupils[i].style.opacity = String(1 - amount * 0.8);
+            pupils[i].style.transform =
+              `translate3d(calc(-50% + ${pupilOffsets[k].toFixed(2)}px),calc(-50% + ${pupilOffsets[k + 1].toFixed(2)}px),0) scaleY(${Math.max(0.03, 1 - close * 0.97).toFixed(4)})`;
           }
           if (!reduced) {
             gsap.set(planes[0], {
+              yPercent: motion.travelMale,
               y: Math.sin(time * 0.85) * 2.5 * motion.breathMale,
             });
             gsap.set(planes[1], {
+              yPercent: motion.travelFemale,
               y: Math.sin(time * 0.85) * 2.5 * motion.breathFemale,
             });
           }
@@ -1112,23 +1118,6 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           inert={!props.active}
           aria-hidden={!props.active}
         >
-          <svg
-            width="0"
-            height="0"
-            aria-hidden="true"
-            className="intro-texture-defs"
-          >
-            <defs>
-              <pattern
-                id="intro-fur-grain"
-                width="32"
-                height="32"
-                patternUnits="userSpaceOnUse"
-              >
-                <image href="/art/lid-grain.png" width="32" height="32" />
-              </pattern>
-            </defs>
-          </svg>
           <h1 className="sr-only">
             A little company. A little progress. Meet Todo.
           </h1>
@@ -1146,51 +1135,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 fetchPriority="high"
                 draggable={false}
               />
-              <div
-                className={`intro-headband ${character === "female" ? "pink-band" : "blue-band"}`}
-              >
-                <i />
-              </div>
-              {character === "female" ? (
-                <div className="intro-bow">
-                  <i />
-                  <b />
-                  <i />
-                </div>
-              ) : null}
-              {/* DOM order is normalized below by selecting male/female explicitly in the engine. */}
               <Eye character={character} side="leftEye" />
               <Eye character={character} side="rightEye" />
-              {character === "female" ? (
-                <>
-                  <svg
-                    className="intro-lashes intro-lashes-left"
-                    viewBox="0 0 60 40"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M53 36Q27 31 20 10 M43 35Q22 26 15 4 M34 35Q15 38 5 20"
-                      fill="none"
-                      stroke="#392c28"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <svg
-                    className="intro-lashes intro-lashes-right"
-                    viewBox="0 0 60 40"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M53 36Q27 31 20 10 M43 35Q22 26 15 4 M34 35Q15 38 5 20"
-                      fill="none"
-                      stroke="#392c28"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </>
-              ) : null}
               <button
                 className="intro-boop"
                 aria-label={`Give ${character === "male" ? "him" : "her"} a little boop`}
