@@ -1,0 +1,1423 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  CircleHelp,
+  Download,
+  FileText,
+  Headphones,
+  History,
+  ImagePlus,
+  Loader2,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Settings2,
+  Sparkles,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { Face, Flower, type MotionPoint } from "./face";
+import {
+  api,
+  exportPDF,
+  type Task,
+  type FocusSession,
+  type Note,
+  type Connection,
+} from "@/lib/todo/client";
+
+type Panel =
+  "solo" | "friends" | "agent" | "settings" | "notes" | "history" | null;
+type Message = {
+  role: "user" | "assistant";
+  content: string;
+  imageName?: string;
+};
+type Timer = {
+  remaining: number;
+  duration: number;
+  deadline: number | null;
+  task: string;
+  phase: "focus" | "break";
+  started: boolean;
+  id: string;
+};
+const freshTimer: Timer = {
+  remaining: 25 * 60,
+  duration: 25 * 60,
+  deadline: null,
+  task: "",
+  phase: "focus",
+  started: false,
+  id: "",
+};
+const choices = [
+  {
+    id: "solo",
+    label: "Focus solo",
+    description: "One thing at a time.",
+    icon: Headphones,
+  },
+  {
+    id: "friends",
+    label: "Join friends",
+    description: "Good company. Same room.",
+    icon: Users,
+  },
+  {
+    id: "agent",
+    label: "Ask Todo",
+    description: "A little help goes a long way.",
+    icon: Sparkles,
+  },
+] as const;
+
+export default function TodoApp() {
+  const [panel, setPanel] = useState<Panel>(null),
+    [female, setFemale] = useState(false),
+    [progress, setProgress] = useState(0);
+  const [reduced, setReduced] = useState(false),
+    [sound, setSound] = useState(false),
+    [reaction, setReaction] = useState<string | null>(null),
+    [blink, setBlink] = useState(false),
+    [greeting, setGreeting] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]),
+    [sessions, setSessions] = useState<FocusSession[]>([]),
+    [notes, setNotes] = useState<Note[]>([]),
+    [connection, setConnection] = useState<Connection | null>(null),
+    [loadError, setLoadError] = useState("");
+  const [timer, setTimer] = useState<Timer>(freshTimer),
+    [timerReady, setTimerReady] = useState(false),
+    [minutes, setMinutes] = useState(25),
+    [taskDraft, setTaskDraft] = useState("");
+  const [saving, setSaving] = useState(false),
+    [race, setRace] = useState(false),
+    [raceScore, setRaceScore] = useState(0);
+  const pointer = useRef<MotionPoint>({ x: 0, y: 0, active: false }),
+    cards = useRef<(HTMLButtonElement | null)[]>([]),
+    timerRef = useRef(timer),
+    audio = useRef<AudioContext | null>(null);
+  const settling = useRef(false),
+    completed = useRef(new Set<string>()),
+    blinkTimeout = useRef<ReturnType<typeof setTimeout> | null>(null),
+    hydrated = useRef(false);
+  const onError = (e: unknown) =>
+    toast.error(
+      e instanceof Error
+        ? e.message
+        : "Something went wrong. Please try again.",
+    );
+  const load = useCallback(async () => {
+    const results = await Promise.allSettled([
+      api<Task[]>("/api/tasks"),
+      api<FocusSession[]>("/api/sessions"),
+      api<Note[]>("/api/notes"),
+      api<Connection>("/api/status"),
+    ]);
+    if (results[0].status === "fulfilled") setTasks(results[0].value);
+    if (results[1].status === "fulfilled") setSessions(results[1].value);
+    if (results[2].status === "fulfilled") setNotes(results[2].value);
+    if (results[3].status === "fulfilled") setConnection(results[3].value);
+    const failed = results.find((r) => r.status === "rejected");
+    setLoadError(failed?.status === "rejected" ? failed.reason.message : "");
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  useEffect(() => {
+    const preference = matchMedia("(prefers-reduced-motion: reduce)");
+    try {
+      const settings = JSON.parse(
+        localStorage.getItem("todo.settings.v1") || "{}",
+      );
+      setReduced(settings.reduced ?? preference.matches);
+      setSound(settings.sound ?? false);
+      const saved = JSON.parse(localStorage.getItem("todo.timer.v1") || "null");
+      if (
+        saved &&
+        typeof saved.remaining === "number" &&
+        typeof saved.task === "string" &&
+        saved.task.length <= 180 &&
+        ["focus", "break"].includes(saved.phase) &&
+        saved.duration > 0 &&
+        saved.duration <= 7200 &&
+        (!saved.deadline || Number.isFinite(saved.deadline))
+      )
+        setTimer(saved);
+      if (localStorage.getItem("todo.character.v1") === "female")
+        window.scrollTo({ top: window.innerHeight });
+    } catch {}
+    hydrated.current = true;
+    setTimerReady(true);
+    const hello = setTimeout(() => setGreeting(true), 1200),
+      bye = setTimeout(() => setGreeting(false), 7000);
+    return () => {
+      clearTimeout(hello);
+      clearTimeout(bye);
+      audio.current?.close();
+    };
+  }, []);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      localStorage.setItem(
+        "todo.settings.v1",
+        JSON.stringify({ reduced, sound }),
+      );
+    } catch {}
+  }, [reduced, sound]);
+  useEffect(() => {
+    timerRef.current = timer;
+    if (timerReady)
+      try {
+        localStorage.setItem("todo.timer.v1", JSON.stringify(timer));
+      } catch {}
+  }, [timer, timerReady]);
+  useEffect(() => {
+    let raf = 0;
+    const scroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        const p = Math.max(0, Math.min(1, window.scrollY / window.innerHeight));
+        setProgress(p);
+        setFemale(p >= 0.5);
+        try {
+          localStorage.setItem(
+            "todo.character.v1",
+            p >= 0.5 ? "female" : "male",
+          );
+        } catch {}
+        raf = 0;
+      });
+    };
+    const move = (event: PointerEvent) => {
+      pointer.current = { x: event.clientX, y: event.clientY, active: true };
+      cards.current.forEach((card) => {
+        if (!card) return;
+        const r = card.getBoundingClientRect(),
+          dx = Math.max(r.left - event.clientX, 0, event.clientX - r.right),
+          dy = Math.max(r.top - event.clientY, 0, event.clientY - r.bottom);
+        const near = reduced ? 0 : Math.max(0, 1 - Math.hypot(dx, dy) / 160);
+        card.style.setProperty("--near", String(near));
+      });
+    };
+    const leave = () => {
+      pointer.current.active = false;
+      cards.current.forEach((c) => c?.style.setProperty("--near", "0"));
+    };
+    window.addEventListener("scroll", scroll, { passive: true });
+    window.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("pointerleave", leave);
+    scroll();
+    return () => {
+      window.removeEventListener("scroll", scroll);
+      window.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerleave", leave);
+      cancelAnimationFrame(raf);
+    };
+  }, [reduced]);
+  const doBlink = useCallback(() => {
+    setBlink(true);
+    if (blinkTimeout.current) clearTimeout(blinkTimeout.current);
+    blinkTimeout.current = setTimeout(() => setBlink(false), 180);
+  }, []);
+  useEffect(() => {
+    if (reduced) return;
+    const id = setInterval(doBlink, 5400);
+    return () => {
+      clearInterval(id);
+      if (blinkTimeout.current) clearTimeout(blinkTimeout.current);
+    };
+  }, [doBlink, reduced]);
+  const chime = useCallback(() => {
+    if (!sound) return;
+    try {
+      const context = audio.current ?? new AudioContext();
+      audio.current = context;
+      void context.resume();
+      const osc = context.createOscillator(),
+        gain = context.createGain();
+      osc.connect(gain);
+      gain.connect(context.destination);
+      osc.frequency.setValueAtTime(660, context.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        880,
+        context.currentTime + 0.12,
+      );
+      gain.gain.setValueAtTime(0.035, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.3);
+      osc.start();
+      osc.stop(context.currentTime + 0.3);
+    } catch {}
+  }, [sound]);
+  const saveSession = useCallback(async (value: Timer) => {
+    if (completed.current.has(value.id)) return true;
+    completed.current.add(value.id);
+    const remaining = value.deadline
+      ? Math.max(0, Math.ceil((value.deadline - Date.now()) / 1000))
+      : value.remaining;
+    const seconds = value.duration - remaining;
+    if (seconds < 1) return true;
+    try {
+      const result = await api<FocusSession>("/api/sessions", "POST", {
+        task: value.task,
+        seconds,
+        character: localStorage.getItem("todo.character.v1") || "male",
+      });
+      setSessions((s) => [result, ...s]);
+      toast.success("A little progress, saved.");
+      return true;
+    } catch (e) {
+      completed.current.delete(value.id);
+      onError(e);
+      return false;
+    }
+  }, []);
+  useEffect(() => {
+    if (!timerReady) return;
+    const id = setInterval(async () => {
+      const current = timerRef.current;
+      if (!current.deadline || settling.current) return;
+      const remaining = Math.max(
+        0,
+        Math.ceil((current.deadline - Date.now()) / 1000),
+      );
+      if (!remaining) {
+        if (current.phase === "focus") {
+          settling.current = true;
+          setTimer({ ...current, remaining: 0, deadline: null });
+          const saved = await saveSession(current);
+          settling.current = false;
+          if (!saved) return;
+          setTimer({
+            ...freshTimer,
+            phase: "break",
+            remaining: 300,
+            duration: 300,
+            task: current.task,
+            id: crypto.randomUUID(),
+          });
+          toast.success("Time for a little breather. You did it!");
+        } else {
+          setTimer({ ...freshTimer, task: current.task });
+          toast.success("Ready for another little step?");
+        }
+        chime();
+        setPanel("solo");
+      } else setTimer({ ...current, remaining });
+    }, 250);
+    return () => clearInterval(id);
+  }, [timerReady, saveSession, chime]);
+  const choose = (id: Panel) => {
+    setReaction(null);
+    setGreeting(false);
+    setPanel(id);
+    chime();
+  };
+  const switchCharacter = () =>
+    window.scrollTo({
+      top: female ? 0 : window.innerHeight,
+      behavior: reduced ? "instant" : "smooth",
+    });
+  const addTask = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!taskDraft.trim() || saving) return;
+    setSaving(true);
+    try {
+      const result = await api<Task>("/api/tasks", "POST", {
+        title: taskDraft,
+      });
+      setTasks((t) => [result, ...t]);
+      if (!timer.task) setTimer((t) => ({ ...t, task: result.title }));
+      setTaskDraft("");
+    } catch (e) {
+      onError(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+  const toggleTask = async (task: Task) => {
+    try {
+      const updated = await api<Task>("/api/tasks", "PATCH", {
+        id: task.id,
+        done: !task.done,
+      });
+      setTasks((ts) => ts.map((t) => (t.id === updated.id ? updated : t)));
+      if (updated.done) chime();
+    } catch (e) {
+      onError(e);
+    }
+  };
+  const removeTask = async (task: Task) => {
+    try {
+      await api("/api/tasks", "DELETE", { id: task.id });
+      setTasks((ts) => ts.filter((t) => t.id !== task.id));
+    } catch (e) {
+      onError(e);
+    }
+  };
+  const start = () => {
+    if (timer.deadline) {
+      setTimer((t) => ({
+        ...t,
+        remaining: Math.max(0, Math.ceil((t.deadline! - Date.now()) / 1000)),
+        deadline: null,
+      }));
+      return;
+    }
+    const current = timerRef.current;
+    if (current.phase === "focus" && !current.task.trim()) {
+      toast("Give this session one small task first.");
+      return;
+    }
+    setTimer((t) => ({
+      ...t,
+      deadline: Date.now() + t.remaining * 1000,
+      started: true,
+      id: t.id || crypto.randomUUID(),
+    }));
+    chime();
+  };
+  const finish = async () => {
+    if (settling.current) return;
+    settling.current = true;
+    const current = timerRef.current;
+    setTimer({
+      ...current,
+      remaining: current.deadline
+        ? Math.max(0, Math.ceil((current.deadline - Date.now()) / 1000))
+        : current.remaining,
+      deadline: null,
+    });
+    const saved = await saveSession(current);
+    settling.current = false;
+    if (saved) {
+      setTimer({ ...freshTimer, task: current.task });
+      chime();
+    }
+  };
+  const clock = `${Math.floor(timer.remaining / 60)
+    .toString()
+    .padStart(2, "0")}:${(timer.remaining % 60).toString().padStart(2, "0")}`;
+
+  return (
+    <main
+      data-ready={timerReady}
+      className={`todo-root ${reduced ? "reduce-motion" : ""}`}
+    >
+      <div className="scroll-runway" aria-hidden="true" />
+      <div className="viewport">
+        <div
+          className={`character-stage ${panel ? "stage-resting" : ""}`}
+          onClick={() => {
+            if (reduced) return;
+            doBlink();
+            setReaction("giggle");
+            setTimeout(() => setReaction(null), 500);
+          }}
+        >
+          <div
+            className="character-layer"
+            style={{
+              transform: `translateY(${-progress * 100}%)`,
+              visibility: progress >= 1 ? "hidden" : "visible",
+            }}
+          >
+            <Face
+              pointer={pointer}
+              reduced={reduced}
+              reaction={reaction}
+              blinking={blink}
+            />
+          </div>
+          <div
+            className="character-layer"
+            style={{
+              transform: `translateY(${(1 - progress) * 100}%)`,
+              visibility: progress <= 0 ? "hidden" : "visible",
+            }}
+          >
+            <Face
+              pointer={pointer}
+              reduced={reduced}
+              reaction={reaction}
+              blinking={blink}
+              female
+            />
+          </div>
+        </div>
+        <div
+          className="handoff"
+          style={{
+            opacity: reduced
+              ? 0
+              : Math.max(0, 1 - Math.abs(progress - 0.5) * 2.2),
+            top: `${72 - progress * 42}%`,
+            transform: `translate(-50%,-50%) rotate(${progress * 25 - 12}deg)`,
+          }}
+        >
+          <Flower />
+        </div>
+        <header className="home-header">
+          <a href="/" className="wordmark" aria-label="Todo home">
+            todo<span>•</span>
+          </a>
+          <div className="header-actions">
+            <span className="character-caption">your penguin, your pace</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Open settings"
+              className="settings-trigger"
+              disabled={!timerReady}
+              onClick={() => choose("settings")}
+            >
+              <Settings2 size={19} />
+            </Button>
+          </div>
+        </header>
+        {greeting && !panel ? (
+          <div className="greeting" role="status">
+            Ready when you are.
+          </div>
+        ) : null}
+        {timer.started && !panel ? (
+          <button className="session-chip" onClick={() => choose("solo")}>
+            <span className={timer.deadline ? "live-dot" : ""} />
+            <Headphones size={15} />
+            <strong>{clock}</strong>
+            <span>
+              {timer.phase === "break"
+                ? "A little break"
+                : timer.deadline
+                  ? "You’re making progress"
+                  : "Paused, no rush"}
+            </span>
+            <ArrowRight size={14} />
+          </button>
+        ) : null}
+        <section
+          className="choice-section"
+          aria-label="What would you like to do?"
+        >
+          <div className="choice-row">
+            {choices.map(({ id, label, description, icon: Icon }, i) => (
+              <button
+                key={id}
+                ref={(node) => {
+                  cards.current[i] = node;
+                }}
+                disabled={!timerReady}
+                className={`choice-card ${id === "solo" ? "primary-choice" : ""}`}
+                onPointerEnter={() => setReaction(id)}
+                onPointerLeave={() => setReaction(null)}
+                onFocus={() => setReaction(id)}
+                onBlur={() => setReaction(null)}
+                onClick={() => choose(id)}
+              >
+                <div className="choice-top">
+                  <Icon size={25} strokeWidth={1.55} />
+                  <ArrowRight className="choice-arrow" size={18} />
+                </div>
+                <h1>
+                  {label}
+                  {id === "solo" ? <span className="orange-dot" /> : null}
+                </h1>
+                <p>{description}</p>
+              </button>
+            ))}
+          </div>
+          <button className="character-switch" onClick={switchCharacter}>
+            {female ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+            <span>
+              {female ? "Scroll up to meet him" : "Scroll to meet her"}
+            </span>
+            <span className="switch-divider">·</span>
+            <span className="switch-caption">or click to switch</span>
+          </button>
+        </section>
+        <footer className="home-footer">
+          <span>A little company. A little progress.</span>
+          <button disabled={!timerReady} onClick={() => choose("notes")}>
+            <FileText size={13} />
+            Your notes
+          </button>
+        </footer>
+      </div>
+
+      <Dialog
+        open={panel === "solo"}
+        onOpenChange={(open) => {
+          if (!open) setPanel(null);
+        }}
+      >
+        <DialogContent className="todo-dialog focus-dialog">
+          <DialogHeader>
+            <div className="dialog-eyebrow">
+              <Headphones size={16} /> A moment for you
+            </div>
+            <DialogTitle>
+              {timer.phase === "break"
+                ? "Take a little breather."
+                : "Let’s do one small thing."}
+            </DialogTitle>
+            <DialogDescription>
+              {timer.phase === "break"
+                ? "Stretch, get some water, or give your penguin a little run."
+                : "No perfect plan needed. Just a place to begin."}
+            </DialogDescription>
+          </DialogHeader>
+          {loadError ? (
+            <div className="inline-warning">
+              {loadError}
+              <button onClick={load}>Retry</button>
+            </div>
+          ) : null}
+          <div className="focus-clock">
+            <span>{clock}</span>
+            <small>
+              {timer.phase === "break"
+                ? "break time"
+                : timer.deadline
+                  ? "one little step at a time"
+                  : "your time, your pace"}
+            </small>
+          </div>
+          {!timer.started && timer.phase === "focus" ? (
+            <div className="duration-picker" aria-label="Focus duration">
+              {[15, 25, 45].map((m) => (
+                <Button
+                  key={m}
+                  variant={minutes === m ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setMinutes(m);
+                    setTimer((t) => ({
+                      ...t,
+                      remaining: m * 60,
+                      duration: m * 60,
+                    }));
+                  }}
+                >
+                  {m} min
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {timer.phase === "focus" ? (
+            <div className="space-y-2">
+              <Label htmlFor="session-task">What are you working on?</Label>
+              <Input
+                id="session-task"
+                placeholder="Something small is a good start…"
+                maxLength={180}
+                value={timer.task}
+                disabled={timer.started}
+                onChange={(e) =>
+                  setTimer((t) => ({ ...t, task: e.target.value }))
+                }
+              />
+            </div>
+          ) : null}
+          <div className="flex justify-center gap-2">
+            <Button size="lg" className="warm-button" onClick={start}>
+              {timer.deadline ? <Pause size={17} /> : <Play size={17} />}{" "}
+              {timer.deadline
+                ? "Pause"
+                : timer.started
+                  ? "Keep going"
+                  : timer.phase === "break"
+                    ? "Start break"
+                    : "Start focusing"}
+            </Button>
+            {timer.started ? (
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={
+                  timer.phase === "focus"
+                    ? finish
+                    : () => {
+                        setTimer({ ...freshTimer, task: timer.task });
+                        setRace(false);
+                      }
+                }
+              >
+                <CheckCheck size={17} />
+                {timer.phase === "break" ? "Back to focus" : "Finish"}
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              aria-label="Reset timer"
+              onClick={() => {
+                setTimer({
+                  ...freshTimer,
+                  task: timer.task,
+                  remaining: minutes * 60,
+                  duration: minutes * 60,
+                });
+                setRace(false);
+              }}
+            >
+              <RotateCcw size={17} />
+            </Button>
+          </div>
+          {timer.phase === "break" ? (
+            <div className="break-play">
+              <p>Your penguin’s little victory lap</p>
+              <div className="race-track">
+                <span style={{ left: `${Math.min(88, raceScore * 4)}%` }}>
+                  🐧
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRace(true);
+                  setRaceScore((s) => Math.min(22, s + 1));
+                }}
+              >
+                {raceScore >= 22
+                  ? "Made it! Nicely waddled."
+                  : race
+                    ? "Tap to waddle!"
+                    : "Let’s waddle"}
+              </Button>
+            </div>
+          ) : (
+            <div className="task-section">
+              <div className="section-label">
+                <span>Your little list</span>
+                <button onClick={() => setPanel("history")}>
+                  <History size={13} />
+                  History
+                </button>
+              </div>
+              <form onSubmit={addTask} className="task-form">
+                <Input
+                  value={taskDraft}
+                  onChange={(e) => setTaskDraft(e.target.value)}
+                  placeholder="Add a little thing to do"
+                  maxLength={180}
+                  aria-label="New task"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={saving || !taskDraft.trim()}
+                  aria-label="Add task"
+                >
+                  {saving ? <Loader2 className="animate-spin" /> : <Plus />}
+                </Button>
+              </form>
+              <div className="task-list">
+                {tasks.length ? (
+                  tasks.map((task) => (
+                    <div className="task-row" key={task.id}>
+                      <Checkbox
+                        aria-label={`Complete ${task.title}`}
+                        checked={task.done}
+                        onCheckedChange={() => toggleTask(task)}
+                      />
+                      <button
+                        className={task.done ? "task-done" : ""}
+                        disabled={timer.started || task.done}
+                        onClick={() =>
+                          setTimer((t) => ({ ...t, task: task.title }))
+                        }
+                      >
+                        {task.title}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`Delete ${task.title}`}
+                        onClick={() => removeTask(task)}
+                      >
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="quiet-empty">
+                    A clear little space. Add your first task above.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          <p className="dialog-footnote">
+            You can close this panel. Your timer will stay with you.
+          </p>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={panel === "agent"}
+        onOpenChange={(open) => {
+          if (!open) setPanel(null);
+        }}
+      >
+        <DialogContent className="todo-dialog agent-dialog">
+          <AgentPanel
+            connection={connection}
+            onSave={(note) => setNotes((ns) => [note, ...ns])}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={panel === "friends"}
+        onOpenChange={(open) => {
+          if (!open) setPanel(null);
+        }}
+      >
+        <DialogContent className="todo-dialog">
+          <DialogHeader>
+            <div className="dialog-eyebrow">
+              <Users size={16} /> Better together
+            </div>
+            <DialogTitle>A seat for your friends.</DialogTitle>
+            <DialogDescription>
+              One cozy room. Your own work. Real conversations.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="friends-preview" aria-hidden="true">
+            <span>🐧</span>
+            <span>🐧</span>
+            <span className="empty-seat">+</span>
+          </div>
+          <div className="coming-note">
+            <span className="tiny-tag">Next chapter</span>
+            <h3>We’re getting the room ready.</h3>
+            <p>
+              Private invites, microphone chat, shared breaks, and penguin races
+              will live here. This first version is your solo space.
+            </p>
+          </div>
+          <Button className="warm-button" onClick={() => choose("solo")}>
+            Focus with Todo for now <ArrowRight size={16} />
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={panel === "settings"}
+        onOpenChange={(open) => {
+          if (!open) setPanel(null);
+        }}
+      >
+        <DialogContent className="todo-dialog">
+          <DialogHeader>
+            <div className="dialog-eyebrow">
+              <Settings2 size={16} /> Make yourself comfortable
+            </div>
+            <DialogTitle>Your little preferences.</DialogTitle>
+            <DialogDescription>
+              A few ways to make Todo feel like you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="setting-row">
+            <div>
+              <Label htmlFor="motion">Gentler motion</Label>
+              <p>Turn off cursor warping and extra movement.</p>
+            </div>
+            <Switch
+              id="motion"
+              checked={reduced}
+              onCheckedChange={setReduced}
+            />
+          </div>
+          <div className="setting-row">
+            <div>
+              <Label htmlFor="sounds">Little sound effects</Label>
+              <p>A quiet chime for starts and small wins.</p>
+            </div>
+            <Switch id="sounds" checked={sound} onCheckedChange={setSound} />
+          </div>
+          <div className="setting-row">
+            <div>
+              <Label>Your companion</Label>
+              <p>
+                {female
+                  ? "Her turn to keep you company."
+                  : "His turn to keep you company."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPanel(null);
+                switchCharacter();
+              }}
+            >
+              Switch <ChevronDown size={14} />
+            </Button>
+          </div>
+          <div className="connection-box">
+            <div>
+              <Sparkles size={16} />
+              <strong>
+                {connection?.ai
+                  ? `${connection.provider} connected`
+                  : "AI connection waiting"}
+              </strong>
+            </div>
+            <p>
+              {connection?.ai
+                ? "Your API key is kept on the server, never in the browser."
+                : "Focus, notes, and PDF export work now. AI needs a private server connection before it can answer."}
+            </p>
+          </div>
+          <Button variant="ghost" onClick={() => setPanel("history")}>
+            <History size={15} />
+            View focus history
+          </Button>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={panel === "notes"}
+        onOpenChange={(open) => {
+          if (!open) setPanel(null);
+        }}
+      >
+        <DialogContent className="todo-dialog notes-dialog">
+          <NotesPanel notes={notes} setNotes={setNotes} />
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={panel === "history"}
+        onOpenChange={(open) => {
+          if (!open) setPanel(null);
+        }}
+      >
+        <DialogContent className="todo-dialog">
+          <DialogHeader>
+            <div className="dialog-eyebrow">
+              <History size={16} /> Little proof of progress
+            </div>
+            <DialogTitle>You showed up.</DialogTitle>
+            <DialogDescription>
+              Every small session counts. No streaks to keep.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="history-summary">
+            <strong>
+              {Math.round(sessions.reduce((sum, s) => sum + s.seconds, 0) / 60)}
+            </strong>
+            <span>minutes of showing up</span>
+          </div>
+          <div className="history-list">
+            {sessions.length ? (
+              sessions.map((s) => (
+                <div className="history-item" key={s.id}>
+                  <Check size={17} />
+                  <div>
+                    <strong>{s.task}</strong>
+                    <p>
+                      {new Date(s.createdAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}{" "}
+                      · {Math.max(1, Math.round(s.seconds / 60))} min
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="quiet-empty">
+                Your first little win will appear here after a focus session.
+              </p>
+            )}
+          </div>
+          <Button variant="outline" onClick={() => choose("solo")}>
+            <ArrowLeft size={15} />
+            Back to focus
+          </Button>
+        </DialogContent>
+      </Dialog>
+      <Toaster position="top-center" theme="light" richColors />
+    </main>
+  );
+}
+
+function AgentPanel({
+  connection,
+  onSave,
+}: {
+  connection: Connection | null;
+  onSave: (note: Note) => void;
+}) {
+  const [mode, setMode] = useState("chat"),
+    [draft, setDraft] = useState(""),
+    [messages, setMessages] = useState<Message[]>([]),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const [image, setImage] = useState<{ data: string; name: string } | null>(
+      null,
+    ),
+    [reading, setReading] = useState(false),
+    [exporting, setExporting] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null),
+    bottom = useRef<HTMLDivElement>(null),
+    abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "instant", block: "nearest" });
+  }, [messages, busy]);
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setError("");
+    setReading(true);
+    try {
+      if (["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+        if (file.size > 3 * 1024 * 1024)
+          throw new Error("Choose an image smaller than 3 MB.");
+        const data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Couldn’t read that image."));
+          reader.readAsDataURL(file);
+        });
+        setImage({ data, name: file.name });
+        if (!draft.trim()) setDraft("Help me understand this image.");
+      } else if (/\.(txt|md)$/i.test(file.name)) {
+        if (file.size > 70000)
+          throw new Error("Choose a text file smaller than 70 KB.");
+        const text = await file.text();
+        if (text.length > 18000)
+          throw new Error(
+            "This file is a little long. Try a shorter section (under 18,000 characters).",
+          );
+        setDraft(`Here is ${file.name}:\n\n${text}`);
+      } else throw new Error("Choose a PNG, JPG, WebP, TXT, or Markdown file.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn’t read that file.");
+    } finally {
+      setReading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  };
+  const send = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!draft.trim() || busy) return;
+    setError("");
+    const user: Message = {
+      role: "user",
+      content: draft,
+      imageName: image?.name,
+    };
+    const next = [...messages, user];
+    setMessages(next);
+    setDraft("");
+    setBusy(true);
+    const controller = new AbortController();
+    abort.current = controller;
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          mode,
+          messages: next
+            .slice(-20)
+            .map(({ role, content }) => ({ role, content })),
+          image: image?.data,
+        }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        text: string;
+      };
+      if (!response.ok)
+        throw new Error(result.error || "Todo couldn’t answer this time.");
+      setMessages((m) => [...m, { role: "assistant", content: result.text }]);
+      setImage(null);
+    } catch (e) {
+      if (controller.signal.aborted)
+        setError("Stopped. You can edit your message and try again.");
+      else setError(e instanceof Error ? e.message : "Couldn’t connect.");
+      setMessages(messages);
+      setDraft(user.content);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = async (message: Message) => {
+    try {
+      const note = await api<Note>("/api/notes", "POST", {
+        title:
+          message.content
+            .split("\n")[0]
+            .replace(/^#+\s*/, "")
+            .slice(0, 100) || "A note from Todo",
+        content: message.content,
+      });
+      onSave(note);
+      toast.success("Saved in your notes.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn’t save.");
+    }
+  };
+  const download = async (message: Message) => {
+    setExporting(true);
+    try {
+      await exportPDF("Notes from Todo", message.content);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn’t export.");
+    } finally {
+      setExporting(false);
+    }
+  };
+  return (
+    <>
+      <DialogHeader>
+        <div className="dialog-eyebrow">
+          <Sparkles size={16} /> A little help, whenever you need it
+        </div>
+        <DialogTitle>What’s on your mind?</DialogTitle>
+        <DialogDescription>
+          Make notes, find the main idea, or talk it through.
+        </DialogDescription>
+      </DialogHeader>
+      <Tabs value={mode} onValueChange={setMode}>
+        <TabsList className="agent-tabs">
+          {[
+            ["chat", "Chat"],
+            ["notes", "Make notes"],
+            ["summarize", "Summarize"],
+            ["explain", "Explain"],
+          ].map(([id, label]) => (
+            <TabsTrigger key={id} value={id} disabled={busy}>
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {!connection?.ai ? (
+        <div className="ai-notice">
+          <CircleHelp size={16} />
+          <p>
+            The AI connection isn’t set up yet. You can explore this workspace;
+            answers will be available once a private API key is connected.
+          </p>
+        </div>
+      ) : (
+        <div className="connection-status">
+          <span className="live-dot" />
+          {connection.provider} · connected
+        </div>
+      )}
+      <div className="conversation" aria-live="polite">
+        {!messages.length ? (
+          <div className="agent-empty">
+            <div className="empty-spark">
+              <Sparkles size={26} />
+            </div>
+            <h3>A second pair of flippers.</h3>
+            <p>Bring your notes, a question, or something you’re stuck on.</p>
+            <div className="prompt-chips">
+              {[
+                "Help me plan a study session",
+                "Turn my text into clear notes",
+                "Explain something step by step",
+              ].map((prompt) => (
+                <button key={prompt} onClick={() => setDraft(prompt)}>
+                  {prompt}
+                  <ArrowUp size={12} />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          messages.map((m, i) => (
+            <div className={`chat-message ${m.role}`} key={i}>
+              <span className="message-who">
+                {m.role === "user" ? "You" : "Todo"}
+              </span>
+              {m.imageName ? (
+                <small className="image-label">
+                  <ImagePlus size={12} />
+                  {m.imageName}
+                </small>
+              ) : null}
+              <p>{m.content}</p>
+              {m.role === "assistant" ? (
+                <div className="message-actions">
+                  <Button variant="ghost" size="xs" onClick={() => save(m)}>
+                    <FileText size={12} />
+                    Save note
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={exporting}
+                    onClick={() => download(m)}
+                  >
+                    <Download size={12} />
+                    PDF
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))
+        )}
+        {busy ? (
+          <div className="thinking">
+            <Loader2 className="animate-spin" size={16} />
+            Todo is thinking…
+            <button onClick={() => abort.current?.abort()}>Stop</button>
+          </div>
+        ) : null}
+        <div ref={bottom} />
+      </div>
+      {error ? (
+        <div className="inline-warning" role="alert">
+          {error}
+        </div>
+      ) : null}
+      <form onSubmit={send} className="composer">
+        {image ? (
+          <div className="image-attachment">
+            <ImagePlus size={13} />
+            <span>{image.name}</span>
+            <button
+              type="button"
+              onClick={() => setImage(null)}
+              aria-label="Remove attached image"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ) : null}
+        <Textarea
+          aria-label="Message Todo"
+          placeholder={
+            mode === "chat"
+              ? "Tell Todo what you need a hand with…"
+              : "Paste your text, or attach a file…"
+          }
+          value={draft}
+          maxLength={20000}
+          disabled={busy}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
+        />
+        <div className="composer-controls">
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".txt,.md,image/png,image/jpeg,image/webp"
+            className="sr-only"
+            aria-label="Attach text or image"
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={busy || reading}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Plus size={16} />
+            {reading ? "Reading…" : "Attach"}
+          </Button>
+          <span>⌘ / Ctrl + Enter</span>
+          <Button
+            className="warm-button"
+            size="sm"
+            disabled={!draft.trim() || busy || reading}
+          >
+            {busy ? (
+              <Loader2 className="animate-spin" size={15} />
+            ) : (
+              <ArrowUp size={15} />
+            )}
+            Send
+          </Button>
+        </div>
+      </form>
+      <p className="dialog-footnote">
+        Only what you send goes to the AI. Double-check important answers.
+      </p>
+    </>
+  );
+}
+
+function NotesPanel({
+  notes,
+  setNotes,
+}: {
+  notes: Note[];
+  setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
+}) {
+  const [title, setTitle] = useState(""),
+    [content, setContent] = useState(""),
+    [busy, setBusy] = useState(false),
+    [exporting, setExporting] = useState(false);
+  const save = async () => {
+    if (!title.trim() || !content.trim()) return;
+    setBusy(true);
+    try {
+      const note = await api<Note>("/api/notes", "POST", { title, content });
+      setNotes((ns) => [note, ...ns]);
+      toast.success("A little thought, safely kept.");
+      setTitle("");
+      setContent("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn’t save.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const download = async () => {
+    setExporting(true);
+    try {
+      await exportPDF(title || "My Todo notes", content);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn’t export.");
+    } finally {
+      setExporting(false);
+    }
+  };
+  return (
+    <>
+      <DialogHeader>
+        <div className="dialog-eyebrow">
+          <FileText size={16} /> A place for your thoughts
+        </div>
+        <DialogTitle>Your little notebook.</DialogTitle>
+        <DialogDescription>
+          Write something down, keep it, or take it with you as a PDF.
+        </DialogDescription>
+      </DialogHeader>
+      <Tabs defaultValue="write">
+        <TabsList>
+          <TabsTrigger value="write">Write a note</TabsTrigger>
+          <TabsTrigger value="saved">Saved notes ({notes.length})</TabsTrigger>
+        </TabsList>
+        <TabsContent value="write" className="note-editor">
+          <Label htmlFor="note-title">Title</Label>
+          <Input
+            id="note-title"
+            value={title}
+            maxLength={160}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Give your thought a name"
+          />
+          <Label htmlFor="note-content">Your notes</Label>
+          <Textarea
+            id="note-content"
+            value={content}
+            maxLength={50000}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Start anywhere…"
+            className="note-textarea"
+          />
+          <div className="flex gap-2">
+            <Button
+              className="warm-button"
+              disabled={busy || !title.trim() || !content.trim()}
+              onClick={save}
+            >
+              {busy ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Check size={15} />
+              )}
+              Save note
+            </Button>
+            <Button
+              variant="outline"
+              disabled={exporting || !content.trim()}
+              onClick={download}
+            >
+              <Download size={15} />
+              {exporting ? "Making PDF…" : "Export PDF"}
+            </Button>
+          </div>
+        </TabsContent>
+        <TabsContent value="saved">
+          <div className="saved-notes">
+            {notes.length ? (
+              notes.map((note) => (
+                <div className="saved-note" key={note.id}>
+                  <button
+                    onClick={() => {
+                      setTitle(note.title);
+                      setContent(note.content);
+                      toast("Loaded into the Write a note tab.");
+                    }}
+                  >
+                    <strong>{note.title}</strong>
+                    <p>{note.content.slice(0, 110)}</p>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Delete note ${note.title}`}
+                    onClick={async () => {
+                      try {
+                        await api("/api/notes", "DELETE", { id: note.id });
+                        setNotes((ns) => ns.filter((n) => n.id !== note.id));
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Couldn’t delete.",
+                        );
+                      }
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="quiet-empty">Your notes will find a home here.</p>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </>
+  );
+}
