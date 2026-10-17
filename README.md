@@ -4,10 +4,11 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 
 ## Start here
 
-- **Focus solo:** add tasks, choose 15/25/45 minutes, pause, resume, and save your progress. The timer continues when you close the panel or refresh.
+- **One shared workspace:** all three home choices enter the same room, with your selected penguin sitting across the desk, a laptop, coffee with rising steam, and a physical-looking live clock. Companion and Agent are modes in this room; closing a tool leaves the room in place.
+- **Focus solo:** set your intention and start on the desk, or open Focus & tasks to add tasks, choose 15/25/45 minutes, pause, resume, and save progress. The timer continues when you close a tool or refresh.
 - **Ask Todo:** chat, make notes, summarize text, or ask about an image once an AI provider is connected. Attach `.txt`, `.md`, PNG, JPEG, or WebP files. Image input needs a vision-capable model.
 - **Your notes:** write and save notes and download real multi-page PDFs. This works without AI.
-- **Choose your companion:** scroll between the penguins or click the switch hint. A flower passes between them during scrolling. Your choice is remembered.
+- **Choose your companion:** scroll between the penguins or click the switch hint. Each character has its own choice cards. They fade away during the flower handoff, then return for the other character. Blue and pink headbands distinguish the companions. Booping their beaks triggers a wink and peace gesture. Your choice is remembered.
 - **Settings:** turn on sound effects or gentler motion.
 
 Friends, microphone chat, and synchronized rooms are the next stage. The Friends panel says this explicitly. Games are on hold: there is no race or other game in this version. Breaks are simple rest periods; game ideas will be revisited later.
@@ -15,7 +16,7 @@ Friends, microphone chat, and synchronized rooms are the next stage. The Friends
 ## The process, in plain language
 
 1. **Frontend:** what you see and click. React displays the penguin, and shadcn supplies accessible buttons, dialogs, inputs, tabs, checkboxes, and switches.
-2. **Animation:** the eyes are separate moving pieces, the face has a small WebGL lens effect around your cursor, and scrolling moves the characters through the flower handoff. The text and panels stay crisp.
+2. **Animation:** the eyes are separate moving pieces, the face has a small WebGL lens effect around your cursor, and scrolling moves the characters through the flower handoff. The text stays crisp. Scroll damping uses elapsed time, so the handoff timing stays consistent across frame rates. Choices are inaccessible during the transfer; gentler motion replaces the story with a simple dissolve.
 3. **Backend:** a private part of the website receives requests. It checks who is signed in and validates the request before saving anything or asking the AI.
 4. **Database:** Cloudflare D1 keeps tasks, notes, and focus history, with every query restricted to the signed-in owner. Device preferences and the active timer use versioned local storage.
 5. **AI API:** our backend sends a message to an existing model and returns its reply. We do not train our own model. The API key stays on the server. The model can read submitted text and, when enabled, images; it cannot operate other apps or browse the web.
@@ -66,12 +67,14 @@ npm run test:e2e
 npm run build
 ```
 
-Tests cover pointer tracking, glass hover, scroll selection and reload persistence, task CRUD, timer pause/resume and history, note persistence, a real multi-page PDF download, uploads, unavailable-AI errors and draft preservation, anonymous/forged-identity rejection, cross-origin rejection, input validation, reduced motion, settings, and mobile controls. Mocked provider tests verify image/text transport and failure handling; a mocked browser reply verifies saving an AI answer as a note. They do not claim that a live provider or model quality has been tested.
+Tests cover pointer tracking, glass hover, scroll selection and reload persistence, task CRUD, timer pause/resume and history, note persistence, a real multi-page PDF download, uploads, unavailable-AI errors and draft preservation, anonymous/forged-identity rejection, cross-origin rejection, input validation, reduced motion, settings, and mobile controls. Additional checks verify card disappearance during transfer, both visible handoff flippers, wink reactions, a stationary room across repeated panel changes, shared timers, and background AI work surviving a panel close. Mocked provider tests verify image/text transport and failure handling; a mocked browser reply verifies saving an AI answer as a note. They do not claim that a live provider or model quality has been tested.
 
 ## Files to change
 
 - `components/todo/todo-app.tsx`: screen choices and focus, notes, AI, history, and settings panels.
-- `components/todo/face.tsx`: animated eyes, face lens shader, flower and flippers.
+- `components/todo/face.tsx`: animated eyes, face lens shader, character accessories and reactions.
+- `components/todo/welcome.tsx`: character-specific choice panels and the scroll-controlled flower handoff.
+- `components/todo/study-room.tsx`: the shared desk scene, companion animation, live clock, and tool dock.
 - `app/globals.css`: typography, glass materials, spacing, transitions, and responsive layouts.
 - `app/api/`: authenticated tasks, notes, sessions, status, and assistant endpoints.
 - `lib/todo/ai.ts`: model connection and assistant instructions.

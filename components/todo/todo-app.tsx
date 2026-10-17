@@ -8,7 +8,6 @@ import {
   type FormEvent,
 } from "react";
 import {
-  ArrowDown,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
@@ -48,7 +47,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import { Face, Flower, type MotionPoint } from "./face";
+import type { MotionPoint } from "./face";
+import { Welcome, type Panel } from "./welcome";
+import { StudyRoom } from "./study-room";
 import {
   api,
   exportPDF,
@@ -58,8 +59,6 @@ import {
   type Connection,
 } from "@/lib/todo/client";
 
-type Panel =
-  "solo" | "friends" | "agent" | "settings" | "notes" | "history" | null;
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -83,27 +82,6 @@ const freshTimer: Timer = {
   started: false,
   id: "",
 };
-const choices = [
-  {
-    id: "solo",
-    label: "Focus solo",
-    description: "One thing at a time.",
-    icon: Headphones,
-  },
-  {
-    id: "friends",
-    label: "Join friends",
-    description: "Good company. Same room.",
-    icon: Users,
-  },
-  {
-    id: "agent",
-    label: "Ask Todo",
-    description: "A little help goes a long way.",
-    icon: Sparkles,
-  },
-] as const;
-
 export default function TodoApp() {
   const [panel, setPanel] = useState<Panel>(null),
     [female, setFemale] = useState(false),
@@ -123,6 +101,10 @@ export default function TodoApp() {
     [minutes, setMinutes] = useState(25),
     [taskDraft, setTaskDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [inRoom, setInRoom] = useState(false),
+    [agentMode, setAgentMode] = useState(false),
+    [agentBusy, setAgentBusy] = useState(false);
+  const smoothProgress = useRef(0);
   const pointer = useRef<MotionPoint>({ x: 0, y: 0, active: false }),
     cards = useRef<(HTMLButtonElement | null)[]>([]),
     timerRef = useRef(timer),
@@ -174,8 +156,12 @@ export default function TodoApp() {
         (!saved.deadline || Number.isFinite(saved.deadline))
       )
         setTimer(saved);
-      if (localStorage.getItem("todo.character.v1") === "female")
+      if (localStorage.getItem("todo.character.v1") === "female") {
+        smoothProgress.current = 1;
+        setProgress(1);
+        setFemale(true);
         window.scrollTo({ top: window.innerHeight });
+      }
     } catch {}
     hydrated.current = true;
     setTimerReady(true);
@@ -204,24 +190,38 @@ export default function TodoApp() {
       } catch {}
   }, [timer, timerReady]);
   useEffect(() => {
-    let raf = 0;
-    const scroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        const p = Math.max(0, Math.min(1, window.scrollY / window.innerHeight));
-        setProgress(p);
-        setFemale(p >= 0.5);
+    let raf = 0,
+      target = smoothProgress.current,
+      last = performance.now();
+    const animate = (now: number) => {
+      const blend = 1 - Math.exp(-(now - last) / 70);
+      last = now;
+      const value = reduced
+        ? target
+        : smoothProgress.current + (target - smoothProgress.current) * blend;
+      const p = Math.abs(target - value) < 0.0005 ? target : value;
+      smoothProgress.current = p;
+      setProgress(p);
+      setFemale(p >= 0.5);
+      if (p === 0 || p === 1)
         try {
           localStorage.setItem(
             "todo.character.v1",
-            p >= 0.5 ? "female" : "male",
+            p === 1 ? "female" : "male",
           );
         } catch {}
-        raf = 0;
-      });
+      raf = p === target ? 0 : requestAnimationFrame(animate);
+    };
+    const scroll = () => {
+      target = Math.max(0, Math.min(1, window.scrollY / window.innerHeight));
+      if (!raf) {
+        last = performance.now();
+        raf = requestAnimationFrame(animate);
+      }
     };
     const move = (event: PointerEvent) => {
       pointer.current = { x: event.clientX, y: event.clientY, active: true };
+      if (inRoom) return;
       cards.current.forEach((card) => {
         if (!card) return;
         const r = card.getBoundingClientRect(),
@@ -245,7 +245,7 @@ export default function TodoApp() {
       document.removeEventListener("pointerleave", leave);
       cancelAnimationFrame(raf);
     };
-  }, [reduced]);
+  }, [reduced, inRoom]);
   const doBlink = useCallback(() => {
     setBlink(true);
     if (blinkTimeout.current) clearTimeout(blinkTimeout.current);
@@ -333,15 +333,34 @@ export default function TodoApp() {
           toast.success("Ready for another little step?");
         }
         chime();
+        setInRoom(true);
         setPanel("solo");
       } else setTimer({ ...current, remaining });
     }, 250);
     return () => clearInterval(id);
   }, [timerReady, saveSession, chime]);
+  useEffect(() => {
+    if (!inRoom) return;
+    const previous = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = previous;
+    };
+  }, [inRoom]);
   const choose = (id: Panel) => {
     setReaction(null);
     setGreeting(false);
-    setPanel(id);
+    if (id === "solo" || id === "agent" || id === "friends") {
+      setInRoom(true);
+      if (id === "agent") setAgentMode(true);
+      setPanel(id === "solo" ? null : id);
+    } else setPanel(id);
+    chime();
+  };
+  const boop = () => {
+    if (reduced) return;
+    setReaction("peace");
+    setTimeout(() => setReaction(null), 1400);
     chime();
   };
   const switchCharacter = () =>
@@ -433,147 +452,57 @@ export default function TodoApp() {
   return (
     <main
       data-ready={timerReady}
-      className={`todo-root ${reduced ? "reduce-motion" : ""}`}
+      className={`todo-root ${reduced ? "reduce-motion" : ""} ${inRoom ? "room-active" : ""}`}
     >
       <div className="scroll-runway" aria-hidden="true" />
-      <div className="viewport">
-        <div
-          className={`character-stage ${panel ? "stage-resting" : ""}`}
-          onClick={() => {
-            if (reduced) return;
-            doBlink();
-            setReaction("giggle");
-            setTimeout(() => setReaction(null), 500);
-          }}
-        >
-          <div
-            className="character-layer"
-            style={{
-              transform: `translateY(${-progress * 100}%)`,
-              visibility: progress >= 1 ? "hidden" : "visible",
-            }}
-          >
-            <Face
-              pointer={pointer}
-              reduced={reduced}
-              reaction={reaction}
-              blinking={blink}
-            />
-          </div>
-          <div
-            className="character-layer"
-            style={{
-              transform: `translateY(${(1 - progress) * 100}%)`,
-              visibility: progress <= 0 ? "hidden" : "visible",
-            }}
-          >
-            <Face
-              pointer={pointer}
-              reduced={reduced}
-              reaction={reaction}
-              blinking={blink}
-              female
-            />
-          </div>
-        </div>
-        <div
-          className="handoff"
-          style={{
-            opacity: reduced
-              ? 0
-              : Math.max(0, 1 - Math.abs(progress - 0.5) * 2.2),
-            top: `${72 - progress * 42}%`,
-            transform: `translate(-50%,-50%) rotate(${progress * 25 - 12}deg)`,
-          }}
-        >
-          <Flower />
-        </div>
-        <header className="home-header">
-          <a href="/" className="wordmark" aria-label="Todo home">
-            todo<span>•</span>
-          </a>
-          <div className="header-actions">
-            <span className="character-caption">your penguin, your pace</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Open settings"
-              className="settings-trigger"
-              disabled={!timerReady}
-              onClick={() => choose("settings")}
-            >
-              <Settings2 size={19} />
-            </Button>
-          </div>
-        </header>
-        {greeting && !panel ? (
-          <div className="greeting" role="status">
-            Ready when you are.
-          </div>
-        ) : null}
-        {timer.started && !panel ? (
-          <button className="session-chip" onClick={() => choose("solo")}>
-            <span className={timer.deadline ? "live-dot" : ""} />
-            <Headphones size={15} />
-            <strong>{clock}</strong>
-            <span>
-              {timer.phase === "break"
-                ? "A little break"
-                : timer.deadline
-                  ? "You’re making progress"
-                  : "Paused, no rush"}
-            </span>
-            <ArrowRight size={14} />
-          </button>
-        ) : null}
-        <section
-          className="choice-section"
-          aria-label="What would you like to do?"
-        >
-          <div className="choice-row">
-            {choices.map(({ id, label, description, icon: Icon }, i) => (
-              <button
-                key={id}
-                ref={(node) => {
-                  cards.current[i] = node;
-                }}
-                disabled={!timerReady}
-                className={`choice-card ${id === "solo" ? "primary-choice" : ""}`}
-                onPointerEnter={() => setReaction(id)}
-                onPointerLeave={() => setReaction(null)}
-                onFocus={() => setReaction(id)}
-                onBlur={() => setReaction(null)}
-                onClick={() => choose(id)}
-              >
-                <div className="choice-top">
-                  <Icon size={25} strokeWidth={1.55} />
-                  <ArrowRight className="choice-arrow" size={18} />
-                </div>
-                <h1>
-                  {label}
-                  {id === "solo" ? <span className="orange-dot" /> : null}
-                </h1>
-                <p>{description}</p>
-              </button>
-            ))}
-          </div>
-          <button className="character-switch" onClick={switchCharacter}>
-            {female ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-            <span>
-              {female ? "Scroll up to meet him" : "Scroll to meet her"}
-            </span>
-            <span className="switch-divider">·</span>
-            <span className="switch-caption">or click to switch</span>
-          </button>
-        </section>
-        <footer className="home-footer">
-          <span>A little company. A little progress.</span>
-          <button disabled={!timerReady} onClick={() => choose("notes")}>
-            <FileText size={13} />
-            Your notes
-          </button>
-        </footer>
-      </div>
+      <Welcome
+        progress={progress}
+        female={female}
+        reduced={reduced}
+        ready={timerReady}
+        pointer={pointer}
+        reaction={reaction}
+        blink={blink}
+        greeting={greeting && !panel}
+        active={!inRoom}
+        cards={cards}
+        onChoose={choose}
+        onSwitch={switchCharacter}
+        onReaction={setReaction}
+        onBoop={boop}
+        timer={{
+          started: timer.started,
+          clock,
+          running: Boolean(timer.deadline),
+        }}
+      />
+      <StudyRoom
+        active={inRoom}
+        female={female}
+        reduced={reduced}
+        clock={clock}
+        running={Boolean(timer.deadline)}
+        started={timer.started}
+        task={timer.task}
+        phase={timer.phase}
+        agentBusy={agentBusy}
+        agentMode={agentMode}
+        onAgentMode={(mode) => {
+          setAgentMode(mode);
+          if (!mode) setPanel(null);
+        }}
+        onTask={(task) => setTimer((t) => ({ ...t, task }))}
+        onStart={start}
+        onFinish={finish}
+        onExit={() => {
+          setPanel(null);
+          setInRoom(false);
+        }}
+        onPanel={(id) => {
+          if (id === "agent") setAgentMode(true);
+          setPanel(id);
+        }}
+      />
 
       <Dialog
         open={panel === "solo"}
@@ -762,24 +691,20 @@ export default function TodoApp() {
             </div>
           )}
           <p className="dialog-footnote">
-            You can close this panel. Your timer will stay with you.
+            Your timer and Todo stay in the room when you close this panel.
           </p>
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <AgentPanel
         open={panel === "agent"}
         onOpenChange={(open) => {
           if (!open) setPanel(null);
         }}
-      >
-        <DialogContent className="todo-dialog agent-dialog">
-          <AgentPanel
-            connection={connection}
-            onSave={(note) => setNotes((ns) => [note, ...ns])}
-          />
-        </DialogContent>
-      </Dialog>
+        connection={connection}
+        onSave={(note) => setNotes((ns) => [note, ...ns])}
+        onBusyChange={setAgentBusy}
+      />
       <Dialog
         open={panel === "friends"}
         onOpenChange={(open) => {
@@ -863,6 +788,7 @@ export default function TodoApp() {
               size="sm"
               onClick={() => {
                 setPanel(null);
+                setInRoom(false);
                 switchCharacter();
               }}
             >
@@ -891,16 +817,14 @@ export default function TodoApp() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
+      <NotesPanel
         open={panel === "notes"}
         onOpenChange={(open) => {
           if (!open) setPanel(null);
         }}
-      >
-        <DialogContent className="todo-dialog notes-dialog">
-          <NotesPanel notes={notes} setNotes={setNotes} />
-        </DialogContent>
-      </Dialog>
+        notes={notes}
+        setNotes={setNotes}
+      />
       <Dialog
         open={panel === "history"}
         onOpenChange={(open) => {
@@ -960,7 +884,13 @@ export default function TodoApp() {
 function AgentPanel({
   connection,
   onSave,
+  open,
+  onOpenChange,
+  onBusyChange,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onBusyChange: (busy: boolean) => void;
   connection: Connection | null;
   onSave: (note: Note) => void;
 }) {
@@ -978,6 +908,9 @@ function AgentPanel({
     bottom = useRef<HTMLDivElement>(null),
     abort = useRef<AbortController | null>(null);
   useEffect(() => () => abort.current?.abort(), []);
+  useEffect(() => {
+    onBusyChange(busy);
+  }, [busy, onBusyChange]);
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "instant", block: "nearest" });
   }, [messages, busy]);
@@ -1087,189 +1020,196 @@ function AgentPanel({
     }
   };
   return (
-    <>
-      <DialogHeader>
-        <div className="dialog-eyebrow">
-          <Sparkles size={16} /> A little help, whenever you need it
-        </div>
-        <DialogTitle>What’s on your mind?</DialogTitle>
-        <DialogDescription>
-          Make notes, find the main idea, or talk it through.
-        </DialogDescription>
-      </DialogHeader>
-      <Tabs value={mode} onValueChange={setMode}>
-        <TabsList className="agent-tabs">
-          {[
-            ["chat", "Chat"],
-            ["notes", "Make notes"],
-            ["summarize", "Summarize"],
-            ["explain", "Explain"],
-          ].map(([id, label]) => (
-            <TabsTrigger key={id} value={id} disabled={busy}>
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      {!connection?.ai ? (
-        <div className="ai-notice">
-          <CircleHelp size={16} />
-          <p>
-            The AI connection isn’t set up yet. You can explore this workspace;
-            answers will be available once a private API key is connected.
-          </p>
-        </div>
-      ) : (
-        <div className="connection-status">
-          <span className="live-dot" />
-          {connection.provider} · connected
-        </div>
-      )}
-      <div className="conversation" aria-live="polite">
-        {!messages.length ? (
-          <div className="agent-empty">
-            <div className="empty-spark">
-              <Sparkles size={26} />
-            </div>
-            <h3>A second pair of flippers.</h3>
-            <p>Bring your notes, a question, or something you’re stuck on.</p>
-            <div className="prompt-chips">
-              {[
-                "Help me plan a study session",
-                "Turn my text into clear notes",
-                "Explain something step by step",
-              ].map((prompt) => (
-                <button key={prompt} onClick={() => setDraft(prompt)}>
-                  {prompt}
-                  <ArrowUp size={12} />
-                </button>
-              ))}
-            </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="todo-dialog agent-dialog">
+        <DialogHeader>
+          <div className="dialog-eyebrow">
+            <Sparkles size={16} /> A little help, whenever you need it
+          </div>
+          <DialogTitle>What’s on your mind?</DialogTitle>
+          <DialogDescription>
+            Make notes, find the main idea, or talk it through.
+          </DialogDescription>
+        </DialogHeader>
+        <Tabs value={mode} onValueChange={setMode}>
+          <TabsList className="agent-tabs">
+            {[
+              ["chat", "Chat"],
+              ["notes", "Make notes"],
+              ["summarize", "Summarize"],
+              ["explain", "Explain"],
+            ].map(([id, label]) => (
+              <TabsTrigger key={id} value={id} disabled={busy}>
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        {!connection?.ai ? (
+          <div className="ai-notice">
+            <CircleHelp size={16} />
+            <p>
+              The AI connection isn’t set up yet. You can explore this
+              workspace; answers will be available once a private API key is
+              connected.
+            </p>
           </div>
         ) : (
-          messages.map((m, i) => (
-            <div className={`chat-message ${m.role}`} key={i}>
-              <span className="message-who">
-                {m.role === "user" ? "You" : "Todo"}
-              </span>
-              {m.imageName ? (
-                <small className="image-label">
-                  <ImagePlus size={12} />
-                  {m.imageName}
-                </small>
-              ) : null}
-              <p>{m.content}</p>
-              {m.role === "assistant" ? (
-                <div className="message-actions">
-                  <Button variant="ghost" size="xs" onClick={() => save(m)}>
-                    <FileText size={12} />
-                    Save note
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    disabled={exporting}
-                    onClick={() => download(m)}
-                  >
-                    <Download size={12} />
-                    PDF
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ))
+          <div className="connection-status">
+            <span className="live-dot" />
+            {connection.provider} · connected
+          </div>
         )}
-        {busy ? (
-          <div className="thinking">
-            <Loader2 className="animate-spin" size={16} />
-            Todo is thinking…
-            <button onClick={() => abort.current?.abort()}>Stop</button>
-          </div>
-        ) : null}
-        <div ref={bottom} />
-      </div>
-      {error ? (
-        <div className="inline-warning" role="alert">
-          {error}
+        <div className="conversation" aria-live="polite">
+          {!messages.length ? (
+            <div className="agent-empty">
+              <div className="empty-spark">
+                <Sparkles size={26} />
+              </div>
+              <h3>A second pair of flippers.</h3>
+              <p>Bring your notes, a question, or something you’re stuck on.</p>
+              <div className="prompt-chips">
+                {[
+                  "Help me plan a study session",
+                  "Turn my text into clear notes",
+                  "Explain something step by step",
+                ].map((prompt) => (
+                  <button key={prompt} onClick={() => setDraft(prompt)}>
+                    {prompt}
+                    <ArrowUp size={12} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            messages.map((m, i) => (
+              <div className={`chat-message ${m.role}`} key={i}>
+                <span className="message-who">
+                  {m.role === "user" ? "You" : "Todo"}
+                </span>
+                {m.imageName ? (
+                  <small className="image-label">
+                    <ImagePlus size={12} />
+                    {m.imageName}
+                  </small>
+                ) : null}
+                <p>{m.content}</p>
+                {m.role === "assistant" ? (
+                  <div className="message-actions">
+                    <Button variant="ghost" size="xs" onClick={() => save(m)}>
+                      <FileText size={12} />
+                      Save note
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      disabled={exporting}
+                      onClick={() => download(m)}
+                    >
+                      <Download size={12} />
+                      PDF
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ))
+          )}
+          {busy ? (
+            <div className="thinking">
+              <Loader2 className="animate-spin" size={16} />
+              Todo is thinking…
+              <button onClick={() => abort.current?.abort()}>Stop</button>
+            </div>
+          ) : null}
+          <div ref={bottom} />
         </div>
-      ) : null}
-      <form onSubmit={send} className="composer">
-        {image ? (
-          <div className="image-attachment">
-            <ImagePlus size={13} />
-            <span>{image.name}</span>
-            <button
-              type="button"
-              onClick={() => setImage(null)}
-              aria-label="Remove attached image"
-            >
-              <X size={13} />
-            </button>
+        {error ? (
+          <div className="inline-warning" role="alert">
+            {error}
           </div>
         ) : null}
-        <Textarea
-          aria-label="Message Todo"
-          placeholder={
-            mode === "chat"
-              ? "Tell Todo what you need a hand with…"
-              : "Paste your text, or attach a file…"
-          }
-          value={draft}
-          maxLength={20000}
-          disabled={busy}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
+        <form onSubmit={send} className="composer">
+          {image ? (
+            <div className="image-attachment">
+              <ImagePlus size={13} />
+              <span>{image.name}</span>
+              <button
+                type="button"
+                onClick={() => setImage(null)}
+                aria-label="Remove attached image"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : null}
+          <Textarea
+            aria-label="Message Todo"
+            placeholder={
+              mode === "chat"
+                ? "Tell Todo what you need a hand with…"
+                : "Paste your text, or attach a file…"
             }
-          }}
-        />
-        <div className="composer-controls">
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".txt,.md,image/png,image/jpeg,image/webp"
-            className="sr-only"
-            aria-label="Attach text or image"
-            onChange={(e) => upload(e.target.files?.[0])}
+            value={draft}
+            maxLength={20000}
+            disabled={busy}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={busy || reading}
-            onClick={() => fileInput.current?.click()}
-          >
-            <Plus size={16} />
-            {reading ? "Reading…" : "Attach"}
-          </Button>
-          <span>⌘ / Ctrl + Enter</span>
-          <Button
-            className="warm-button"
-            size="sm"
-            disabled={!draft.trim() || busy || reading}
-          >
-            {busy ? (
-              <Loader2 className="animate-spin" size={15} />
-            ) : (
-              <ArrowUp size={15} />
-            )}
-            Send
-          </Button>
-        </div>
-      </form>
-      <p className="dialog-footnote">
-        Only what you send goes to the AI. Double-check important answers.
-      </p>
-    </>
+          <div className="composer-controls">
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".txt,.md,image/png,image/jpeg,image/webp"
+              className="sr-only"
+              aria-label="Attach text or image"
+              onChange={(e) => upload(e.target.files?.[0])}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={busy || reading}
+              onClick={() => fileInput.current?.click()}
+            >
+              <Plus size={16} />
+              {reading ? "Reading…" : "Attach"}
+            </Button>
+            <span>⌘ / Ctrl + Enter</span>
+            <Button
+              className="warm-button"
+              size="sm"
+              disabled={!draft.trim() || busy || reading}
+            >
+              {busy ? (
+                <Loader2 className="animate-spin" size={15} />
+              ) : (
+                <ArrowUp size={15} />
+              )}
+              Send
+            </Button>
+          </div>
+        </form>
+        <p className="dialog-footnote">
+          Only what you send goes to the AI. Double-check important answers.
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function NotesPanel({
   notes,
   setNotes,
+  open,
+  onOpenChange,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   notes: Note[];
   setNotes: React.Dispatch<React.SetStateAction<Note[]>>;
 }) {
@@ -1303,102 +1243,106 @@ function NotesPanel({
     }
   };
   return (
-    <>
-      <DialogHeader>
-        <div className="dialog-eyebrow">
-          <FileText size={16} /> A place for your thoughts
-        </div>
-        <DialogTitle>Your little notebook.</DialogTitle>
-        <DialogDescription>
-          Write something down, keep it, or take it with you as a PDF.
-        </DialogDescription>
-      </DialogHeader>
-      <Tabs defaultValue="write">
-        <TabsList>
-          <TabsTrigger value="write">Write a note</TabsTrigger>
-          <TabsTrigger value="saved">Saved notes ({notes.length})</TabsTrigger>
-        </TabsList>
-        <TabsContent value="write" className="note-editor">
-          <Label htmlFor="note-title">Title</Label>
-          <Input
-            id="note-title"
-            value={title}
-            maxLength={160}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Give your thought a name"
-          />
-          <Label htmlFor="note-content">Your notes</Label>
-          <Textarea
-            id="note-content"
-            value={content}
-            maxLength={50000}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Start anywhere…"
-            className="note-textarea"
-          />
-          <div className="flex gap-2">
-            <Button
-              className="warm-button"
-              disabled={busy || !title.trim() || !content.trim()}
-              onClick={save}
-            >
-              {busy ? (
-                <Loader2 size={15} className="animate-spin" />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="todo-dialog notes-dialog">
+        <DialogHeader>
+          <div className="dialog-eyebrow">
+            <FileText size={16} /> A place for your thoughts
+          </div>
+          <DialogTitle>Your little notebook.</DialogTitle>
+          <DialogDescription>
+            Write something down, keep it, or take it with you as a PDF.
+          </DialogDescription>
+        </DialogHeader>
+        <Tabs defaultValue="write">
+          <TabsList>
+            <TabsTrigger value="write">Write a note</TabsTrigger>
+            <TabsTrigger value="saved">
+              Saved notes ({notes.length})
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="write" className="note-editor">
+            <Label htmlFor="note-title">Title</Label>
+            <Input
+              id="note-title"
+              value={title}
+              maxLength={160}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Give your thought a name"
+            />
+            <Label htmlFor="note-content">Your notes</Label>
+            <Textarea
+              id="note-content"
+              value={content}
+              maxLength={50000}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Start anywhere…"
+              className="note-textarea"
+            />
+            <div className="flex gap-2">
+              <Button
+                className="warm-button"
+                disabled={busy || !title.trim() || !content.trim()}
+                onClick={save}
+              >
+                {busy ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Check size={15} />
+                )}
+                Save note
+              </Button>
+              <Button
+                variant="outline"
+                disabled={exporting || !content.trim()}
+                onClick={download}
+              >
+                <Download size={15} />
+                {exporting ? "Making PDF…" : "Export PDF"}
+              </Button>
+            </div>
+          </TabsContent>
+          <TabsContent value="saved">
+            <div className="saved-notes">
+              {notes.length ? (
+                notes.map((note) => (
+                  <div className="saved-note" key={note.id}>
+                    <button
+                      onClick={() => {
+                        setTitle(note.title);
+                        setContent(note.content);
+                        toast("Loaded into the Write a note tab.");
+                      }}
+                    >
+                      <strong>{note.title}</strong>
+                      <p>{note.content.slice(0, 110)}</p>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Delete note ${note.title}`}
+                      onClick={async () => {
+                        try {
+                          await api("/api/notes", "DELETE", { id: note.id });
+                          setNotes((ns) => ns.filter((n) => n.id !== note.id));
+                        } catch (e) {
+                          toast.error(
+                            e instanceof Error ? e.message : "Couldn’t delete.",
+                          );
+                        }
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
+                ))
               ) : (
-                <Check size={15} />
+                <p className="quiet-empty">Your notes will find a home here.</p>
               )}
-              Save note
-            </Button>
-            <Button
-              variant="outline"
-              disabled={exporting || !content.trim()}
-              onClick={download}
-            >
-              <Download size={15} />
-              {exporting ? "Making PDF…" : "Export PDF"}
-            </Button>
-          </div>
-        </TabsContent>
-        <TabsContent value="saved">
-          <div className="saved-notes">
-            {notes.length ? (
-              notes.map((note) => (
-                <div className="saved-note" key={note.id}>
-                  <button
-                    onClick={() => {
-                      setTitle(note.title);
-                      setContent(note.content);
-                      toast("Loaded into the Write a note tab.");
-                    }}
-                  >
-                    <strong>{note.title}</strong>
-                    <p>{note.content.slice(0, 110)}</p>
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Delete note ${note.title}`}
-                    onClick={async () => {
-                      try {
-                        await api("/api/notes", "DELETE", { id: note.id });
-                        setNotes((ns) => ns.filter((n) => n.id !== note.id));
-                      } catch (e) {
-                        toast.error(
-                          e instanceof Error ? e.message : "Couldn’t delete.",
-                        );
-                      }
-                    }}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p className="quiet-empty">Your notes will find a home here.</p>
-            )}
-          </div>
-        </TabsContent>
-      </Tabs>
-    </>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }

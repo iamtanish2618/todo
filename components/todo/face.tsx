@@ -5,17 +5,22 @@ export type MotionPoint = { x: number; y: number; active: boolean };
 type Props = {
   pointer: RefObject<MotionPoint>;
   reduced: boolean;
+  active?: boolean;
   female?: boolean;
   reaction: string | null;
   blinking: boolean;
 };
 
 // Only the artwork is refracted. All UI stays in a separate, crisp DOM layer.
-function FaceTexture({ pointer, reduced }: Pick<Props, "pointer" | "reduced">) {
+function FaceTexture({
+  pointer,
+  reduced,
+  active = true,
+}: Pick<Props, "pointer" | "reduced" | "active">) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const node = canvas.current;
-    if (!node || reduced) {
+    if (!node || reduced || !active) {
       if (node) node.style.opacity = "0";
       return;
     }
@@ -120,7 +125,7 @@ function FaceTexture({ pointer, reduced }: Pick<Props, "pointer" | "reduced">) {
       gl.deleteShader(vertex);
       gl.deleteShader(fragment);
     };
-  }, [pointer, reduced]);
+  }, [pointer, reduced, active]);
   return <canvas ref={canvas} aria-hidden="true" className="face-texture" />;
 }
 
@@ -130,11 +135,12 @@ function Eye({
   reduced,
   reaction,
   blinking,
+  active = true,
 }: { side: "left" | "right" } & Omit<Props, "female">) {
   const eye = useRef<HTMLDivElement>(null),
     pupil = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (reduced) {
+    if (reduced || !active) {
       if (pupil.current) pupil.current.style.transform = "translate(-50%,-50%)";
       return;
     }
@@ -164,11 +170,11 @@ function Eye({
     }
     move();
     return () => cancelAnimationFrame(frame);
-  }, [pointer, reduced]);
+  }, [pointer, reduced, active]);
   return (
     <div
       ref={eye}
-      className={`eye eye-${side} ${blinking ? "blink" : ""} ${reaction === "friends" ? "bright-eye" : ""}`}
+      className={`eye eye-${side} ${blinking || (reaction === "peace" && side === "left") ? "blink" : ""} ${reaction === "friends" ? "bright-eye" : ""}`}
     >
       <div className="pupil" ref={pupil}>
         <i />
@@ -185,64 +191,72 @@ export const Face = memo(function Face(props: Props) {
       className={`penguin-art ${props.female ? "female-art" : ""} ${props.reaction === "solo" ? "nod" : ""} ${props.reaction === "giggle" ? "giggle" : ""}`}
       aria-hidden="true"
     >
-      <FaceTexture pointer={props.pointer} reduced={props.reduced} />
+      <FaceTexture
+        pointer={props.pointer}
+        reduced={props.reduced}
+        active={props.active}
+      />
       <Eye side="left" {...props} />
       <Eye side="right" {...props} />
       {props.female ? (
-        <div className="penguin-bow">
+        <>
+          <svg
+            className="face-lashes face-lashes-left"
+            viewBox="0 0 60 40"
+            aria-hidden="true"
+          >
+            <path
+              d="M53 36Q27 31 20 10 M43 35Q22 26 15 4 M34 35Q15 38 5 20"
+              fill="none"
+              stroke="#312927"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+          <svg
+            className="face-lashes face-lashes-right"
+            viewBox="0 0 60 40"
+            aria-hidden="true"
+          >
+            <path
+              d="M53 36Q27 31 20 10 M43 35Q22 26 15 4 M34 35Q15 38 5 20"
+              fill="none"
+              stroke="#312927"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+          <div className="penguin-headband female-band">
+            <span />
+          </div>
+          <div className="penguin-bow">
+            <span />
+            <i />
+            <span />
+          </div>
+        </>
+      ) : (
+        <div className="penguin-headband">
           <span />
-          <i />
-          <span />
+        </div>
+      )}
+      {props.reaction === "peace" ? (
+        <div className="peace-flipper">
+          <svg viewBox="0 0 120 150">
+            <path
+              d="M25 145 Q4 100 25 78 L16 24 Q15 4 31 12 L51 63 L58 10 Q62 -4 74 10 L73 76 Q108 66 111 99 Q115 130 85 150Z"
+              fill="#383332"
+            />
+            <path
+              d="M31 91 Q62 113 86 90"
+              stroke="#68605a"
+              strokeWidth="3"
+              fill="none"
+            />
+          </svg>
         </div>
       ) : null}
       {props.reaction === "agent" ? <div className="beak-reaction" /> : null}
     </div>
   );
 });
-
-export function Flower() {
-  return (
-    <svg viewBox="0 0 180 240" aria-hidden="true" className="flower-art">
-      <defs>
-        <radialGradient id="petal">
-          <stop stopColor="#ffe6d2" />
-          <stop offset="1" stopColor="#eaa67d" />
-        </radialGradient>
-        <linearGradient id="flipper">
-          <stop stopColor="#514c49" />
-          <stop offset="1" stopColor="#292727" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M91 95 Q78 160 94 223"
-        fill="none"
-        stroke="#758470"
-        strokeWidth="7"
-        strokeLinecap="round"
-      />
-      <path d="M88 167 Q45 132 53 174 Q70 191 88 180" fill="#8b9b7a" />
-      {[0, 60, 120, 180, 240, 300].map((a) => (
-        <ellipse
-          key={a}
-          cx="90"
-          cy="55"
-          rx="18"
-          ry="33"
-          fill="url(#petal)"
-          transform={`rotate(${a} 90 86)`}
-        />
-      ))}
-      <circle cx="90" cy="86" r="20" fill="#eec36e" />
-      <path
-        className="giving-flipper"
-        d="M-20 125 Q25 90 76 144 Q105 180 65 178 Q20 164 -20 169"
-        fill="url(#flipper)"
-      />
-      <path
-        className="receiving-flipper"
-        d="M200 225 Q150 159 102 155 Q70 156 93 183 Q139 209 200 248"
-        fill="url(#flipper)"
-      />
-    </svg>
-  );
-}

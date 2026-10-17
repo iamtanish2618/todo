@@ -52,6 +52,9 @@ test("task create, complete, reload persistence, timer pause and saved history",
   page,
 }) => {
   await page.getByRole("button", { name: /Focus solo/ }).click();
+  await page
+    .getByRole("button", { name: "Focus & tasks", exact: true })
+    .click();
   const task = `Read chapter ${Date.now()}`;
   await page.getByRole("textbox", { name: "New task" }).fill(task);
   await page.getByRole("button", { name: "Add task", exact: true }).click();
@@ -66,9 +69,12 @@ test("task create, complete, reload persistence, timer pause and saved history",
     page.getByRole("button", { name: "Pause", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await expect(page.locator(".session-chip")).toBeVisible();
+  await expect(page.locator(".desk-clock")).toBeVisible();
   await page.reload();
   await page.locator(".session-chip").click();
+  await page
+    .getByRole("button", { name: "Focus & tasks", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: "Pause", exact: true }),
   ).toBeVisible();
@@ -89,6 +95,9 @@ test("task create, complete, reload persistence, timer pause and saved history",
     page.locator(".history-item").filter({ hasText: task }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Back to focus" }).click();
+  await page
+    .getByRole("button", { name: "Focus & tasks", exact: true })
+    .click();
   await page
     .getByRole("button", { name: `Delete ${task}`, exact: true })
     .click();
@@ -250,10 +259,16 @@ test("settings, keyboard dismissal, reduced motion and transparent friends statu
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
   await page.reload();
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
+  await page.getByRole("button", { name: /Scroll to meet her/ }).click();
+  await expect(page.locator(".female-choices")).toHaveCSS("opacity", "1");
+  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(1);
+  await expect(page.locator(".story-handoff")).toHaveCount(0);
   await page.getByRole("button", { name: /Join friends/ }).click();
   await expect(page.getByText("We’re getting the room ready.")).toBeVisible();
   await page.getByRole("button", { name: /Focus with Todo for now/ }).click();
-  await expect(page.getByText("Let’s do one small thing.")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Your shared Todo workspace" }),
+  ).toBeVisible();
 });
 
 test("mobile layout has no horizontal overflow and every primary control opens", async ({
@@ -270,8 +285,19 @@ test("mobile layout has no horizontal overflow and every primary control opens",
   ).toBe(true);
   for (const name of [/Focus solo/, /Join friends/, /Ask Todo/]) {
     await page.getByRole("button", { name }).click();
+    await expect(page.locator(".study-room.room-entered")).toBeVisible();
+    if (String(name).includes("Focus solo")) {
+      await expect(page.locator(".study-room")).toHaveCSS("opacity", "1");
+      await page.screenshot({ path: "outputs/room-mobile-v2.png" });
+      await page
+        .getByRole("button", { name: "Focus & tasks", exact: true })
+        .click();
+    }
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Choose companion", exact: true })
+      .click();
   }
 });
 
@@ -352,4 +378,90 @@ test("a completed focus session leads to a quiet break with games on hold", asyn
   await expect(
     page.getByRole("heading", { name: "Let’s do one small thing." }),
   ).toBeVisible();
+});
+
+test("scroll hides both choice sets during an actual flower handoff and booping winks", async ({
+  page,
+}) => {
+  await page.getByRole("button", { name: "Give him a little boop" }).click();
+  await expect(page.locator(".male-layer .eye-left")).toHaveClass(/blink/);
+  await expect(page.locator(".male-layer .peace-flipper")).toBeVisible();
+  await page.evaluate(() => scrollTo(0, innerHeight * 0.5));
+  await expect(page.locator(".is-transferring")).toBeVisible();
+  await expect(page.locator(".welcome-viewport")).toHaveAttribute(
+    "data-scroll-progress",
+    "0.500",
+  );
+  await expect(page.locator(".male-choices")).toHaveCSS("opacity", "0");
+  await expect(page.locator(".female-choices")).toHaveCSS("opacity", "0");
+  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(0);
+  await expect(page.locator(".story-handoff")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".receiving-hand")).toBeVisible();
+  await expect(page.locator(".giving-hand")).toBeVisible();
+  await page.screenshot({ path: "outputs/handoff-v2.png" });
+  await page.evaluate(() => scrollTo(0, innerHeight));
+  await expect(page.locator(".female-choices")).toHaveCSS("opacity", "1");
+  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(1);
+  await expect(page.locator(".female-art .penguin-bow")).toBeVisible();
+  await page.screenshot({ path: "outputs/female-v2.png" });
+});
+
+test("solo is a room; tool panels preserve the scene, timer, and background AI work", async ({
+  page,
+}) => {
+  await page.route("**/api/assistant", async (route) => {
+    await new Promise((r) => setTimeout(r, 2200));
+    await route.fulfill({
+      json: { text: "A calm plan: read, make notes, then take a break." },
+    });
+  });
+  await page.getByRole("button", { name: /Focus solo/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const room = page.getByRole("region", { name: "Your shared Todo workspace" });
+  await expect(room).toBeVisible();
+  await expect(room).toHaveCSS("opacity", "1");
+  await expect(page.locator(".room-laptop")).toBeVisible();
+  await expect(page.locator(".coffee-cup")).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Room focus task" })
+    .fill("Study with my penguin");
+  await page
+    .getByRole("button", { name: "Start focusing", exact: true })
+    .click();
+  await expect(room).toHaveClass(/is-working/);
+  await page.screenshot({ path: "outputs/room-v2.png" });
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+  const before = await page.locator(".room-companion").boundingBox();
+  for (let i = 0; i < 2; i++) {
+    await page
+      .getByRole("button", { name: "Focus & tasks", exact: true })
+      .click();
+    await expect(
+      page.getByRole("textbox", { name: "What are you working on?" }),
+    ).toHaveValue("Study with my penguin");
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+  }
+  const after = await page.locator(".room-companion").boundingBox();
+  expect(Math.abs(before!.x - after!.x)).toBeLessThan(1);
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Message Todo" })
+    .fill("Help me make a plan.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.locator(".room-presence")).toContainText(
+    "Working on your request.",
+  );
+  await expect(room).toHaveAttribute("data-mode", "agent");
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
+  await expect(page.locator(".chat-message.assistant")).toContainText(
+    "A calm plan",
+  );
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("button", { name: "Companion", exact: true }).click();
+  await expect(room).toHaveAttribute("data-mode", "companion");
+  await page
+    .getByRole("button", { name: "Focus & tasks", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
 });
