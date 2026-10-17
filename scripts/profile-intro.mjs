@@ -3,13 +3,20 @@
 import { chromium } from "@playwright/test";
 import fs from "node:fs/promises";
 await fs.mkdir("outputs", { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const pointerOnly = process.argv.includes("--pointer");
+const browser = await chromium.launch({
+  headless: true,
+  args: ["--enable-unsafe-swiftshader"],
+});
 const summaries = [];
 try {
   for (const profile of [
     { name: "desktop", width: 1440, height: 960, dpr: 1, cpu: 1 },
     { name: "portrait", width: 390, height: 844, dpr: 2, cpu: 4 },
-  ]) {
+  ].filter(
+    (profile) =>
+      !process.argv.includes("--desktop") || profile.name === "desktop",
+  )) {
     const page = await browser.newPage({
       viewport: { width: profile.width, height: profile.height },
       deviceScaleFactor: profile.dpr,
@@ -35,7 +42,7 @@ try {
     });
     // Scroll events are test inputs. The application still uses only GSAP's shared ticker.
     await page.evaluate(
-      () =>
+      (pointerOnly) =>
         new Promise((resolve) => {
           let n = 0;
           const distance =
@@ -43,7 +50,17 @@ try {
             innerHeight;
           const timer = setInterval(() => {
             const p = n <= 150 ? n / 150 : (300 - n) / 150;
-            scrollTo(0, distance * Math.max(0, p));
+            if (pointerOnly) {
+              window.dispatchEvent(
+                new PointerEvent("pointermove", {
+                  pointerType: "mouse",
+                  clientX: innerWidth * (0.5 + 0.37 * Math.sin(n * 0.055)),
+                  clientY: innerHeight * (0.45 + 0.23 * Math.cos(n * 0.045)),
+                }),
+              );
+              if (n % 75 === 0)
+                document.querySelector(".intro-male .intro-pet-target").click();
+            } else scrollTo(0, distance * Math.max(0, p));
             n++;
             if (n > 300) {
               clearInterval(timer);
@@ -51,6 +68,7 @@ try {
             }
           }, 25);
         }),
+      pointerOnly,
     );
     await page.waitForTimeout(1000);
     const done = new Promise((resolve) =>
@@ -65,7 +83,10 @@ try {
       if (chunk.eof) break;
     }
     await cdp.send("IO.close", { handle: stream });
-    await fs.writeFile(`outputs/intro-${profile.name}-trace.json`, trace);
+    await fs.writeFile(
+      `outputs/intro-${profile.name}${pointerOnly ? "-pointer" : ""}-trace.json`,
+      trace,
+    );
     const events = JSON.parse(trace).traceEvents;
     const draws = events
       .filter((e) => e.name === "DrawFrame")
@@ -76,15 +97,15 @@ try {
       .map((t, i) => (t - draws[i]) / 1000)
       .filter((ms) => ms > 1 && ms < 250)
       .sort((a, b) => a - b);
-    const data = await page
-      .locator(".intro-experience")
-      .evaluate((e) => ({
-        tickerFPS: e.dataset.fps,
-        remainingParticles: e.dataset.particles,
-        dpr: e.dataset.dpr,
-        qualityDrops: e.dataset.qualityDrops,
-        cls: window.__introCLS,
-      }));
+    const data = await page.locator(".intro-experience").evaluate((e) => ({
+      tickerFPS: e.dataset.fps,
+      lens: e.dataset.lens,
+      lensDraws: e.dataset.lensDraws,
+      remainingParticles: e.dataset.particles,
+      dpr: e.dataset.dpr,
+      qualityDrops: e.dataset.qualityDrops,
+      cls: window.__introCLS,
+    }));
     const median = intervals[Math.floor(intervals.length * 0.5)] ?? null,
       p95 = intervals[Math.floor(intervals.length * 0.95)] ?? null;
     summaries.push({
@@ -103,7 +124,7 @@ try {
   await browser.close();
 }
 await fs.writeFile(
-  "outputs/intro-performance.json",
+  `outputs/intro-${pointerOnly ? "pointer-" : ""}performance.json`,
   JSON.stringify(
     {
       recordedAt: new Date().toISOString(),

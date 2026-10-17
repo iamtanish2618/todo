@@ -1,6 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 const root = ".intro-experience";
 async function progress(page: Page, p: number) {
+  // A rebuild uses Lenis's immediate restore; let its native-scroll suppression clear
+  // before issuing another programmatic scroll (real wheel input uses a different path).
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
   await page.evaluate(
     (value) =>
       window.scrollTo(
@@ -136,8 +144,8 @@ test("fast scroll, resize at a stopped transition, and live timing controls do n
     }),
   );
   for (const eye of registration) {
-    expect(eye.cx).toBeCloseTo(0.372, 3);
-    expect(eye.cy).toBeCloseTo(0.58, 3);
+    expect(eye.cx).toBeCloseTo(0.262, 3);
+    expect(eye.cy).toBeCloseTo(0.416, 3);
   }
   await expect(page.locator(".intro-debug-readout")).toContainText("Snow");
   const timing = page.getByRole("slider", { name: "Eyes open · start" });
@@ -204,7 +212,7 @@ test("reduced motion uses the quiet crossfade without snow or scripted lids", as
   await expect(page.locator(".intro-male")).toHaveCSS("opacity", "1");
 });
 
-test("one long wheel gesture completes the story; companions move up from separate winter artwork", async ({
+test("one long wheel gesture completes the story; companions move up with the original avatar and separate clothes", async ({
   page,
 }) => {
   const range = await page
@@ -212,11 +220,15 @@ test("one long wheel gesture completes the story; companions move up from separa
     .evaluate((e) => e.clientHeight - innerHeight);
   expect(range).toBeLessThan(await page.evaluate(() => innerHeight));
   const sources = await page
-    .locator(".intro-face > img")
+    .locator(".intro-base-art")
     .evaluateAll((images) =>
       images.map((image) => (image as HTMLImageElement).getAttribute("src")),
     );
-  expect(new Set(sources).size).toBe(2);
+  expect(new Set(sources)).toEqual(new Set(["/art/todo-face.webp"]));
+  const outfits = await page
+    .locator(".intro-wardrobe")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("src")));
+  expect(new Set(outfits).size).toBe(2);
   await expect(page.locator(".intro-headband")).toHaveCount(0);
   const before = await page
     .locator(".intro-male")
@@ -237,4 +249,79 @@ test("one long wheel gesture completes the story; companions move up from separa
     .poll(() => page.locator(root).getAttribute("data-scroll-progress"))
     .toBe("1.0000");
   await expect(page.getByRole("button", { name: "Choose her" })).toBeVisible();
+});
+
+test("cursor sways the original avatar and renders refraction; clicking cheeks reacts without blinking", async ({
+  page,
+}) => {
+  await expect(page.locator(root)).toHaveAttribute("data-lens", "webgl");
+  await page.mouse.move(80, 220);
+  await page.waitForTimeout(450);
+  const left = await page.locator(".intro-male").getAttribute("style");
+  const draws = Number(
+    await page.locator(root).getAttribute("data-lens-draws"),
+  );
+  await page.mouse.move(1320, 620);
+  await page.waitForTimeout(450);
+  expect(await page.locator(".intro-male").getAttribute("style")).not.toBe(
+    left,
+  );
+  await expect
+    .poll(async () =>
+      Number(await page.locator(root).getAttribute("data-lens-draws")),
+    )
+    .toBeGreaterThan(draws);
+  await expect(page.locator(".intro-art-lens")).toHaveCSS("opacity", "1");
+  const ratio = await page
+    .locator(".intro-male .intro-pupil")
+    .first()
+    .evaluate(
+      (e) =>
+        e.getBoundingClientRect().width /
+        e.parentElement!.getBoundingClientRect().width,
+    );
+  expect(ratio).toBeLessThan(0.56);
+  for (const [index, expected] of ["wiggle", "bounce", "nuzzle"].entries()) {
+    await page.mouse.click(index ? 1200 : 150, 560);
+    await expect(page.locator(root)).toHaveAttribute("data-reaction", expected);
+    await page.waitForTimeout(170);
+    const lids = await page
+      .locator(".intro-male .intro-closed-eye")
+      .evaluateAll((nodes) =>
+        nodes.map((n) => Number((n as SVGElement).style.opacity)),
+      );
+    expect(lids).toEqual([0, 0]);
+    await expect
+      .poll(async () =>
+        Number(
+          await page
+            .locator(".intro-male .intro-blush")
+            .first()
+            .evaluate((e) => e.style.opacity),
+        ),
+      )
+      .toBeGreaterThan(0.05);
+    if (index > 0)
+      await expect
+        .poll(async () =>
+          Number(
+            await page
+              .locator(".intro-male .intro-delight")
+              .first()
+              .evaluate((e) => e.style.opacity),
+          ),
+        )
+        .toBeGreaterThan(0.1);
+    await expect(page.locator(root)).toHaveAttribute("data-reaction", "idle");
+  }
+  await page.getByRole("button", { name: "Play with him" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(root)).toHaveAttribute("data-reaction", "wiggle");
+  await progress(page, 1);
+  await page.mouse.move(1100, 560);
+  await page.waitForTimeout(400);
+  await expect(page.locator(".intro-female .intro-art-lens")).toHaveCount(1);
+  await page.getByRole("button", { name: "Play with her" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(root)).toHaveAttribute("data-reaction", "bounce");
 });

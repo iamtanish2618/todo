@@ -28,3 +28,10 @@ The user supplied a fluffy baby penguin wearing a dusty blue knitted pompom cap 
 The male brief preserved that character identity, soft fur, knit texture, tiny closed orange beak, and blue winter accessories in a symmetrical head-and-scarf close-up. Small blank ivory eye sockets support live glossy pupils. The female edit changed only the cap/scarf to dusty rose pink, increased cool rosy cheek blush, and added subtle outside lashes while preserving feature registration. The closed-eye edits replaced both sockets with continuous cream fur and naturally closed eye seams, keeping camera, colour, and composition unchanged. Soft localized SVG masks blend those registered closed states over the live eyes; no circular lid cutout remains visible when shut.
 
 These winter assets establish the selected character design for subsequent screens. This pass changes the landing animation; the room scene can be adapted to the winter wardrobe when room work resumes.
+
+
+## Original playful avatar restored — current design
+
+The user chose the original playful avatar over the photographic winter portraits. The current base is again `todo-face.webp`; it has not been repainted. ImageGen created transparent blue and pink cap/muffler overlays (`todo-cap-scarf-blue.webp`, `todo-cap-scarf-pink.webp`) matched to the existing art space. Their central face area stays transparent. A separate precise edit of the original avatar supplies `todo-face-closed.webp`, removing the open sockets and replacing them with continuous fur and relaxed closed-eye seams, without changing the smiling beak or face identity. Final files are WebP quality 84, with alpha preserved on the clothing.
+
+The photographic winter plates described above are superseded. The live avatar uses code pupils, separate wardrobe, cursor sway/refraction, and whole-character click reactions; it is not a substituted portrait. All live motion runs on the existing GSAP ticker.

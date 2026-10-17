@@ -12,42 +12,46 @@ import {
   ArrowRight,
   FileText,
   Headphones,
+  Heart,
   Loader2,
   Settings2,
   Sparkles,
   Users,
   X,
 } from "lucide-react";
+import { createArtLens } from "@/lib/todo/art-lens";
 import { Button } from "@/components/ui/button";
 import "lenis/dist/lenis.css";
 import "./welcome.css";
 
 /** All art-space coordinates are fractions of the natural image, not viewport pixels.
- * The winter companions are matched artwork variants; their knit colours and blush are baked into the real art.
+ * The original avatar is unchanged; caps/scarves are separate transparent overlays and reactions stay live.
  * Replace either src independently and adjust its framing if new artwork is supplied. */
 export const INTRO_CONFIG = {
   images: {
     male: {
-      src: "/art/todo-winter-male.webp",
-      closedSrc: "/art/todo-winter-male-closed.webp",
+      src: "/art/todo-face.webp",
+      wardrobe: "/art/todo-cap-scarf-blue.webp",
+      closedSrc: "/art/todo-face-closed.webp",
       alt: "Todo, your blue winter-hat and scarf penguin companion",
       scale: 1,
       translateX: 0,
       translateY: 0,
     },
     female: {
-      src: "/art/todo-winter-female.webp",
-      closedSrc: "/art/todo-winter-female-closed.webp",
+      src: "/art/todo-face.webp",
+      wardrobe: "/art/todo-cap-scarf-pink.webp",
+      closedSrc: "/art/todo-face-closed.webp",
       alt: "Todo, your pink winter-hat and scarf penguin companion",
       scale: 1,
       translateX: 0,
       translateY: 0,
     },
   },
-  portrait: { maxImageWidth: 1.8, eyeHeight: 0.39 },
+  portrait: { maxImageWidth: 1.5, eyeHeight: 0.41 },
   eyes: {
-    leftEye: { cx: 0.372, cy: 0.58, rx: 0.035, ry: 0.052 },
-    rightEye: { cx: 0.603, cy: 0.585, rx: 0.035, ry: 0.052 },
+    leftEye: { cx: 0.262, cy: 0.416, rx: 0.085, ry: 0.114 },
+    rightEye: { cx: 0.739, cy: 0.416, rx: 0.085, ry: 0.114 },
   },
   snow: {
     desktop: 260,
@@ -78,6 +82,14 @@ export const INTRO_CONFIG = {
     veilEdge: "#E8F1F9",
   },
   travel: { maleExit: -12, femaleEntry: 22 },
+  interaction: {
+    swayX: 10,
+    swayY: 6,
+    tilt: 0.35,
+    reactionSeconds: 1.35,
+    pupilReachX: 0.18,
+    pupilReachY: 0.14,
+  },
   caption: "or maybe you'd like me?",
   sectionHeight: "180svh",
   scrub: 0.55,
@@ -101,7 +113,7 @@ type Props = {
 type Engine = {
   select: (character: Character, immediate?: boolean) => void;
   rebuild: (timings: Timings) => void;
-  wink: () => void;
+  react: () => void;
   dispose: () => void;
 };
 const choices = [
@@ -212,6 +224,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
     }, [timings]);
 
     useEffect(() => {
+      // Hydrate motion preferences before starting an engine, avoiding a competing first-load restore.
+      if (!props.ready) return;
       const element = root.current;
       if (!element) return;
       let cancelled = false,
@@ -238,7 +252,13 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           image.src = frame.closedSrc;
           return image;
         });
+        const outfits = Object.values(INTRO_CONFIG.images).map((frame) => {
+          const image = new Image();
+          image.src = frame.wardrobe;
+          return image;
+        });
         await Promise.all([
+          ...outfits.map((image) => image.decode()),
           ...images.map((image) => image.decode()),
           ...closedImages.map((image) => image.decode()),
           document.fonts.load("600 16px Nunito"),
@@ -258,6 +278,28 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const oldRestoration = history.scrollRestoration;
         history.scrollRestoration = "manual";
         const reduced = latest.current.reduced;
+        const artLens = reduced ? null : createArtLens(images[0]);
+        let lensSide = 0;
+        if (artLens)
+          planes[0].insertBefore(artLens.canvas, planes[0].children[1] ?? null);
+        element.dataset.lens = artLens ? "webgl" : "off";
+        const frames = new Float32Array(8); // registered x,y,width,height; no pointer-time layout reads
+        const blushes = planes.map((plane) =>
+          Array.from(plane.querySelectorAll<HTMLElement>(".intro-blush")),
+        );
+        const delights = planes.map((plane) =>
+          Array.from(plane.querySelectorAll<HTMLElement>(".intro-delight")),
+        );
+        const feel = {
+          x: 0,
+          y: 0,
+          lensX: 0,
+          lensY: 0,
+          power: 0,
+          rotation: 0,
+          bounce: 0,
+        };
+        const reaction = { start: -10, kind: 0, count: 0 };
         const canvas = element.querySelector<HTMLCanvasElement>(".intro-snow")!,
           ctx = canvas.getContext("2d", { alpha: true });
         const veil = element.querySelector<HTMLElement>(".intro-veil")!,
@@ -306,13 +348,14 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           qualityDrops = 0;
         const pointer = { x: 0, y: 0, present: false, touchUntil: 0 },
           wander = { x: 0, y: 0, next: 0 },
-          blink = { start: -10, next: 0, leftOnly: false };
+          blink = { start: -10, next: 0 };
         let randomState = INTRO_CONFIG.snow.seed as number;
         const random = () => {
           randomState = (Math.imul(1664525, randomState) + 1013904223) | 0;
           return (randomState >>> 0) / 4294967296;
         };
         const motion = {
+          veilOpacity: 0,
           density: 0,
           wind: 0,
           swirl: 0,
@@ -396,7 +439,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 (cached.width * INTRO_CONFIG.portrait.maxImageWidth) /
                   image.naturalWidth,
               );
-            cover *= frame.scale;
+            cover *= frame.scale * (portrait ? 1 : 1.03);
             const w = image.naturalWidth * cover,
               h = image.naturalHeight * cover,
               x = (cached.width - w) / 2 + frame.translateX * w,
@@ -412,6 +455,10 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               left: `${x}px`,
               top: `${y}px`,
             });
+            frames[i * 4] = x;
+            frames[i * 4 + 1] = y;
+            frames[i * 4 + 2] = w;
+            frames[i * 4 + 3] = h;
             [INTRO_CONFIG.eyes.leftEye, INTRO_CONFIG.eyes.rightEye].forEach(
               (eye, side) => {
                 const j = (i * 2 + side) * 4;
@@ -441,6 +488,11 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             cardBounds[j + 2] = rect.right;
             cardBounds[j + 3] = rect.bottom;
           });
+          artLens?.resize(
+            frames[lensSide * 4 + 2],
+            frames[lensSide * 4 + 3],
+            cached.width / cached.height < 0.85,
+          );
           resizeBuffer();
           lenis.resize();
         };
@@ -466,6 +518,12 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             trays[1].inert = !female;
             trays[0].setAttribute("aria-hidden", String(!male));
             trays[1].setAttribute("aria-hidden", String(!female));
+            planes[0].querySelector<HTMLButtonElement>(
+              ".intro-pet-target",
+            )!.disabled = !male;
+            planes[1].querySelector<HTMLButtonElement>(
+              ".intro-pet-target",
+            )!.disabled = !female;
             lastCards = key;
           }
           planes[0].setAttribute(
@@ -510,10 +568,19 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           timeline?.kill();
           currentTimings = t;
           Object.assign(motion, initialMotion);
-          gsap.set(planes[0], { autoAlpha: 1, scale: 1, y: 0, yPercent: 0 });
+          gsap.set(planes[0], {
+            autoAlpha: 1,
+            scale: 1,
+            x: 0,
+            rotation: 0,
+            y: 0,
+            yPercent: 0,
+          });
           gsap.set(planes[1], {
             autoAlpha: 0,
             scale: reduced ? 1 : 1.06,
+            x: 0,
+            rotation: 0,
             y: 0,
             yPercent: reduced ? 0 : INTRO_CONFIG.travel.femaleEntry,
           });
@@ -536,7 +603,9 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               scrub: INTRO_CONFIG.scrub,
               start: "top top",
               end: "bottom bottom",
-              invalidateOnRefresh: true,
+              // Geometry is measured separately. Invalidating normalized .to() values
+              // mid-scroll can recapture the veil's current opacity as a new start.
+              invalidateOnRefresh: false,
               onRefresh: (trigger) => {
                 measure();
                 element.dataset.scrollStart = String(trigger.start);
@@ -613,17 +682,17 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 t.snowStart,
               )
               .to(
-                veil,
+                motion,
                 {
-                  autoAlpha: 0.85,
+                  veilOpacity: 0.85,
                   duration: t.whiteAt - t.snowStart - 0.035,
                   ease: "power2.in",
                 },
                 t.snowStart,
               )
               .to(
-                veil,
-                { autoAlpha: 1, duration: 0.035, ease: "power1.out" },
+                motion,
+                { veilOpacity: 1, duration: 0.035, ease: "power1.out" },
                 t.whiteAt - 0.035,
               )
               .to(
@@ -657,9 +726,9 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 t.captionOut,
               )
               .to(
-                veil,
+                motion,
                 {
-                  autoAlpha: 0,
+                  veilOpacity: 0,
                   duration: t.clearEnd - t.whiteUntil,
                   ease: "power2.inOut",
                 },
@@ -748,6 +817,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 t.settleStart,
               );
           }
+          // Resolve tween starts in chronological order before the first visible seek.
+          timeline.progress(1).progress(0);
           ScrollTrigger.refresh();
           lenis.resize();
           element.dataset.openStart = String(t.openStart);
@@ -855,6 +926,11 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                           : "settle";
             lastProgress = p;
           }
+          // A numeric proxy keeps veil state deterministic across seeks and React renders.
+          veil.style.opacity = String(
+            Math.round(motion.veilOpacity * 10000) / 10000,
+          );
+          veil.style.visibility = motion.veilOpacity > 0 ? "visible" : "hidden";
           applyAccessibility(p);
           if (!finePointer && performance.now() > pointer.touchUntil)
             pointer.present = false;
@@ -863,11 +939,19 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             wander.y = cached.height * (0.2 + random() * 0.5);
             wander.next = time + 2 + random() * 2;
           }
-          if (!reduced && !transitioning && !moving) {
+          if (transitioning) reaction.start = -10;
+          const reactionAge = time - reaction.start,
+            reacting =
+              reactionAge >= 0 &&
+              reactionAge < INTRO_CONFIG.interaction.reactionSeconds;
+          const u = reacting
+              ? reactionAge / INTRO_CONFIG.interaction.reactionSeconds
+              : 1,
+            joy = reacting ? Math.sin(Math.PI * u) : 0;
+          if (!reduced && !transitioning && !moving && !reacting) {
             if (!blink.next) blink.next = time + 3 + random() * 3;
             if (time >= blink.next) {
               blink.start = time;
-              blink.leftOnly = false;
               blink.next = time + 3 + random() * 3;
             }
           } else {
@@ -919,10 +1003,11 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 ? motion.trackingFemale
                 : motion.trackingMale;
             const tx =
-                (dx * 0.18 * weight + (female ? motion.femaleLookX : 0)) *
+                (dx * INTRO_CONFIG.interaction.pupilReachX * weight +
+                  (female ? motion.femaleLookX : 0)) *
                 eyeBoxes[j + 2],
               ty =
-                (dy * 0.14 * weight +
+                (dy * INTRO_CONFIG.interaction.pupilReachY * weight +
                   (female ? motion.femaleLookY : motion.maleLookY)) *
                 eyeBoxes[j + 3];
             pupilOffsets[k] += (tx - pupilOffsets[k]) * lerp;
@@ -937,7 +1022,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                   ? motion.maleRight
                   : motion.maleClose;
             // Preserve the small negative back.out overshoot instead of clamping it to an idle zero.
-            const blinkAmount = blink.leftOnly && i % 2 ? 0 : idleBlink;
+            const blinkAmount = idleBlink;
             const close =
               blinkAmount > 0 ? Math.max(scripted, blinkAmount) : scripted;
             const amount = clamp(close);
@@ -948,16 +1033,95 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             pupils[i].style.transform =
               `translate3d(calc(-50% + ${pupilOffsets[k].toFixed(2)}px),calc(-50% + ${pupilOffsets[k + 1].toFixed(2)}px),0) scaleY(${Math.max(0.03, 1 - close * 0.97).toFixed(4)})`;
           }
-          if (!reduced) {
-            gsap.set(planes[0], {
-              yPercent: motion.travelMale,
-              y: Math.sin(time * 0.85) * 2.5 * motion.breathMale,
-            });
-            gsap.set(planes[1], {
-              yPercent: motion.travelFemale,
-              y: Math.sin(time * 0.85) * 2.5 * motion.breathFemale,
-            });
+          const activeSide = p < 0.5 ? 0 : 1;
+          const tracking = Math.max(motion.trackingMale, motion.trackingFemale);
+          const pointerWeight =
+            !reduced && pointer.present && !transitioning ? tracking : 0;
+          feel.x +=
+            ((pointer.x / cached.width - 0.5) * 2 * pointerWeight - feel.x) *
+            lerp;
+          feel.y +=
+            ((pointer.y / cached.height - 0.5) * 2 * pointerWeight - feel.y) *
+            lerp;
+          feel.power += (pointerWeight - feel.power) * lerp;
+          feel.lensX += (pointer.x - feel.lensX) * lerp;
+          feel.lensY += (pointer.y - feel.lensY) * lerp;
+          const kickRotate = reduced
+            ? 0
+            : reaction.kind === 0
+              ? Math.sin(u * Math.PI * 6) * Math.pow(1 - u, 2) * 2.2
+              : Math.sin(u * Math.PI) * (reaction.kind === 1 ? -0.8 : 2);
+          const kickY = reduced
+            ? 0
+            : reaction.kind === 1
+              ? -12 * joy * Math.exp(-u)
+              : -4 * joy;
+          feel.rotation += (kickRotate - feel.rotation) * lerp;
+          feel.bounce += (kickY - feel.bounce) * lerp;
+          for (let side = 0; side < 2; side++) {
+            const weight = side ? motion.trackingFemale : motion.trackingMale;
+            const happy = side === activeSide ? joy : 0;
+            const x = feel.x * INTRO_CONFIG.interaction.swayX * weight;
+            const y =
+              Math.sin(time * 0.85) *
+                2.5 *
+                (side ? motion.breathFemale : motion.breathMale) +
+              feel.y * INTRO_CONFIG.interaction.swayY * weight +
+              (side === activeSide ? feel.bounce : 0);
+            if (!reduced)
+              gsap.set(planes[side], {
+                yPercent: side ? motion.travelFemale : motion.travelMale,
+                x,
+                y,
+                rotation:
+                  feel.x * INTRO_CONFIG.interaction.tilt * weight +
+                  (side === activeSide ? feel.rotation : 0),
+              });
+            for (const blush of blushes[side])
+              blush.style.opacity = String(
+                (side ? 0.06 : 0) + happy * (reduced ? 0.23 : 0.45),
+              );
+            for (let j = 0; j < delights[side].length; j++) {
+              const a = clamp((reactionAge - j * 0.09) / 0.9),
+                alpha =
+                  side === activeSide &&
+                  reacting &&
+                  !reduced &&
+                  reaction.kind > 0
+                    ? Math.sin(Math.PI * a) * 0.8
+                    : 0;
+              delights[side][j].style.opacity = String(alpha);
+              delights[side][j].style.transform =
+                `translate3d(0,${-a * 35}px,0) rotate(${(j ? 1 : -1) * a * 15}deg) scale(${0.7 + 0.35 * Math.sin(Math.PI * a)})`;
+            }
           }
+          if (artLens) {
+            if (lensSide !== activeSide) {
+              lensSide = activeSide;
+              planes[activeSide].insertBefore(
+                artLens.canvas,
+                planes[activeSide].children[1] ?? null,
+              );
+              artLens.resize(
+                frames[activeSide * 4 + 2],
+                frames[activeSide * 4 + 3],
+                cached.width / cached.height < 0.85,
+              );
+            }
+            const j = activeSide * 4,
+              travel = activeSide ? motion.travelFemale : motion.travelMale;
+            artLens.render(
+              feel.lensX - frames[j] - feel.x * INTRO_CONFIG.interaction.swayX,
+              feel.lensY -
+                frames[j + 1] -
+                (travel * frames[j + 3]) / 100 -
+                feel.y * INTRO_CONFIG.interaction.swayY,
+              feel.power,
+            );
+          }
+          element.dataset.reaction = reacting
+            ? ["wiggle", "bounce", "nuzzle"][reaction.kind]
+            : "idle";
           const count = reduced
             ? 0
             : Math.floor(maximum * motion.density * budget);
@@ -1019,6 +1183,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             element.dataset.fps = (1000 / Math.max(1, frameTime)).toFixed(1);
           }
           if (time - lastDebug > 0.15) {
+            element.dataset.lensDraws = String(artLens?.draws ?? 0);
             element.dataset.whiteout = String(Number(veil.style.opacity));
             element.dataset.density = motion.density.toFixed(3);
             element.dataset.particles = String(count);
@@ -1054,6 +1219,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           window.removeEventListener("pointerdown", change);
           document.removeEventListener("pointerleave", leave);
           window.removeEventListener("resize", resize);
+          artLens?.dispose();
           gsap.ticker.remove(tick);
           lenis.off("scroll", ScrollTrigger.update);
           lenis.destroy();
@@ -1065,11 +1231,22 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         engine.current = {
           select,
           rebuild: (t) => build(t),
-          wink: () => {
-            if (!reduced) {
-              blink.start = gsap.ticker.time;
-              blink.leftOnly = true;
-            }
+          react: () => {
+            if (!latest.current.active || latest.current.blocked) return;
+            const p = timeline.progress();
+            if (
+              p > currentTimings.closeStart &&
+              p < currentTimings.openEnd + 0.045
+            )
+              return;
+            reaction.start = gsap.ticker.time;
+            reaction.kind = reaction.count++ % 3;
+            blink.start = -10;
+            blink.next =
+              gsap.ticker.time +
+              INTRO_CONFIG.interaction.reactionSeconds +
+              3 +
+              random() * 3;
           },
           dispose,
         };
@@ -1089,7 +1266,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         cleanup();
         engine.current = null;
       };
-    }, [attempt, props.reduced]);
+    }, [attempt, props.reduced, props.ready]);
 
     const updateTiming = (key: keyof Timings, value: number) =>
       setTimings((t) => ({ ...t, [key]: value }));
@@ -1117,6 +1294,15 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           className="intro-stage"
           inert={!props.active}
           aria-hidden={!props.active}
+          onClick={(event) => {
+            if (
+              event.target instanceof Element &&
+              !event.target.closest(
+                "button,a,input,textarea,[data-lenis-prevent]",
+              )
+            )
+              engine.current?.react();
+          }}
         >
           <h1 className="sr-only">
             A little company. A little progress. Meet Todo.
@@ -1128,6 +1314,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               data-character={character}
             >
               <img
+                className="intro-base-art"
                 src={INTRO_CONFIG.images[character].src}
                 alt={INTRO_CONFIG.images[character].alt}
                 width="1536"
@@ -1137,10 +1324,39 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               />
               <Eye character={character} side="leftEye" />
               <Eye character={character} side="rightEye" />
+              <img
+                className="intro-wardrobe"
+                src={INTRO_CONFIG.images[character].wardrobe}
+                alt=""
+                width="1536"
+                height="1024"
+                aria-hidden="true"
+                draggable={false}
+              />
+              <div
+                className="intro-blush intro-blush-left"
+                aria-hidden="true"
+              />
+              <div
+                className="intro-blush intro-blush-right"
+                aria-hidden="true"
+              />
+              <span
+                className="intro-delight intro-delight-left"
+                aria-hidden="true"
+              >
+                <Heart size={25} fill="currentColor" />
+              </span>
+              <span
+                className="intro-delight intro-delight-right"
+                aria-hidden="true"
+              >
+                <Heart size={18} fill="currentColor" />
+              </span>
               <button
-                className="intro-boop"
-                aria-label={`Give ${character === "male" ? "him" : "her"} a little boop`}
-                onClick={() => engine.current?.wink()}
+                className="intro-pet-target"
+                aria-label={`Play with ${character === "male" ? "him" : "her"}`}
+                onClick={() => engine.current?.react()}
               />
             </div>
           ))}

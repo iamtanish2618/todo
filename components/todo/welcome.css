@@ -773,3 +773,182 @@
     );
   }
 }
+/* The original avatar remains the base art. Clothes, eyes, affection, and refraction are live layers. */
+.intro-stage {
+  background: linear-gradient(#292c2b 0 24%, #f3e7d7 58%, #fbf2e5 100%);
+}
+.intro-face > .intro-wardrobe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  z-index: 3;
+}
+.intro-art-lens {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+}
+.intro-eye,
+.intro-closed-eye {
+  z-index: 1;
+}
+.intro-pupil {
+  width: 52%;
+  height: 72%;
+  background: radial-gradient(
+    ellipse at 43% 28%,
+    #514539 0,
+    #302a24 29%,
+    #191b1a 61%,
+    #0b1114 84%,
+    #29302d 100%
+  );
+  box-shadow:
+    inset -3px -4px 8px #0008,
+    inset 1px 1px 4px #b29c7540,
+    0 1px 3px #6f574a50;
+}
+.intro-pupil i {
+  width: 17%;
+  height: 14%;
+  left: 19%;
+  top: 16%;
+  background: #fffaf1;
+  opacity: 0.87;
+  box-shadow: 0 0 3px #fff7e775;
+}
+.intro-pupil b {
+  width: 5%;
+  height: 4%;
+  left: 57%;
+  top: 37%;
+  background: #fff9ec;
+  opacity: 0.5;
+}
+.intro-pupil:after {
+  content: "";
+  position: absolute;
+  left: 25%;
+  top: 20%;
+  width: 26%;
+  height: 19%;
+  border-radius: 35% 45% 50% 30%;
+  background: linear-gradient(135deg, #f5e5d12b, transparent);
+  transform: rotate(-20deg);
+}
+.intro-blush {
+  position: absolute;
+  top: 48%;
+  width: 22%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #ee8b9566, transparent 68%);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.intro-blush-left {
+  left: 4%;
+}
+.intro-blush-right {
+  right: 4%;
+}
+.intro-delight {
+  position: absolute;
+  z-index: 4;
+  color: #dc9a9b;
+  opacity: 0;
+  pointer-events: none;
+}
+.intro-delight-left {
+  left: 16%;
+  top: 33%;
+}
+.intro-delight-right {
+  right: 16%;
+  top: 29%;
+}
+.intro-pet-target {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  z-index: 5;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.intro-pet-target:focus-visible {
+  outline: none;
+}
+.intro-pet-target:focus-visible:after {
+  content: "";
+  position: absolute;
+  left: 42%;
+  top: 48%;
+  width: 16%;
+  height: 15%;
+  border-radius: 50%;
+  border: 2px dashed #bd7e4f;
+  outline-offset: 7px;
+}
+@media (max-aspect-ratio: 85/100) {
+  .intro-stage {
+    background: linear-gradient(#292b2b 0 32%, #e8dbca 49%, #fbf2e5 67%);
+  }
+}
+/* Keep static raster masks on the art, not the parent: a parent mask flattens every live
+   pupil/lens frame into a full-screen surface and makes software renderers expensive. */
+.intro-face {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+.intro-face > .intro-base-art,
+.intro-face > .intro-wardrobe {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 5%,
+    #000 90%,
+    transparent
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 5%,
+    #000 90%,
+    transparent
+  );
+}
+@media (max-aspect-ratio: 85/100) {
+  .intro-face > .intro-base-art,
+  .intro-face > .intro-wardrobe {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 8%,
+      #000 84%,
+      transparent
+    );
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 8%,
+      #000 84%,
+      transparent
+    );
+  }
+}
+.intro-experience {
+  overflow-anchor: none;
+}
