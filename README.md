@@ -10,7 +10,7 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 - **Choose your companion:** scroll between the penguins or click the switch hint. A flower passes between them during scrolling. Your choice is remembered.
 - **Settings:** turn on sound effects or gentler motion.
 
-Friends, microphone chat, synchronized rooms, and multiplayer racing are the next stage. The Friends panel says this explicitly. A small solo waddle activity is available during focus breaks; it is not a networked race.
+Friends, microphone chat, and synchronized rooms are the next stage. The Friends panel says this explicitly. Games are on hold: there is no race or other game in this version. Breaks are simple rest periods; game ideas will be revisited later.
 
 ## The process, in plain language
 

@@ -122,9 +122,7 @@ export default function TodoApp() {
     [timerReady, setTimerReady] = useState(false),
     [minutes, setMinutes] = useState(25),
     [taskDraft, setTaskDraft] = useState("");
-  const [saving, setSaving] = useState(false),
-    [race, setRace] = useState(false),
-    [raceScore, setRaceScore] = useState(0);
+  const [saving, setSaving] = useState(false);
   const pointer = useRef<MotionPoint>({ x: 0, y: 0, active: false }),
     cards = useRef<(HTMLButtonElement | null)[]>([]),
     timerRef = useRef(timer),
@@ -595,7 +593,7 @@ export default function TodoApp() {
             </DialogTitle>
             <DialogDescription>
               {timer.phase === "break"
-                ? "Stretch, get some water, or give your penguin a little run."
+                ? "Stretch, get some water, and rest for a moment."
                 : "No perfect plan needed. Just a place to begin."}
             </DialogDescription>
           </DialogHeader>
@@ -671,7 +669,6 @@ export default function TodoApp() {
                     ? finish
                     : () => {
                         setTimer({ ...freshTimer, task: timer.task });
-                        setRace(false);
                       }
                 }
               >
@@ -690,33 +687,17 @@ export default function TodoApp() {
                   remaining: minutes * 60,
                   duration: minutes * 60,
                 });
-                setRace(false);
               }}
             >
               <RotateCcw size={17} />
             </Button>
           </div>
           {timer.phase === "break" ? (
-            <div className="break-play">
-              <p>Your penguin’s little victory lap</p>
-              <div className="race-track">
-                <span style={{ left: `${Math.min(88, raceScore * 4)}%` }}>
-                  🐧
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setRace(true);
-                  setRaceScore((s) => Math.min(22, s + 1));
-                }}
-              >
-                {raceScore >= 22
-                  ? "Made it! Nicely waddled."
-                  : race
-                    ? "Tap to waddle!"
-                    : "Let’s waddle"}
-              </Button>
+            <div className="break-rest">
+              <p>A little space to recharge.</p>
+              <small>
+                Stretch your flippers, get some water, and take your time.
+              </small>
             </div>
           ) : (
             <div className="task-section">
@@ -824,8 +805,8 @@ export default function TodoApp() {
             <span className="tiny-tag">Next chapter</span>
             <h3>We’re getting the room ready.</h3>
             <p>
-              Private invites, microphone chat, shared breaks, and penguin races
-              will live here. This first version is your solo space.
+              Private invites, microphone chat, and shared breaks will live
+              here. This first version is your solo space.
             </p>
           </div>
           <Button className="warm-button" onClick={() => choose("solo")}>

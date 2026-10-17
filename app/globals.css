@@ -758,27 +758,20 @@ a:focus-visible {
   text-decoration: underline;
   margin-left: auto;
 }
-.break-play {
+.break-rest {
   text-align: center;
-  padding: 10px;
+  padding: 18px;
   background: #f9f4ed;
   border-radius: 16px;
 }
-.break-play > p {
-  font-size: 12px;
+.break-rest p {
+  font-size: 13px;
   color: #8c7a68;
+  margin: 0 0 6px;
 }
-.race-track {
-  height: 60px;
-  position: relative;
-  border-bottom: 1px dashed #cfc0ad;
-  margin: 0 10px 12px;
-}
-.race-track span {
-  position: absolute;
-  font-size: 32px;
-  bottom: 0;
-  transition: left 0.2s;
+.break-rest small {
+  font-size: 10px;
+  color: #a08e7c;
 }
 .setting-row {
   display: flex;

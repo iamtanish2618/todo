@@ -146,31 +146,27 @@ test("AI setup state is honest; text uploads work and failed sends preserve the 
   await expect(
     page.getByText(/The AI connection isn’t set up yet/),
   ).toBeVisible();
-  await page
-    .getByLabel("Attach text or image")
-    .setInputFiles({
-      name: "chapter.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from(
-        "The water cycle includes evaporation and condensation.",
-      ),
-    });
+  await page.getByLabel("Attach text or image").setInputFiles({
+    name: "chapter.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "The water cycle includes evaporation and condensation.",
+    ),
+  });
   const composer = page.getByRole("textbox", { name: "Message Todo" });
   await expect(composer).toHaveValue(/water cycle/);
   await page.getByRole("tab", { name: "Summarize", exact: true }).click();
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("private API connection");
   await expect(composer).toHaveValue(/water cycle/);
-  await page
-    .getByLabel("Attach text or image")
-    .setInputFiles({
-      name: "photo.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jq3cAAAAASUVORK5CYII=",
-        "base64",
-      ),
-    });
+  await page.getByLabel("Attach text or image").setInputFiles({
+    name: "photo.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jq3cAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
   await expect(page.locator(".image-attachment")).toContainText("photo.png");
   await page.getByRole("button", { name: "Remove attached image" }).click();
   await expect(page.locator(".image-attachment")).toHaveCount(0);
@@ -318,4 +314,42 @@ test("AI answer can be saved as a note (mocked provider response; no live AI cla
   );
   await page.getByRole("button", { name: "Save note", exact: true }).click();
   await expect(page.getByText("Saved in your notes.")).toBeVisible();
+});
+
+test("a completed focus session leads to a quiet break with games on hold", async ({
+  page,
+}) => {
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "todo.timer.v1",
+      JSON.stringify({
+        remaining: 1,
+        duration: 60,
+        deadline: Date.now() + 400,
+        task: "Break flow check",
+        phase: "focus",
+        started: true,
+        id: crypto.randomUUID(),
+      }),
+    ),
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Take a little breather." }),
+  ).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("A little space to recharge.")).toBeVisible();
+  await expect(page.locator(".race-track")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /waddle|race/i })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Back to focus", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Back to focus", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Let’s do one small thing." }),
+  ).toBeVisible();
 });
