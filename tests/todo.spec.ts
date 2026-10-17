@@ -5,6 +5,10 @@ import fs from "node:fs/promises";
 test.beforeEach(async ({ page }, info) => {
   if (info.title.startsWith("backend")) return;
   await page.goto("/");
+  await expect(page.locator(".intro-experience")).toHaveAttribute(
+    "data-loaded",
+    "true",
+  );
   await expect(page.getByRole("button", { name: /Focus solo/ })).toBeVisible();
   await expect(page.locator(".todo-root")).toHaveAttribute(
     "data-ready",
@@ -20,31 +24,29 @@ test("homepage, live pupil tracking, glass hover, scroll handoff and character p
   await page.mouse.move(100, 140);
   await page.waitForTimeout(500);
   const left = await page
-    .locator(".eye-left .pupil")
+    .locator(".intro-male .leftEye .intro-pupil")
     .first()
     .getAttribute("style");
   await page.mouse.move(1300, 700);
   await page.waitForTimeout(500);
   const right = await page
-    .locator(".eye-left .pupil")
+    .locator(".intro-male .leftEye .intro-pupil")
     .first()
     .getAttribute("style");
   expect(left).not.toEqual(right);
   const first = page.getByRole("button", { name: /Focus solo/ });
   await first.hover();
-  await expect(first).toHaveCSS("border-color", "rgb(233, 179, 140)");
+  await expect(first).toHaveCSS("border-color", "rgb(232, 185, 140)");
   await page.mouse.move(800, 80);
   await page.screenshot({ path: "outputs/todo-desktop.png" });
-  await page.getByRole("button", { name: /Scroll to meet her/ }).click();
-  await expect(
-    page.getByRole("button", { name: /Scroll up to meet him/ }),
-  ).toBeVisible();
-  await page.waitForFunction(() => window.scrollY >= window.innerHeight - 2);
+  await page.getByRole("button", { name: /scroll to meet her/i }).click();
+  await expect(page.getByRole("button", { name: "Choose him" })).toBeVisible();
+  await page.waitForFunction(
+    () => window.scrollY >= 4 * window.innerHeight - 2,
+  );
   await page.screenshot({ path: "outputs/todo-female.png" });
   await page.reload();
-  await expect(
-    page.getByRole("button", { name: /Scroll up to meet him/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Choose him" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -71,7 +73,7 @@ test("task create, complete, reload persistence, timer pause and saved history",
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.locator(".desk-clock")).toBeVisible();
   await page.reload();
-  await page.locator(".session-chip").click();
+  await page.getByRole("button", {name: /Your room is waiting/}).click();
   await page
     .getByRole("button", { name: "Focus & tasks", exact: true })
     .click();
@@ -259,10 +261,13 @@ test("settings, keyboard dismissal, reduced motion and transparent friends statu
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
   await page.reload();
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
-  await page.getByRole("button", { name: /Scroll to meet her/ }).click();
-  await expect(page.locator(".female-choices")).toHaveCSS("opacity", "1");
+  await page.getByRole("button", { name: /scroll to meet her/i }).click();
+  await expect(page.locator(".intro-cards-female")).toHaveCSS("opacity", "1");
   await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(1);
-  await expect(page.locator(".story-handoff")).toHaveCount(0);
+  await expect(page.locator(".intro-experience")).toHaveAttribute(
+    "data-particles",
+    "0",
+  );
   await page.getByRole("button", { name: /Join friends/ }).click();
   await expect(page.getByText("We’re getting the room ready.")).toBeVisible();
   await page.getByRole("button", { name: /Focus with Todo for now/ }).click();
@@ -378,32 +383,6 @@ test("a completed focus session leads to a quiet break with games on hold", asyn
   await expect(
     page.getByRole("heading", { name: "Let’s do one small thing." }),
   ).toBeVisible();
-});
-
-test("scroll hides both choice sets during an actual flower handoff and booping winks", async ({
-  page,
-}) => {
-  await page.getByRole("button", { name: "Give him a little boop" }).click();
-  await expect(page.locator(".male-layer .eye-left")).toHaveClass(/blink/);
-  await expect(page.locator(".male-layer .peace-flipper")).toBeVisible();
-  await page.evaluate(() => scrollTo(0, innerHeight * 0.5));
-  await expect(page.locator(".is-transferring")).toBeVisible();
-  await expect(page.locator(".welcome-viewport")).toHaveAttribute(
-    "data-scroll-progress",
-    "0.500",
-  );
-  await expect(page.locator(".male-choices")).toHaveCSS("opacity", "0");
-  await expect(page.locator(".female-choices")).toHaveCSS("opacity", "0");
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(0);
-  await expect(page.locator(".story-handoff")).toHaveCSS("opacity", "1");
-  await expect(page.locator(".receiving-hand")).toBeVisible();
-  await expect(page.locator(".giving-hand")).toBeVisible();
-  await page.screenshot({ path: "outputs/handoff-v2.png" });
-  await page.evaluate(() => scrollTo(0, innerHeight));
-  await expect(page.locator(".female-choices")).toHaveCSS("opacity", "1");
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(1);
-  await expect(page.locator(".female-art .penguin-bow")).toBeVisible();
-  await page.screenshot({ path: "outputs/female-v2.png" });
 });
 
 test("solo is a room; tool panels preserve the scene, timer, and background AI work", async ({

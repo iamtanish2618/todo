@@ -47,8 +47,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-import type { MotionPoint } from "./face";
-import { Welcome, type Panel } from "./welcome";
+import { Welcome, type WelcomeHandle, type Panel } from "./welcome";
 import { StudyRoom } from "./study-room";
 import {
   api,
@@ -84,13 +83,9 @@ const freshTimer: Timer = {
 };
 export default function TodoApp() {
   const [panel, setPanel] = useState<Panel>(null),
-    [female, setFemale] = useState(false),
-    [progress, setProgress] = useState(0);
+    [female, setFemale] = useState(false);
   const [reduced, setReduced] = useState(false),
-    [sound, setSound] = useState(false),
-    [reaction, setReaction] = useState<string | null>(null),
-    [blink, setBlink] = useState(false),
-    [greeting, setGreeting] = useState(false);
+    [sound, setSound] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]),
     [sessions, setSessions] = useState<FocusSession[]>([]),
     [notes, setNotes] = useState<Note[]>([]),
@@ -104,14 +99,11 @@ export default function TodoApp() {
   const [inRoom, setInRoom] = useState(false),
     [agentMode, setAgentMode] = useState(false),
     [agentBusy, setAgentBusy] = useState(false);
-  const smoothProgress = useRef(0);
-  const pointer = useRef<MotionPoint>({ x: 0, y: 0, active: false }),
-    cards = useRef<(HTMLButtonElement | null)[]>([]),
+  const introRef = useRef<WelcomeHandle>(null),
     timerRef = useRef(timer),
     audio = useRef<AudioContext | null>(null);
   const settling = useRef(false),
     completed = useRef(new Set<string>()),
-    blinkTimeout = useRef<ReturnType<typeof setTimeout> | null>(null),
     hydrated = useRef(false);
   const onError = (e: unknown) =>
     toast.error(
@@ -142,7 +134,7 @@ export default function TodoApp() {
       const settings = JSON.parse(
         localStorage.getItem("todo.settings.v1") || "{}",
       );
-      setReduced(settings.reduced ?? preference.matches);
+      setReduced(Boolean(settings.reduced || preference.matches));
       setSound(settings.sound ?? false);
       const saved = JSON.parse(localStorage.getItem("todo.timer.v1") || "null");
       if (
@@ -156,20 +148,10 @@ export default function TodoApp() {
         (!saved.deadline || Number.isFinite(saved.deadline))
       )
         setTimer(saved);
-      if (localStorage.getItem("todo.character.v1") === "female") {
-        smoothProgress.current = 1;
-        setProgress(1);
-        setFemale(true);
-        window.scrollTo({ top: window.innerHeight });
-      }
     } catch {}
     hydrated.current = true;
     setTimerReady(true);
-    const hello = setTimeout(() => setGreeting(true), 1200),
-      bye = setTimeout(() => setGreeting(false), 7000);
     return () => {
-      clearTimeout(hello);
-      clearTimeout(bye);
       audio.current?.close();
     };
   }, []);
@@ -189,76 +171,6 @@ export default function TodoApp() {
         localStorage.setItem("todo.timer.v1", JSON.stringify(timer));
       } catch {}
   }, [timer, timerReady]);
-  useEffect(() => {
-    let raf = 0,
-      target = smoothProgress.current,
-      last = performance.now();
-    const animate = (now: number) => {
-      const blend = 1 - Math.exp(-(now - last) / 70);
-      last = now;
-      const value = reduced
-        ? target
-        : smoothProgress.current + (target - smoothProgress.current) * blend;
-      const p = Math.abs(target - value) < 0.0005 ? target : value;
-      smoothProgress.current = p;
-      setProgress(p);
-      setFemale(p >= 0.5);
-      if (p === 0 || p === 1)
-        try {
-          localStorage.setItem(
-            "todo.character.v1",
-            p === 1 ? "female" : "male",
-          );
-        } catch {}
-      raf = p === target ? 0 : requestAnimationFrame(animate);
-    };
-    const scroll = () => {
-      target = Math.max(0, Math.min(1, window.scrollY / window.innerHeight));
-      if (!raf) {
-        last = performance.now();
-        raf = requestAnimationFrame(animate);
-      }
-    };
-    const move = (event: PointerEvent) => {
-      pointer.current = { x: event.clientX, y: event.clientY, active: true };
-      if (inRoom) return;
-      cards.current.forEach((card) => {
-        if (!card) return;
-        const r = card.getBoundingClientRect(),
-          dx = Math.max(r.left - event.clientX, 0, event.clientX - r.right),
-          dy = Math.max(r.top - event.clientY, 0, event.clientY - r.bottom);
-        const near = reduced ? 0 : Math.max(0, 1 - Math.hypot(dx, dy) / 160);
-        card.style.setProperty("--near", String(near));
-      });
-    };
-    const leave = () => {
-      pointer.current.active = false;
-      cards.current.forEach((c) => c?.style.setProperty("--near", "0"));
-    };
-    window.addEventListener("scroll", scroll, { passive: true });
-    window.addEventListener("pointermove", move, { passive: true });
-    document.addEventListener("pointerleave", leave);
-    scroll();
-    return () => {
-      window.removeEventListener("scroll", scroll);
-      window.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerleave", leave);
-      cancelAnimationFrame(raf);
-    };
-  }, [reduced, inRoom]);
-  const doBlink = useCallback(() => {
-    setBlink(true);
-    if (blinkTimeout.current) clearTimeout(blinkTimeout.current);
-    blinkTimeout.current = setTimeout(() => setBlink(false), 180);
-  }, []);
-  useEffect(() => {
-    if (reduced) return;
-    const id = setInterval(doBlink, 5400);
-    return () => {
-      clearInterval(id);
-      if (blinkTimeout.current) clearTimeout(blinkTimeout.current);
-    };
-  }, [doBlink, reduced]);
   const chime = useCallback(() => {
     if (!sound) return;
     try {
@@ -348,8 +260,6 @@ export default function TodoApp() {
     };
   }, [inRoom]);
   const choose = (id: Panel) => {
-    setReaction(null);
-    setGreeting(false);
     if (id === "solo" || id === "agent" || id === "friends") {
       setInRoom(true);
       if (id === "agent") setAgentMode(true);
@@ -357,17 +267,8 @@ export default function TodoApp() {
     } else setPanel(id);
     chime();
   };
-  const boop = () => {
-    if (reduced) return;
-    setReaction("peace");
-    setTimeout(() => setReaction(null), 1400);
-    chime();
-  };
   const switchCharacter = () =>
-    window.scrollTo({
-      top: female ? 0 : window.innerHeight,
-      behavior: reduced ? "instant" : "smooth",
-    });
+    introRef.current?.selectCharacter(female ? "male" : "female");
   const addTask = async (e: FormEvent) => {
     e.preventDefault();
     if (!taskDraft.trim() || saving) return;
@@ -454,22 +355,14 @@ export default function TodoApp() {
       data-ready={timerReady}
       className={`todo-root ${reduced ? "reduce-motion" : ""} ${inRoom ? "room-active" : ""}`}
     >
-      <div className="scroll-runway" aria-hidden="true" />
       <Welcome
-        progress={progress}
-        female={female}
+        ref={introRef}
         reduced={reduced}
         ready={timerReady}
-        pointer={pointer}
-        reaction={reaction}
-        blink={blink}
-        greeting={greeting && !panel}
         active={!inRoom}
-        cards={cards}
+        blocked={Boolean(panel)}
         onChoose={choose}
-        onSwitch={switchCharacter}
-        onReaction={setReaction}
-        onBoop={boop}
+        onCharacterChange={setFemale}
         timer={{
           started: timer.started,
           clock,
