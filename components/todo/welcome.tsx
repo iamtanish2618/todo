@@ -935,10 +935,10 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 : i % 2
                   ? motion.maleRight
                   : motion.maleClose;
-            const close = Math.max(
-              scripted,
-              blink.leftOnly && i % 2 ? 0 : idleBlink,
-            );
+            // Preserve the small negative back.out overshoot instead of clamping it to an idle zero.
+            const blinkAmount = blink.leftOnly && i % 2 ? 0 : idleBlink;
+            const close =
+              blinkAmount > 0 ? Math.max(scripted, blinkAmount) : scripted;
             uppers[i].style.transform =
               `translate3d(0,${-70 * (1 - close)}%,0)`;
             lowers[i].style.opacity = String(clamp(close));

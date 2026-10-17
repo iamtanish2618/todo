@@ -76,6 +76,12 @@ test("cinematic sequence: closed eyes, hidden swap, reveal, and identical revers
     "data-tracking-female",
     "0.000",
   );
+  await progress(page, 0.83);
+  const opening = await page
+    .locator(".intro-female .intro-lid-upper")
+    .first()
+    .getAttribute("style");
+  expect(Number(opening?.match(/,\s*(-?[\d.]+)%/)?.[1])).toBeLessThan(-70);
   await progress(page, 1);
   await expect(page.locator(root)).toHaveAttribute(
     "data-tracking-female",
