@@ -104,9 +104,12 @@ export function useTodoAuth(initialIdentity: TodoIdentity, config: AuthConfig) {
               const next = verified
                 ? await session("POST", await user.getIdToken())
                 : await session("DELETE");
+              // The SDK observer and explicit sign-in can overlap. Preserve the
+              // first profile creation even when the newer sync owns the UI.
+              if (!cancelled && next.newAccount && next.identity &&
+                  auth.currentUser?.uid === user?.uid)
+                freshUser.current = next.identity.id;
               if (!cancelled && epoch === generation.current) {
-                if (next.newAccount && next.identity)
-                  freshUser.current = next.identity.id;
                 setNewAccount(
                   Boolean(
                     next.identity && freshUser.current === next.identity.id,

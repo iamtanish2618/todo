@@ -4,7 +4,7 @@ Todo can use Firebase Authentication independently of ChatGPT. Google and email/
 
 ## Firebase project and deployment
 
-Firebase project `todo-penguin-26a9f3` (Todo) and its Todo web app are provisioned. Google sign-in and email/password are enabled; anonymous authentication is disabled. Analytics, Gemini, Firestore and Firebase Hosting are unnecessary: hosting and application records stay on Sites/D1.
+Firebase project `todo-penguin-26a9f3` (Todo) and its Todo web app are provisioned. Google sign-in and email/password are enabled; the production Site is public and both required hostnames are confirmed in Firebase; anonymous authentication is disabled. Analytics, Gemini, Firestore and Firebase Hosting are unnecessary: hosting and application records stay on Sites/D1.
 
 The production runtime contains `TODO_AUTH_PROVIDER=firebase` and the four public web settings: `TODO_FIREBASE_API_KEY`, `TODO_FIREBASE_PROJECT_ID`, `TODO_FIREBASE_AUTH_DOMAIN`, `TODO_FIREBASE_APP_ID`. Local equivalents live only in ignored `.env.local`. Never supply service-account JSON or OAuth secrets to the browser. An unknown provider fails closed; missing Firebase settings cannot fall back to platform identity. Legacy platform mode requires an explicit `TODO_AUTH_PROVIDER=chatgpt`.
 
@@ -33,6 +33,8 @@ The hosting workspace supplies `aniketyadav982` in the generated address. Renami
 ## Validation
 
 `npm run typecheck` and `npm run test:e2e` (23 tests) passed during implementation; the two authentication tests were then rerun against Firebase mode. New tests exercise signed Google/password claims and reject wrong project/issuer, expired/future tokens, unverified email, anonymous providers, unknown signing keys, tampering, oversized tokens and unsigned JWTs. Session API tests reject cross-origin/missing-Origin mutations and fake tokens and check logout cookie protections.
+
+Live production checks confirmed anonymous homepage HTTP 200, anonymous/forged-token data requests HTTP 401, cross-origin session mutation HTTP 403, and successful Google sign-in with a real verified account, including initial profile creation and room access. Email delivery/verification/reset with a real inbox still requires user testing.
 
 The real LoginForm was also exercised in a local mock-controller fixture: Google popup cancellation, email signup → verification state, refusal to enter an unverified room, and generic reset confirmation. That fixture lives under ignored `work/` and is not a deployed authentication bypass. No test email was sent and no live Firebase account was registered by those UI checks.
 
