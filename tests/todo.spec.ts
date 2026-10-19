@@ -41,8 +41,10 @@ test("homepage, live pupil tracking, glass hover, scroll handoff and character p
   await expect(first).toHaveCSS("border-color", "rgb(232, 185, 140)");
   await page.mouse.move(800, 80);
   await page.screenshot({ path: "outputs/todo-desktop.png" });
-  await page.getByRole("button", { name: /scroll to meet her/i }).click();
-  await expect(page.getByRole("button", { name: "Choose him" })).toBeVisible();
+  await page.getByRole("button", { name: "Choose her", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Choose her" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.waitForFunction(
     () =>
       window.scrollY >=
@@ -52,7 +54,9 @@ test("homepage, live pupil tracking, glass hover, scroll handoff and character p
   );
   await page.screenshot({ path: "outputs/todo-female.png" });
   await page.reload();
-  await expect(page.getByRole("button", { name: "Choose him" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Choose her" }),
+  ).toHaveAttribute("aria-pressed", "true");
   expect(errors).toEqual([]);
 });
 
@@ -270,7 +274,7 @@ test("settings, keyboard dismissal, reduced motion and transparent friends statu
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
   await page.reload();
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
-  await page.getByRole("button", { name: /scroll to meet her/i }).click();
+  await page.getByRole("button", { name: "Choose her", exact: true }).click();
   await expect(page.locator(".intro-cards-female")).toHaveCSS("opacity", "1");
   await expect(
     page.getByRole("button", { name: /Focus with Todo/ }),

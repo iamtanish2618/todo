@@ -8,7 +8,6 @@ import {
   useState,
 } from "react";
 import {
-  ArrowDown,
   ArrowRight,
   Headphones,
   Heart,
@@ -322,8 +321,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const trays = Array.from(
             element.querySelectorAll<HTMLElement>(".intro-cards"),
           ),
-          ui = element.querySelector<HTMLElement>(".intro-ui")!,
-          hint = element.querySelector<HTMLElement>(".intro-scroll-hint")!;
+          ui = element.querySelector<HTMLElement>(".intro-ui")!;
+        const picker = element.querySelector<HTMLElement>(".intro-picker")!;
         const pickers = Array.from(
           element.querySelectorAll<HTMLButtonElement>(".intro-picker button"),
         );
@@ -532,6 +531,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               : p > currentTimings.openEnd + 0.045);
           const key = `${male}/${female}`;
           if (key !== lastCards) {
+            picker.inert = !male && !female;
+            picker.setAttribute("aria-hidden", String(!male && !female));
             trays[0].inert = !male;
             trays[1].inert = !female;
             trays[0].setAttribute("aria-hidden", String(!male));
@@ -602,15 +603,14 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             y: 0,
             yPercent: reduced ? 0 : INTRO_CONFIG.travel.femaleEntry,
           });
-          gsap.set([veil, caption, vignette, trays[1], ...pickers], {
+          gsap.set([veil, caption, vignette, trays[1]], {
             autoAlpha: 0,
           });
           gsap.set(trays[0], { autoAlpha: 1, y: 0 });
           gsap.set(trays[1], { y: 30 });
-          gsap.set(pickers, { y: 12 });
+          gsap.set(pickers, { autoAlpha: 1, y: 0 });
           gsap.set(caption, { y: 12 });
           gsap.set(ui, { autoAlpha: 1 });
-          gsap.set(hint, { autoAlpha: 1 });
           timeline = gsap.timeline({
             defaults: { ease: "none" },
             scrollTrigger: {
@@ -634,7 +634,11 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           timeline.to({}, { duration: 1 }, 0);
           if (!reduced) {
             timeline
-              .to(hint, { autoAlpha: 0, duration: 0.05 }, 0.05)
+              .to(
+                pickers,
+                { autoAlpha: 0, y: 12, duration: 0.06 },
+                t.closeStart,
+              )
               .to(
                 motion,
                 {
@@ -895,8 +899,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           });
           gsap.set(trays[0], { autoAlpha: side === "male" ? 1 : 0, y: 0 });
           gsap.set(trays[1], { autoAlpha: side === "female" ? 1 : 0, y: 0 });
-          gsap.set(hint, { autoAlpha: side === "male" ? 1 : 0 });
-          gsap.set(pickers, { autoAlpha: side === "female" ? 1 : 0, y: 0 });
+          gsap.set(pickers, { autoAlpha: 1, y: 0 });
         };
         const tick = (time: number, deltaMs: number) => {
           if (disposed || cancelled) return;
@@ -1452,16 +1455,6 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             >
               <div className="intro-welcome-line">
                 <p className="intro-greeting">{props.greeting}</p>
-                <button
-                  type="button"
-                  className="intro-identity"
-                  aria-label={`Select ${character === "male" ? "blue" : "pink"} companion`}
-                  aria-pressed={selected === character}
-                  onClick={() => engine.current?.select(character)}
-                >
-                  <span className={character} />{" "}
-                  {character === "male" ? "Choose Him" : "Choose Her"}
-                </button>
               </div>
               <div className="intro-card-row">
                 {choices.map(({ id, label, icon: Icon }) => (
@@ -1497,15 +1490,15 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               ) : null}
             </section>
           ))}
-          <button
-            className="intro-scroll-hint"
-            onClick={() => engine.current?.select("female")}
+          <div
+            className="intro-picker"
+            role="group"
+            aria-label="Choose your companion"
           >
-            <ArrowDown size={14} />
-            <span>scroll to meet her</span>
-          </button>
-          <div className="intro-picker" aria-label="Choose your companion">
             <button
+              type="button"
+              data-character="male"
+              disabled={!props.ready || !loaded}
               aria-pressed={selected === "male"}
               onClick={() => engine.current?.select("male")}
             >
@@ -1513,6 +1506,9 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               Choose him
             </button>
             <button
+              type="button"
+              data-character="female"
+              disabled={!props.ready || !loaded}
               aria-pressed={selected === "female"}
               onClick={() => engine.current?.select("female")}
             >

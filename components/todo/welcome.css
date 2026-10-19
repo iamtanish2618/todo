@@ -410,28 +410,32 @@
   gap: 7px;
   white-space: nowrap;
   border: 1px solid #c7ae953d;
-  background: #fffbf16b;
-  color: #998170;
+  background: #fffaf12e;
+  color: #665247;
   border-radius: 30px;
-  padding: 7px 13px;
+  padding: 8px 14px;
+  min-height: 38px;
   font:
     600 10px Nunito,
     system-ui;
-  opacity: 0;
-  visibility: hidden;
   cursor: pointer;
   transition:
     background-color 0.2s,
     color 0.2s;
 }
-.intro-picker button[aria-pressed="true"] {
-  background: #fff9ee;
-  color: #6e5546;
-  border-color: #caa98877;
-}
 .intro-picker button:hover {
   background: #fffaf1;
   color: #78523a;
+}
+.intro-picker button[data-character="male"][aria-pressed="true"] {
+  background: #dceaf4ed;
+  color: #456b84;
+  border-color: #a8c2d5;
+}
+.intro-picker button[data-character="female"][aria-pressed="true"] {
+  background: #f4dee7ed;
+  color: #92566f;
+  border-color: #dab2c3;
 }
 .intro-loading {
   position: absolute;
@@ -1143,11 +1147,11 @@
   background: #fffaf2;
 }
 .intro-picker {
-  bottom: 5%;
+  bottom: 2.5%;
 }
 .intro-picker button {
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
 }
 .intro-scroll-hint {
   bottom: 2.5%;
