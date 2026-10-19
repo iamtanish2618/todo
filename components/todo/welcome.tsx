@@ -46,6 +46,9 @@ export const INTRO_CONFIG = {
     },
   },
   portrait: { maxImageWidth: 1.5, eyeHeight: 0.41 },
+  // A gentle vertical optical correction gives the wide source art a rounder
+  // laptop silhouette. All art, eyes, knit and refraction share this same frame.
+  landscape: { zoom: 1.08, fullness: 1.12, eyeHeight: 0.42 },
   eyes: {
     leftEye: { cx: 0.262, cy: 0.416, rx: 0.085, ry: 0.114 },
     rightEye: { cx: 0.739, cy: 0.416, rx: 0.085, ry: 0.114 },
@@ -120,7 +123,6 @@ const choices = [
   {
     id: "solo",
     label: "Focus with Todo",
-    description: "Your room. Your pace. A little company.",
     icon: Headphones,
   },
 ] as const;
@@ -451,15 +453,19 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 (cached.width * INTRO_CONFIG.portrait.maxImageWidth) /
                   image.naturalWidth,
               );
-            cover *= frame.scale * (portrait ? 1 : 1.03);
+            cover *= frame.scale * (portrait ? 1 : INTRO_CONFIG.landscape.zoom);
             const w = image.naturalWidth * cover,
-              h = image.naturalHeight * cover,
+              h =
+                image.naturalHeight *
+                cover *
+                (portrait ? 1 : INTRO_CONFIG.landscape.fullness),
               x = (cached.width - w) / 2 + frame.translateX * w,
               y =
                 (portrait
                   ? cached.height * INTRO_CONFIG.portrait.eyeHeight -
                     INTRO_CONFIG.eyes.leftEye.cy * h
-                  : (cached.height - h) / 2) +
+                  : cached.height * INTRO_CONFIG.landscape.eyeHeight -
+                    INTRO_CONFIG.eyes.leftEye.cy * h) +
                 frame.translateY * h;
             Object.assign(planes[i].style, {
               width: `${w}px`,
@@ -1437,10 +1443,6 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 <Settings2 size={18} />
               </Button>
             </header>
-            <footer className="intro-footer">
-              <span>A little company. A little progress.</span>
-              <span>your penguin, your pace</span>
-            </footer>
           </div>
           {(["male", "female"] as const).map((character) => (
             <section
@@ -1448,37 +1450,36 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               key={character}
               aria-label={`Choose ${character} companion`}
             >
-              <button
-                type="button"
-                className="intro-identity"
-                aria-label={`Select ${character === "male" ? "blue" : "pink"} companion`}
-                aria-pressed={selected === character}
-                onClick={() => engine.current?.select(character)}
-              >
-                <span className={character} />{" "}
-                {character === "male" ? "Choose Him" : "Choose Her"}
-              </button>
-              <p className="intro-greeting">{props.greeting}</p>
-              <p className="intro-greeting-note">
-                A little company for whatever’s next.
-              </p>
+              <div className="intro-welcome-line">
+                <p className="intro-greeting">{props.greeting}</p>
+                <button
+                  type="button"
+                  className="intro-identity"
+                  aria-label={`Select ${character === "male" ? "blue" : "pink"} companion`}
+                  aria-pressed={selected === character}
+                  onClick={() => engine.current?.select(character)}
+                >
+                  <span className={character} />{" "}
+                  {character === "male" ? "Choose Him" : "Choose Her"}
+                </button>
+              </div>
               <div className="intro-card-row">
-                {choices.map(({ id, label, description, icon: Icon }) => (
+                {choices.map(({ id, label, icon: Icon }) => (
                   <button
                     key={id}
                     className={`intro-glass ${id === "solo" ? "intro-primary" : ""}`}
                     disabled={!props.ready || !loaded}
                     onClick={() => props.onChoose(id)}
                   >
-                    <div>
-                      <Icon size={25} strokeWidth={1.5} />
-                      <ArrowRight size={17} />
-                    </div>
-                    <h2>
-                      {label}
-                      {id === "solo" ? <i /> : null}
-                    </h2>
-                    <p>{description}</p>
+                    <span className="intro-focus-icon" aria-hidden="true">
+                      <Icon size={22} strokeWidth={1.6} />
+                    </span>
+                    <span className="intro-focus-label">{label}</span>
+                    <ArrowRight
+                      className="intro-focus-arrow"
+                      size={18}
+                      aria-hidden="true"
+                    />
                   </button>
                 ))}
               </div>
