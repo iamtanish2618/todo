@@ -1,6 +1,12 @@
 /** Native WebGL cursor refraction. A small, transparent canvas follows the cursor,
  * rather than repainting a full-screen surface. GSAP's shared ticker owns all draws. */
-export function createArtLens(image: HTMLImageElement) {
+export function createArtLens(
+  image: TexImageSource,
+  eyes: {
+    leftEye: { cx: number; cy: number; rx: number; ry: number };
+    rightEye: { cx: number; cy: number; rx: number; ry: number };
+  },
+) {
   const canvas = document.createElement("canvas");
   canvas.className = "intro-art-lens";
   canvas.setAttribute("aria-hidden", "true");
@@ -27,7 +33,7 @@ export function createArtLens(image: HTMLImageElement) {
   const fragment = shader(
     gl.FRAGMENT_SHADER,
     `precision mediump float;
-    varying vec2 localUV;uniform sampler2D art;uniform vec2 mouse;uniform vec2 span;uniform vec2 edges;uniform float aspect;uniform float power;
+    varying vec2 localUV;uniform sampler2D art;uniform vec2 mouse;uniform vec2 span;uniform vec2 edges;uniform vec4 eye0;uniform vec4 eye1;uniform float aspect;uniform float power;
     void main(){vec2 uv=mouse+(localUV-.5)*span;
       vec2 d=(uv-mouse)*vec2(aspect,1.);float r=length(d);float radius=span.y*.5;
       float lens=exp(-dot(d,d)/.009)*power;float ring=sin(r*70.)*exp(-r*19.)*power*.003;
@@ -36,7 +42,9 @@ export function createArtLens(image: HTMLImageElement) {
       float alpha=1.-smoothstep(radius*.70,radius,r);
       alpha*=step(0.,uv.x)*step(uv.x,1.)*step(0.,uv.y)*step(uv.y,1.);
       alpha*=clamp(uv.y/edges.x,0.,1.)*clamp((1.-uv.y)/(1.-edges.y),0.,1.);
-      gl_FragColor=vec4(c.rgb,alpha);}`,
+      alpha*=smoothstep(.90,1.25,length((uv-eye0.xy)/eye0.zw));
+      alpha*=smoothstep(.90,1.25,length((uv-eye1.xy)/eye1.zw));
+      gl_FragColor=vec4(c.rgb,alpha*c.a);}`,
   );
   if (!vertex || !fragment) return null;
   const program = gl.createProgram()!;
@@ -61,6 +69,15 @@ export function createArtLens(image: HTMLImageElement) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+  [eyes.leftEye, eyes.rightEye].forEach((eye, index) =>
+    gl.uniform4f(
+      gl.getUniformLocation(program, `eye${index}`),
+      eye.cx,
+      eye.cy,
+      eye.rx,
+      eye.ry,
+    ),
+  );
   const edges = gl.getUniformLocation(program, "edges");
   const mouse = gl.getUniformLocation(program, "mouse"),
     span = gl.getUniformLocation(program, "span"),
@@ -91,6 +108,17 @@ export function createArtLens(image: HTMLImageElement) {
   return {
     canvas,
     resize,
+    setImage(source: TexImageSource) {
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        source,
+      );
+      lastPower = -9;
+    },
     get draws() {
       return draws;
     },

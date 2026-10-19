@@ -10,13 +10,10 @@ import {
 import {
   ArrowDown,
   ArrowRight,
-  FileText,
   Headphones,
   Heart,
   Loader2,
   Settings2,
-  Sparkles,
-  Users,
   X,
 } from "lucide-react";
 import { createArtLens } from "@/lib/todo/art-lens";
@@ -67,7 +64,7 @@ export const INTRO_CONFIG = {
     holdEnd: 0.12,
     closeStart: 0.12,
     closeEnd: 0.3,
-    rightOffset: 0.025,
+    rightOffset: 0,
     snowStart: 0.22,
     whiteAt: 0.46,
     whiteUntil: 0.54,
@@ -81,7 +78,7 @@ export const INTRO_CONFIG = {
     veilCenter: "#FFFFFF",
     veilEdge: "#E8F1F9",
   },
-  travel: { maleExit: -12, femaleEntry: 22 },
+  travel: { maleExit: -12, femaleEntry: 13 },
   interaction: {
     swayX: 10,
     swayY: 6,
@@ -90,7 +87,7 @@ export const INTRO_CONFIG = {
     pupilReachX: 0.18,
     pupilReachY: 0.14,
   },
-  caption: "or maybe you'd like me?",
+  caption: "Please choose your companion.",
   sectionHeight: "180svh",
   scrub: 0.55,
   lenisLerp: 0.09,
@@ -109,6 +106,9 @@ type Props = {
   onChoose: (panel: Panel) => void;
   onCharacterChange: (female: boolean) => void;
   timer: { started: boolean; clock: string; running: boolean };
+  greeting: string;
+  signedIn: boolean;
+  onAccount: (mode: "signup" | "login" | "account") => void;
 };
 type Engine = {
   select: (character: Character, immediate?: boolean) => void;
@@ -119,21 +119,9 @@ type Engine = {
 const choices = [
   {
     id: "solo",
-    label: "Focus solo",
-    description: "One thing at a time.",
+    label: "Focus with Todo",
+    description: "Your room. Your pace. A little company.",
     icon: Headphones,
-  },
-  {
-    id: "friends",
-    label: "Join friends",
-    description: "Good company. Same room.",
-    icon: Users,
-  },
-  {
-    id: "agent",
-    label: "Ask Todo",
-    description: "A little help goes a long way.",
-    icon: Sparkles,
   },
 ] as const;
 const clamp = (x: number, low = 0, high = 1) =>
@@ -278,7 +266,26 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const oldRestoration = history.scrollRestoration;
         history.scrollRestoration = "manual";
         const reduced = latest.current.reduced;
-        const artLens = reduced ? null : createArtLens(images[0]);
+        // Bake only the two static art layers once. The live eyes stay above the
+        // refraction window, and the clothes now bend with the fur under the cursor.
+        const textures = images.map((image, index) => {
+          const texture = document.createElement("canvas");
+          texture.width = image.naturalWidth;
+          texture.height = image.naturalHeight;
+          const context = texture.getContext("2d")!;
+          context.drawImage(image, 0, 0);
+          context.drawImage(
+            outfits[index],
+            0,
+            0,
+            texture.width,
+            texture.height,
+          );
+          return texture;
+        });
+        const artLens = reduced
+          ? null
+          : createArtLens(textures[0], INTRO_CONFIG.eyes);
         let lensSide = 0;
         if (artLens)
           planes[0].insertBefore(artLens.canvas, planes[0].children[1] ?? null);
@@ -287,6 +294,11 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const blushes = planes.map((plane) =>
           Array.from(plane.querySelectorAll<HTMLElement>(".intro-blush")),
         );
+        const wardrobes = planes.map((plane) =>
+          plane.querySelector<HTMLElement>(".intro-wardrobe")!,
+        );
+        const atmosphere =
+          element.querySelector<HTMLElement>(".intro-atmosphere")!;
         const delights = planes.map((plane) =>
           Array.from(plane.querySelectorAll<HTMLElement>(".intro-delight")),
         );
@@ -756,7 +768,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 {
                   femaleClose: 0,
                   duration: t.openEnd - t.openStart - t.rightOffset,
-                  ease: "back.out(1.2)",
+                  ease: "back.out(1.05)",
                 },
                 t.openStart,
               )
@@ -765,7 +777,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 {
                   femaleRight: 0,
                   duration: t.openEnd - t.openStart - t.rightOffset,
-                  ease: "back.out(1.2)",
+                  ease: "back.out(1.05)",
                 },
                 t.openStart + t.rightOffset,
               )
@@ -1077,6 +1089,14 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                   feel.x * INTRO_CONFIG.interaction.tilt * weight +
                   (side === activeSide ? feel.rotation : 0),
               });
+            // A small lag in the knit gives it weight without detaching the brim
+            // from the face. This transform shares the main ticker and reverses cleanly.
+            const knit =
+              reduced || transitioning
+                ? 0
+                : feel.x * 0.28 + feel.rotation * -0.35;
+            wardrobes[side].style.transform =
+              `translate3d(${(-feel.x * weight * 1.5).toFixed(2)}px,${(-feel.bounce * 0.12 * weight).toFixed(2)}px,0) rotate(${knit.toFixed(3)}deg) scale(${(1 + happy * 0.005).toFixed(4)},${(1 - happy * 0.006).toFixed(4)})`;
             for (const blush of blushes[side])
               blush.style.opacity = String(
                 (side ? 0.06 : 0) + happy * (reduced ? 0.23 : 0.45),
@@ -1095,9 +1115,13 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 `translate3d(0,${-a * 35}px,0) rotate(${(j ? 1 : -1) * a * 15}deg) scale(${0.7 + 0.35 * Math.sin(Math.PI * a)})`;
             }
           }
+          atmosphere.style.transform = reduced
+            ? "none"
+            : `translate3d(${(-feel.x * 8).toFixed(2)}px,${(-feel.y * 6 + feel.bounce * 0.22).toFixed(2)}px,0) scale(1.04) rotate(${(feel.rotation * -0.12).toFixed(3)}deg)`;
           if (artLens) {
             if (lensSide !== activeSide) {
               lensSide = activeSide;
+              artLens.setImage(textures[activeSide]);
               planes[activeSide].insertBefore(
                 artLens.canvas,
                 planes[activeSide].children[1] ?? null,
@@ -1116,7 +1140,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                 frames[j + 1] -
                 (travel * frames[j + 3]) / 100 -
                 feel.y * INTRO_CONFIG.interaction.swayY,
-              feel.power,
+              feel.power + joy * 0.45,
             );
           }
           element.dataset.reaction = reacting
@@ -1307,6 +1331,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           <h1 className="sr-only">
             A little company. A little progress. Meet Todo.
           </h1>
+          <div className="intro-atmosphere" aria-hidden="true" />
           {(["female", "male"] as const).map((character) => (
             <div
               key={character}
@@ -1375,7 +1400,32 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               <a href="/" className="intro-wordmark" aria-label="Todo home">
                 todo<span>•</span>
               </a>
-              <span>your penguin, your pace</span>
+              <nav className="intro-account-nav" aria-label="Your account">
+                {props.signedIn ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => props.onAccount("account")}
+                  >
+                    Your account
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      onClick={() => props.onAccount("login")}
+                    >
+                      Log in
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="intro-signup"
+                      onClick={() => props.onAccount("signup")}
+                    >
+                      Sign up <ArrowRight size={14} />
+                    </Button>
+                  </>
+                )}
+              </nav>
               <Button
                 variant="ghost"
                 size="icon"
@@ -1389,13 +1439,7 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
             </header>
             <footer className="intro-footer">
               <span>A little company. A little progress.</span>
-              <button
-                onClick={() => props.onChoose("notes")}
-                disabled={!props.ready || !loaded}
-              >
-                <FileText size={13} />
-                Your notes
-              </button>
+              <span>your penguin, your pace</span>
             </footer>
           </div>
           {(["male", "female"] as const).map((character) => (
@@ -1404,12 +1448,20 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
               key={character}
               aria-label={`Choose ${character} companion`}
             >
-              <div className="intro-identity">
+              <button
+                type="button"
+                className="intro-identity"
+                aria-label={`Select ${character === "male" ? "blue" : "pink"} companion`}
+                aria-pressed={selected === character}
+                onClick={() => engine.current?.select(character)}
+              >
                 <span className={character} />{" "}
-                {character === "male"
-                  ? "His corner. Your company."
-                  : "Her corner. Your company."}
-              </div>
+                {character === "male" ? "Choose Him" : "Choose Her"}
+              </button>
+              <p className="intro-greeting">{props.greeting}</p>
+              <p className="intro-greeting-note">
+                A little company for whatever’s next.
+              </p>
               <div className="intro-card-row">
                 {choices.map(({ id, label, description, icon: Icon }) => (
                   <button

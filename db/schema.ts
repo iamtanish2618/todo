@@ -5,6 +5,13 @@ import {
   primaryKey,
 } from "drizzle-orm/sqlite-core";
 
+export const profiles = sqliteTable("profiles", {
+  userId: text("user_id").primaryKey(),
+  name: text("name").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),

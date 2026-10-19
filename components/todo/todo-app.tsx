@@ -49,6 +49,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Welcome, type WelcomeHandle, type Panel } from "./welcome";
 import { StudyRoom } from "./study-room";
+import { AccountPanel, type Identity, type Profile } from "./account-panel";
 import {
   api,
   exportPDF,
@@ -81,7 +82,22 @@ const freshTimer: Timer = {
   started: false,
   id: "",
 };
-export default function TodoApp() {
+export default function TodoApp({
+  identity,
+  signInPath,
+  signOutPath,
+}: {
+  identity: Identity;
+  signInPath: string;
+  signOutPath: string;
+}) {
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountMode, setAccountMode] = useState<
+    "signup" | "login" | "account"
+  >("account");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [returning, setReturning] = useState(false);
+  const [profileError, setProfileError] = useState("");
   const [panel, setPanel] = useState<Panel>(null),
     [female, setFemale] = useState(false);
   const [reduced, setReduced] = useState(false),
@@ -126,8 +142,26 @@ export default function TodoApp() {
     setLoadError(failed?.status === "rejected" ? failed.reason.message : "");
   }, []);
   useEffect(() => {
+    if (!identity) return;
     load();
-  }, [load]);
+    let cancelled = false;
+    api<Profile | null>("/api/profile")
+      .then((result) => {
+        if (!cancelled) {
+          setProfile(result);
+          setReturning(Boolean(result));
+        }
+      })
+      .catch(() => {
+        if (!cancelled)
+          setProfileError(
+            "Your saved name couldn’t load. You can update it in Your account.",
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [load, identity]);
   useEffect(() => {
     const preference = matchMedia("(prefers-reduced-motion: reduce)");
     try {
@@ -260,6 +294,11 @@ export default function TodoApp() {
     };
   }, [inRoom]);
   const choose = (id: Panel) => {
+    if (!identity && id !== "settings") {
+      setAccountMode("signup");
+      setAccountOpen(true);
+      return;
+    }
     if (id === "solo" || id === "agent" || id === "friends") {
       setInRoom(true);
       if (id === "agent") setAgentMode(true);
@@ -360,7 +399,17 @@ export default function TodoApp() {
         reduced={reduced}
         ready={timerReady}
         active={!inRoom}
-        blocked={Boolean(panel)}
+        blocked={Boolean(panel) || accountOpen}
+        greeting={
+          identity
+            ? `${returning ? "Welcome back" : "Hey"}${profile?.name || identity.name ? `, ${profile?.name || identity.name?.split(" ")[0]}` : ""}.`
+            : "Hey, you."
+        }
+        signedIn={Boolean(identity)}
+        onAccount={(mode) => {
+          setAccountMode(mode);
+          setAccountOpen(true);
+        }}
         onChoose={choose}
         onCharacterChange={setFemale}
         timer={{
@@ -369,6 +418,29 @@ export default function TodoApp() {
           running: Boolean(timer.deadline),
         }}
       />
+      {accountOpen ? (
+        <AccountPanel
+          open={accountOpen}
+          onOpenChange={setAccountOpen}
+          mode={accountMode}
+          identity={identity}
+          profile={profile}
+          female={female}
+          signInPath={signInPath}
+          signOutPath={signOutPath}
+          reduced={reduced}
+          onSaved={(next) => {
+            setProfile(next);
+            setReturning(false);
+            setProfileError("");
+          }}
+        />
+      ) : null}
+      {profileError ? (
+        <p className="profile-load-error" role="status">
+          {profileError}
+        </p>
+      ) : null}
       <StudyRoom
         active={inRoom}
         female={female}

@@ -4,12 +4,14 @@ import fs from "node:fs/promises";
 
 test.beforeEach(async ({ page }, info) => {
   if (info.title.startsWith("backend")) return;
-  await page.goto("/");
+  await page.goto("/signin-with-chatgpt?return_to=/");
   await expect(page.locator(".intro-experience")).toHaveAttribute(
     "data-loaded",
     "true",
   );
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Focus with Todo/ }),
+  ).toBeVisible();
   await expect(page.locator(".todo-root")).toHaveAttribute(
     "data-ready",
     "true",
@@ -34,7 +36,7 @@ test("homepage, live pupil tracking, glass hover, scroll handoff and character p
     .first()
     .getAttribute("style");
   expect(left).not.toEqual(right);
-  const first = page.getByRole("button", { name: /Focus solo/ });
+  const first = page.getByRole("button", { name: /Focus with Todo/ });
   await first.hover();
   await expect(first).toHaveCSS("border-color", "rgb(232, 185, 140)");
   await page.mouse.move(800, 80);
@@ -57,7 +59,7 @@ test("homepage, live pupil tracking, glass hover, scroll handoff and character p
 test("task create, complete, reload persistence, timer pause and saved history", async ({
   page,
 }) => {
-  await page.getByRole("button", { name: /Focus solo/ }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
   await page
     .getByRole("button", { name: "Focus & tasks", exact: true })
     .click();
@@ -115,7 +117,8 @@ test("task create, complete, reload persistence, timer pause and saved history",
 test("write and persist note; export a real paginated PDF", async ({
   page,
 }) => {
-  await page.getByRole("button", { name: "Your notes", exact: true }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
   const title = `Study notes ${Date.now()}`;
   await page.getByRole("textbox", { name: "Title", exact: true }).fill(title);
   await page
@@ -141,7 +144,8 @@ test("write and persist note; export a real paginated PDF", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.reload();
-  await page.getByRole("button", { name: "Your notes", exact: true }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
   await page.getByRole("tab", { name: /Saved notes/ }).click();
   await expect(
     page.getByRole("button", { name: new RegExp("^" + title) }),
@@ -157,7 +161,8 @@ test("write and persist note; export a real paginated PDF", async ({
 test("AI setup state is honest; text uploads work and failed sends preserve the draft", async ({
   page,
 }) => {
-  await page.getByRole("button", { name: /Ask Todo/ }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
   await expect(
     page.getByText(/The AI connection isn’t set up yet/),
   ).toBeVisible();
@@ -267,12 +272,15 @@ test("settings, keyboard dismissal, reduced motion and transparent friends statu
   await expect(page.locator(".todo-root")).toHaveClass(/reduce-motion/);
   await page.getByRole("button", { name: /scroll to meet her/i }).click();
   await expect(page.locator(".intro-cards-female")).toHaveCSS("opacity", "1");
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: /Focus with Todo/ }),
+  ).toHaveCount(1);
   await expect(page.locator(".intro-experience")).toHaveAttribute(
     "data-particles",
     "0",
   );
-  await page.getByRole("button", { name: /Join friends/ }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
+  await page.getByRole("button", { name: "Friends", exact: true }).click();
   await expect(page.getByText("We’re getting the room ready.")).toBeVisible();
   await page.getByRole("button", { name: /Focus with Todo for now/ }).click();
   await expect(
@@ -292,15 +300,13 @@ test("mobile layout has no horizontal overflow and every primary control opens",
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  for (const name of [/Focus solo/, /Join friends/, /Ask Todo/]) {
-    await page.getByRole("button", { name }).click();
+  for (const name of ["Focus & tasks", "Friends", "Agent"]) {
+    await page.getByRole("button", { name: /Focus with Todo/ }).click();
+    await page.getByRole("button", { name, exact: true }).click();
     await expect(page.locator(".study-room.room-entered")).toBeVisible();
-    if (String(name).includes("Focus solo")) {
+    if (name === "Focus & tasks") {
       await expect(page.locator(".study-room")).toHaveCSS("opacity", "1");
       await page.screenshot({ path: "outputs/room-mobile-v2.png" });
-      await page
-        .getByRole("button", { name: "Focus & tasks", exact: true })
-        .click();
     }
     await expect(page.getByRole("dialog")).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
@@ -338,7 +344,8 @@ test("AI answer can be saved as a note (mocked provider response; no live AI cla
     "data-ready",
     "true",
   );
-  await page.getByRole("button", { name: /Ask Todo/ }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
   await page.getByRole("tab", { name: "Make notes", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Message Todo" })
@@ -398,7 +405,7 @@ test("solo is a room; tool panels preserve the scene, timer, and background AI w
       json: { text: "A calm plan: read, make notes, then take a break." },
     });
   });
-  await page.getByRole("button", { name: /Focus solo/ }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const room = page.getByRole("region", { name: "Your shared Todo workspace" });
   await expect(room).toBeVisible();

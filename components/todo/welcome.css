@@ -952,3 +952,259 @@
 .intro-experience {
   overflow-anchor: none;
 }
+
+/* Quiet entry: one invitation, one companion, no tool grid. */
+.intro-stage {
+  background: #f5eee4;
+}
+.intro-atmosphere {
+  position: absolute;
+  inset: -3%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 14% 12%, #dbe8ee 0, transparent 53%),
+    radial-gradient(ellipse at 86% 25%, #f3e0df 0, transparent 57%),
+    linear-gradient(#f2f3ef, #faf0e1);
+}
+.intro-ui::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 160px;
+  pointer-events: none;
+  background: linear-gradient(#f6f1e9fa, #f6f1e9a3 50%, #f6f1e900);
+}
+.intro-header {
+  position: relative;
+  color: #5c574f;
+  height: 90px;
+  gap: 13px;
+}
+.intro-account-nav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: auto;
+  pointer-events: auto;
+}
+.intro-account-nav button {
+  font-family: inherit;
+  font-size: 12px;
+  color: #675d51;
+  border-radius: 30px;
+  padding: 0 18px;
+  height: 38px;
+}
+.intro-account-nav button:hover {
+  background: #fffaf3b5;
+}
+.intro-account-nav .intro-signup {
+  background: #fffaf0d9;
+  border: 1px solid #fffefa;
+  box-shadow: 0 3px 14px #72513908;
+}
+.intro-settings {
+  margin-left: 0;
+  color: #7f7467 !important;
+  border-color: #ffffff9e !important;
+  background: #fff9f385 !important;
+  width: 38px !important;
+  height: 38px !important;
+}
+.intro-cards {
+  width: min(360px, calc(100vw - 48px));
+  bottom: 12%;
+  text-align: center;
+}
+.intro-identity {
+  font-family: inherit;
+  border: 1px solid #fffdf4c7;
+  background: #fffaf1c9;
+  color: #847464;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  padding: 6px 13px;
+  margin-bottom: 12px;
+  transition:
+    background 0.3s,
+    transform 0.3s;
+}
+.intro-identity:hover {
+  background: #fffdf8;
+  transform: translateY(-2px);
+}
+.intro-identity:focus-visible {
+  outline: 2px solid #b68153;
+  outline-offset: 4px;
+}
+.intro-greeting {
+  margin: 0;
+  font-size: clamp(24px, 2.5vw, 34px);
+  font-weight: 800;
+  color: #655143;
+  letter-spacing: -0.055em;
+  line-height: 1.1;
+}
+.intro-greeting-note {
+  font-size: 11px;
+  color: #95806d;
+  margin: 8px 0 19px;
+}
+.intro-card-row {
+  display: block;
+}
+.intro-glass.intro-primary {
+  width: 100%;
+  min-height: 0;
+  padding: 17px 20px;
+  border-radius: 19px;
+  background: rgb(255 249 239 / calc(0.81 + var(--near, 0) * 0.12));
+  border: 1px solid #fffdf8;
+}
+.intro-glass > div {
+  float: left;
+  height: 42px;
+  margin: 0 15px 0 0;
+  color: #b0825a;
+}
+.intro-glass > div > svg:last-child {
+  position: absolute;
+  right: 19px;
+  top: 28px;
+}
+.intro-glass h2 {
+  margin: 1px 20px 5px 0;
+  font-size: 19px;
+  line-height: 1.25;
+}
+.intro-glass p {
+  font-size: 10px;
+  white-space: normal;
+  color: #96816e;
+  padding-right: 10px;
+}
+.intro-primary h2 i {
+  display: none;
+}
+.intro-glass:hover {
+  border-color: #e8b98c;
+  background: #fffaf2;
+}
+.intro-picker {
+  bottom: 5%;
+}
+.intro-picker button {
+  font-family: inherit;
+  font-size: 10px;
+}
+.intro-scroll-hint {
+  bottom: 4%;
+}
+.intro-footer {
+  bottom: 17px;
+  font-size: 9px;
+}
+.intro-art-lens {
+  z-index: 3;
+}
+.intro-face > .intro-wardrobe {
+  transform-origin: 50% 49%;
+}
+.profile-load-error {
+  position: fixed;
+  bottom: 10px;
+  left: 20px;
+  z-index: 12;
+  max-width: 300px;
+  font:
+    11px Nunito,
+    sans-serif;
+  color: #8f6a4e;
+  background: #fffaf0;
+  padding: 8px 12px;
+  border-radius: 10px;
+}
+@media (max-aspect-ratio: 85/100) {
+  .intro-stage {
+    background: #f4efe6;
+  }
+  .intro-cards {
+    bottom: 14%;
+    width: min(330px, calc(100vw - 44px));
+  }
+  .intro-header {
+    padding: 0 22px;
+    height: 78px;
+    gap: 8px;
+  }
+  .intro-wordmark {
+    font-size: 30px;
+  }
+  .intro-account-nav {
+    gap: 1px;
+  }
+  .intro-account-nav button {
+    padding: 0 11px;
+    height: 35px;
+    font-size: 11px;
+  }
+  .intro-settings {
+    width: 33px !important;
+    height: 33px !important;
+  }
+  .intro-footer {
+    left: 22px;
+    right: 22px;
+    bottom: 15px;
+    font-size: 8px;
+  }
+  .intro-greeting {
+    font-size: 28px;
+  }
+  .intro-greeting-note {
+    font-size: 11px;
+    margin-bottom: 16px;
+  }
+  .intro-glass.intro-primary {
+    min-height: 0;
+    padding: 17px 20px;
+  }
+  .intro-glass > div {
+    margin: 0 14px 0 0;
+  }
+  .intro-glass h2 {
+    font-size: 18px;
+  }
+  .intro-picker {
+    bottom: 5.5%;
+  }
+  .intro-scroll-hint {
+    bottom: 5.5%;
+  }
+}
+@media (max-height: 620px) and (min-aspect-ratio: 85/100) {
+  .intro-cards {
+    bottom: 12%;
+  }
+  .intro-greeting {
+    font-size: 22px;
+  }
+  .intro-greeting-note {
+    margin: 5px 0 10px;
+  }
+  .intro-identity {
+    margin-bottom: 8px;
+  }
+  .intro-header {
+    height: 64px;
+  }
+  .intro-footer {
+    bottom: 10px;
+  }
+}
+.intro-greeting {
+  overflow-wrap: anywhere;
+}

@@ -38,7 +38,16 @@ async function progress(page: Page, p: number) {
       ),
     p,
   );
-  // Numeric scrub catches up, then inspect exact layer styles, independent of the continuing particle positions.
+  // Wait for scrub to reach the *actual rounded browser scroll coordinate*.
+  // Merely entering a one-pixel window can sample opposite sides of a steep veil
+  // curve when reversing direction, before the intentionally delayed scrub settles.
+  await page.waitForFunction(() => {
+    const element = document.querySelector<HTMLElement>(".intro-experience")!;
+    const destination = scrollY / (element.offsetHeight - innerHeight);
+    return (
+      Math.abs(Number(element.dataset.scrollProgress) - destination) < 0.00006
+    );
+  });
   await page.waitForTimeout(180);
 }
 async function snapshot(page: Page) {
@@ -62,7 +71,7 @@ async function snapshot(page: Page) {
   }));
 }
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/signin-with-chatgpt?return_to=/");
   await expect(page.locator(root)).toHaveAttribute("data-loaded", "true");
 });
 
@@ -71,6 +80,15 @@ test("cinematic sequence: closed eyes, hidden swap, reveal, and identical revers
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  await progress(page, 0.21);
+  const closing = await page
+    .locator(".intro-male .intro-closed-eye")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => Number((node as SVGElement).style.opacity)),
+    );
+  expect(closing[0]).toBeGreaterThan(0);
+  expect(closing[0]).toBeLessThan(1);
+  expect(closing[0]).toBeCloseTo(closing[1], 5);
   await progress(page, 0.3);
   const closed = await snapshot(page);
   expect(Number(closed.lid)).toBe(1);
@@ -78,7 +96,9 @@ test("cinematic sequence: closed eyes, hidden swap, reveal, and identical revers
     "visibility",
     "hidden",
   );
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Focus with Todo/ }),
+  ).toHaveCount(0);
   await progress(page, 0.4);
   const forward = await snapshot(page);
   for (const p of [0.46, 0.48, 0.5, 0.52, 0.54]) {
@@ -106,7 +126,9 @@ test("cinematic sequence: closed eyes, hidden swap, reveal, and identical revers
   await expect(
     page.getByRole("button", { name: "Choose her" }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: /Focus with Todo/ }),
+  ).toHaveCount(1);
   await progress(page, 0.4);
   const reverse = await snapshot(page);
   expect(reverse.veil).toBeCloseTo(forward.veil, 3);
@@ -157,7 +179,9 @@ test("fast scroll, resize at a stopped transition, and live timing controls do n
   await progress(page, 1);
   await expect(page.getByRole("button", { name: "Choose her" })).toBeVisible();
   await progress(page, 0);
-  await expect(page.getByRole("button", { name: /Focus solo/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Focus with Todo/ }),
+  ).toBeVisible();
 });
 
 test("390 × 844 portrait framing keeps both eyes in view with native keyboard scrolling", async ({
@@ -190,7 +214,7 @@ test("390 × 844 portrait framing keeps both eyes in view with native keyboard s
   await expect(page.locator(root)).toHaveAttribute("data-whiteout", "1");
   await progress(page, 1);
   await page.screenshot({ path: "outputs/intro-portrait-female.png" });
-  await page.getByRole("button", { name: /Focus solo/ }).click();
+  await page.getByRole("button", { name: /Focus with Todo/ }).click();
   await expect(page.locator(".study-room.room-entered")).toBeVisible();
 });
 
@@ -285,6 +309,11 @@ test("cursor sways the original avatar and renders refraction; clicking cheeks r
     await page.mouse.click(index ? 1200 : 150, 560);
     await expect(page.locator(root)).toHaveAttribute("data-reaction", expected);
     await page.waitForTimeout(170);
+    const clothing = await page
+      .locator(".intro-male .intro-wardrobe")
+      .getAttribute("style");
+    expect(clothing).toContain("rotate(");
+    expect(clothing).not.toContain("rotate(0.000deg) scale(1.0000,1.0000)");
     const lids = await page
       .locator(".intro-male .intro-closed-eye")
       .evaluateAll((nodes) =>

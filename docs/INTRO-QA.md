@@ -1,30 +1,30 @@
-# Introduction verification — 18 October 2026
+# Introduction verification — 19 October 2026
 
-`npm run typecheck` passed. `npm run test:e2e`: **18 passed**. The final introduction suite also passed **6/6** after render optimizations, including existing room, persistence, PDF, and API checks. AI transport tests use a mock provider; this first-page change does not enable live AI.
+`npm run typecheck` passed. The expanded browser/API suite now contains **21 checks**. The latest full run passed 20; the remaining reverse-scrub assertion sampled before the intended animation lag had settled. The helper now waits for the actual rounded scroll destination, and the complete introduction suite then passed **6/6**, including that reverse-state assertion. All 21 checks have passed across these runs. AI transport tests use a mock provider; this first-page change does not enable live AI.
 
-| Acceptance check | Evidence |
-| --- | --- |
-| One long scroll / directional handover | A single wheel gesture of 0.85 viewport heights completes the 0.8-viewport travel. His registered artwork moves upward and hers arrives from below. The unchanged original avatar uses separate transparent blue/pink cap-and-muffler layers. |
-| Cursor and whole-character reactions | Real pointer events change the character transform and increase native WebGL draw counts. Either cheek and keyboard activation trigger wiggle/bounce/nuzzle responses, warmer blush and hearts. Both closed-eye patches remain at opacity 0 after clicks. The shared lens follows the selected avatar. |
-| Slow close → snow → hidden exchange → open | Browser checkpoints confirm natural feathered closed-eye artwork, hidden/inert cards, fully opaque veil at progress .46/.48/.50/.52/.54, female reveal with a small opening overshoot, restored cursor tracking and character controls. Desktop/portrait screenshots inspected. |
-| Reverse scroll | Layer opacity, closed-eye blend opacity, and snow density at .40 match when approaching from both directions. Moving flakes remain time-based, as specified. |
-| Fast scroll and stop | Test jumps to the end, returns mid-transition, then reaches both endpoints without a stuck layer. |
-| Resize mid-scroll | Cached cover-crop geometry is refreshed after pin recalculation. Both eye centers retain their configured natural-image fractions. |
-| Live timing panel | `?debug=1` readout updates; moving the eye-opening slider rebuilds the same master timeline and preserves position. |
-| Phone framing and keyboard | 390 × 844: both eyes remain on-screen, no horizontal overflow, PageDown scrolls natively, female choices open the shared room. |
-| Reduced motion | No snow or scripted blink; a 600ms crossfade changes the companion and reverses correctly. |
-| Console and layout stability | Performance runs captured **zero page errors and CLS 0** for both profiles. Art/font loading completes behind the loading overlay. |
+| Acceptance check                           | Evidence                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| One long scroll / directional handover     | A single wheel gesture of 0.85 viewport heights completes the 0.8-viewport travel. His registered artwork moves upward and hers arrives from below. The unchanged original avatar uses separate transparent blue/pink cap-and-muffler layers.                                                          |
+| Cursor and whole-character reactions       | Real pointer events change the character transform and increase native WebGL draw counts. Either cheek and keyboard activation trigger wiggle/bounce/nuzzle responses, warmer blush and hearts. Both closed-eye patches remain at opacity 0 after clicks. The shared lens follows the selected avatar. |
+| Slow close → snow → hidden exchange → open | Browser checkpoints confirm natural feathered closed-eye artwork, hidden/inert cards, fully opaque veil at progress .46/.48/.50/.52/.54, female reveal with a small opening overshoot, restored cursor tracking and character controls. Desktop/portrait screenshots inspected.                        |
+| Reverse scroll                             | Layer opacity, closed-eye blend opacity, and snow density at .40 match when approaching from both directions. Moving flakes remain time-based, as specified.                                                                                                                                           |
+| Fast scroll and stop                       | Test jumps to the end, returns mid-transition, then reaches both endpoints without a stuck layer.                                                                                                                                                                                                      |
+| Resize mid-scroll                          | Cached cover-crop geometry is refreshed after pin recalculation. Both eye centers retain their configured natural-image fractions.                                                                                                                                                                     |
+| Live timing panel                          | `?debug=1` readout updates; moving the eye-opening slider rebuilds the same master timeline and preserves position.                                                                                                                                                                                    |
+| Phone framing and keyboard                 | 390 × 844: both eyes remain on-screen, no horizontal overflow, PageDown scrolls natively, female choices open the shared room.                                                                                                                                                                         |
+| Reduced motion                             | No snow or scripted blink; a 600ms crossfade changes the companion and reverses correctly.                                                                                                                                                                                                             |
+| Console and layout stability               | Both profiles captured zero page errors. The latest pointer run reported CLS 0 on desktop and 0.0017 in portrait; no visible jump was found in visual inspection. Art/font loading completes behind the loading overlay.                                                                               |
 
 ## Chrome Performance recording
 
 Recorded with `node scripts/profile-intro.mjs` against the local development server, scrolling the whole sequence down and back. Traces are in ignored `outputs/intro-desktop-trace.json` and `outputs/intro-portrait-trace.json`; load either into Chrome DevTools Performance. The machine-readable summaries are `outputs/intro-performance.json` and `outputs/intro-pointer-performance.json`. The pointer run records continuous shader rendering and repeated reactions, not just an idle character.
 
-| Mode | Profile | Median frame interval | 95th percentile interval | Median frame rate | CLS |
-| --- | --- | --- | --- | --- | --- |
-| Scroll | 1440 × 960, DPR 1.00 | 16.671ms | 17.575ms | 60.0 FPS | 0 |
-| Scroll | 390 × 844, DPR 2.00, 4× CPU throttle | 16.667ms | 17.546ms | 60.0 FPS | 0 |
-| Cursor + click reactions | 1440 × 960, DPR 1.00 | 16.663ms | 17.241ms | 60.0 FPS | 0 |
-| Cursor + click reactions | 390 × 844, DPR 2.00, 4× CPU throttle | 16.667ms | 17.585ms | 60.0 FPS | 0 |
+| Mode                     | Profile                              | Median frame interval | 95th percentile interval | Median frame rate | CLS    |
+| ------------------------ | ------------------------------------ | --------------------- | ------------------------ | ----------------- | ------ |
+| Scroll                   | 1440 × 960, DPR 1.00                 | 16.965ms              | 18.756ms                 | 58.9 FPS          | 0.0005 |
+| Scroll                   | 390 × 844, DPR 2.00, 4× CPU throttle | 16.662ms              | 17.565ms                 | 60.0 FPS          | 0.0017 |
+| Cursor + click reactions | 1440 × 960, DPR 1.00                 | 16.861ms              | 17.593ms                 | 59.3 FPS          | 0      |
+| Cursor + click reactions | 390 × 844, DPR 2.00, 4× CPU throttle | 16.658ms              | 17.578ms                 | 60.0 FPS          | 0.0017 |
 
 These are local headless Chromium measurements. They verify the implementation in this browser environment; they do **not** establish 60 FPS on a physical mid-range phone or Safari. That device check remains outstanding. The app reduces snow count first and DPR second if sustained frame timing exceeds its budget.
 
@@ -33,3 +33,13 @@ The current avatar revision replaces the flat SVG lid discs with localized feath
 The original avatar base is preserved byte-for-byte. Clothing is a transparent accessory layer, rather than a replacement portrait. The lens uses a small canvas window with a softly transparent edge. Raster-edge masks are applied to static image layers instead of flattening the whole live character subtree, keeping cursor movement fast. Motion preferences hydrate before engine startup, and normalized timeline values retain their starts on refresh. Veil opacity is applied from the timeline’s numeric state to keep forward/reverse rendering consistent.
 
 Scroll anchoring is disabled inside the pinned story. Automated programmatic seeks wait two browser frames after live tuning so Lenis can finish its immediate-position restore; real wheel input uses Lenis’s regular virtual-scroll path.
+
+## Minimal landing and profile revision
+
+- Home now has a greeting, account controls, Choose Him / Choose Her, and one Focus with Todo invitation. AI, Friends, and Notes remain in the room dock.
+- Browser tests follow the real top-level sign-in anchor through the local platform simulation. Hosted authentication itself is owned by Sites; third-party Google/Apple/Facebook/SMS connections are not enabled.
+- The profile test saves a name through the API into local D1, reloads, checks Welcome back by name, and enters the room. The shadcn form mascot follows name/email focus and celebrates only a successful write.
+- Profile API tests reject anonymous requests, forged identity headers, injected user IDs, invalid names, oversized payloads, and cross-origin writes. Every query is scoped to server-established identity.
+- Both eyes now close/open simultaneously. Female entry travel is gentler (13%); wardrobe and background gain secondary sway, with clothing included in cursor refraction. Click reactions still suppress blinking.
+- Desktop 1440 × 960 and portrait 390 × 844 screenshots of home, sign-in, and profile forms were inspected. The portrait profile dialog fits inside the viewport, and the page has no horizontal overflow.
+- React review: server-only identity lookup, named client props, validated owner-scoped API, labelled fields, native top-level auth links, real buttons/focus rings, and both device/custom reduced-motion preferences preserved.
