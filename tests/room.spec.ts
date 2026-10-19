@@ -71,7 +71,7 @@ test("desktop room is fully visible at all requested desktop sizes; one invitati
       width: (r.width * ROOM_CONFIG.zones.window.width) / 100,
       height: (r.height * ROOM_CONFIG.zones.window.height) / 100,
     };
-    for (const name of ["Timer", "Tasks", "Notes"]) {
+    for (const name of ["Ambience", "Tasks", "Notes"]) {
       await page.getByRole("button", { name, exact: true }).click();
       await expect(page.getByRole("dialog")).toHaveCount(1);
       const panel = (await page.getByRole("dialog").boundingBox())!;
@@ -159,25 +159,29 @@ test("a sit persists its timer, updates the document title, saves once, then off
   await page
     .getByRole("button", { name: "Start table timer", exact: true })
     .click();
-  await page.getByRole("button", { name: "Timer", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute(
     "data-pose",
     "writing",
   );
   await expect(page).toHaveTitle(/24:5\d - Todo/);
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
-  const paused = await page.locator(".room-ring strong").innerText();
+  await page
+    .getByRole("button", { name: "Pause table timer", exact: true })
+    .click();
+  const paused = await page.locator(".round-timer-face strong").innerText();
   await page.waitForTimeout(1100);
-  expect(await page.locator(".room-ring strong").innerText()).toBe(paused);
+  expect(await page.locator(".round-timer-face strong").innerText()).toBe(
+    paused,
+  );
   await page.reload();
   await page
     .getByRole("button", { name: "Focus with Todo", exact: true })
     .click();
-  await page.getByRole("button", { name: "Timer", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Resume", exact: true }),
+    page.getByRole("button", { name: "Resume table timer", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Finish focus session", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Session complete", exact: true }),
   ).toBeVisible();
@@ -194,8 +198,7 @@ test("a sit persists its timer, updates the document title, saves once, then off
     .getByRole("button", { name: "Take five minutes", exact: true })
     .click();
   await expect(page).toHaveTitle(/04:5\d - Todo/);
-  await page.getByRole("button", { name: "Timer", exact: true }).click();
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Finish break", exact: true }).click();
   expect(
     (await (await page.request.get("/api/room-summary")).json()).totalSits,
   ).toBe(after.totalSits);
@@ -531,14 +534,14 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
   expect(errors).toEqual([]);
 });
 
-test("round table has a grounded dimensional timer and a lamp → notebook entrance, with an interactive lamp", async ({
+test("round table has a grounded dimensional timer, dimensional notebook and direct lamp toggle", async ({
   page,
 }) => {
   await enter(page);
   const scene = page.locator(".round-room-art");
   await expect(scene).toHaveAttribute("data-entry", "ready");
   await expect(scene).toHaveAttribute("data-lamp-on", "true");
-  await expect(page.locator(".room-table-notebook")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".desk-book")).toHaveCSS("opacity", "1");
   const clock = (await page.locator(".round-timer").boundingBox())!;
   expect(clock.width / clock.height).toBeCloseTo(1, 1);
   const photo = (await page.locator(".cozy-room-image").boundingBox())!;
@@ -556,4 +559,170 @@ test("round table has a grounded dimensional timer and a lamp → notebook entra
   await expect(page.locator(".round-timer-case")).toBeVisible();
   await expect(page.locator(".round-timer-shadow")).toBeVisible();
   await page.screenshot({ path: "outputs/todo-round-room-desktop.png" });
+});
+
+test("morning replaces the moon; lamp leaves no hand; real writing and coffee flippers move and Timer panel is absent", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await enter(page);
+  await expect(
+    page.getByRole("button", { name: "Timer", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(
+      ".round-reaching-flipper,.round-resting-flipper,.room-writing-hand,.room-ring",
+    ),
+  ).toHaveCount(0);
+  await page
+    .getByRole("combobox", { name: "Focus duration", exact: true })
+    .selectOption("15");
+  await expect(page.locator(".round-timer-face strong")).toHaveText("15:00");
+  await page
+    .getByRole("button", { name: "Turn table lamp off", exact: true })
+    .click();
+  await expect(page.locator(".round-room-art")).toHaveAttribute(
+    "data-lamp-on",
+    "false",
+  );
+  await page
+    .getByRole("button", { name: "Turn table lamp on", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Ambience", exact: true }).click();
+  await page.getByRole("button", { name: "Day", exact: true }).click();
+  await expect(page.locator(".room-window-world")).toHaveAttribute(
+    "data-sky",
+    "day",
+  );
+  await expect(page.locator(".room-morning-sky")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".room-morning-sky")).toHaveJSProperty(
+    "naturalWidth",
+    1536,
+  );
+  await page.getByRole("switch", { name: "Rain outside", exact: true }).check();
+  const duration = await page
+    .locator(".window-rain-drops i")
+    .first()
+    .evaluate((e) => parseFloat(getComputedStyle(e).animationDuration));
+  expect(duration).toBeGreaterThanOrEqual(2.8);
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.screenshot({ path: "outputs/todo-calm-morning.png" });
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  const title = `Flipper motion ${Date.now()}`;
+  await page.getByLabel("New task", { exact: true }).fill(title);
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Focus on ${title}`, exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Focus with 1 task", exact: true })
+    .click();
+  const matrix = (selector: string) =>
+    page.locator(selector).evaluate((e) => getComputedStyle(e).transform);
+  await expect(page.locator(".todo-writing-rig")).toHaveCSS("opacity", "1");
+  const left = await matrix(".todo-write-left"),
+    right = await matrix(".todo-write-right");
+  await page.waitForTimeout(650);
+  expect(await matrix(".todo-write-left")).not.toBe(left);
+  expect(await matrix(".todo-write-right")).not.toBe(right);
+  await page.screenshot({ path: "outputs/todo-writing-flippers.png" });
+  await page
+    .getByRole("button", { name: "Pause table timer", exact: true })
+    .click();
+  await expect(page.locator(".todo-writing-rig")).toHaveCSS("opacity", "0");
+  await page
+    .getByRole("button", { name: "Finish focus session", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Todo, take a break", exact: true })
+    .click();
+  await expect(page.locator(".todo-coffee-rig")).toHaveCSS("opacity", "1");
+  const cup = await matrix(".todo-sip-cup");
+  await page.waitForTimeout(4900);
+  expect(await matrix(".todo-sip-cup")).not.toBe(cup);
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.screenshot({ path: "outputs/todo-coffee-sip.png" });
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Delete ${title}`, exact: true })
+    .click();
+  expect(errors).toEqual([]);
+});
+
+test("calmer audio plays an actual rain recording at a controlled level, crossfades off and cleans up on exit", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const Original = window.AudioContext;
+    const observed: Array<{ ctx: AudioContext; analyser: AnalyserNode }> = [];
+    (window as unknown as { __todoAudio: typeof observed }).__todoAudio =
+      observed;
+    window.AudioContext = class extends Original {
+      readonly probe: AnalyserNode;
+      constructor(options?: AudioContextOptions) {
+        super(options);
+        this.probe = super.createAnalyser();
+        const silent = super.createGain();
+        silent.gain.value = 0;
+        this.probe.connect(silent);
+        silent.connect(this.destination);
+        observed.push({ ctx: this, analyser: this.probe });
+      }
+      createDynamicsCompressor() {
+        const node = super.createDynamicsCompressor();
+        node.connect(this.probe);
+        return node;
+      }
+    };
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await enter(page);
+  await page.getByRole("button", { name: "Ambience", exact: true }).click();
+  const recording = page.waitForResponse((r) =>
+    r.url().endsWith("/audio/quiet-rain.mp3"),
+  );
+  await page.getByLabel("Soft sounds", { exact: true }).selectOption("rain");
+  expect((await recording).status()).toBe(200);
+  await page.waitForTimeout(2300);
+  const rms = await page.evaluate(() => {
+    const list = (
+      window as unknown as {
+        __todoAudio: Array<{ ctx: AudioContext; analyser: AnalyserNode }>;
+      }
+    ).__todoAudio;
+    const a = list.at(-1)!;
+    const samples = new Float32Array(2048);
+    a.analyser.getFloatTimeDomainData(samples);
+    return {
+      state: a.ctx.state,
+      value: Math.sqrt(samples.reduce((s, v) => s + v * v, 0) / samples.length),
+    };
+  });
+  expect(rms.state).toBe("running");
+  expect(rms.value).toBeGreaterThan(0.00001);
+  expect(rms.value).toBeLessThan(0.16);
+  await page.getByLabel("Soft sounds", { exact: true }).selectOption("off");
+  await page.waitForTimeout(1200);
+  expect(
+    await page.evaluate(() =>
+      (
+        window as unknown as { __todoAudio: Array<{ ctx: AudioContext }> }
+      ).__todoAudio.every((a) => a.ctx.state === "closed"),
+    ),
+  ).toBe(true);
+  await page.getByLabel("Soft sounds", { exact: true }).selectOption("day");
+  await page
+    .getByRole("button", { name: "Choose companion", exact: true })
+    .click();
+  await page.waitForTimeout(1200);
+  expect(
+    await page.evaluate(() =>
+      (
+        window as unknown as { __todoAudio: Array<{ ctx: AudioContext }> }
+      ).__todoAudio.every((a) => a.ctx.state === "closed"),
+    ),
+  ).toBe(true);
+  expect(errors).toEqual([]);
 });

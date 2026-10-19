@@ -116,7 +116,7 @@ export function RoomPenguin({
   // The writing rig uses the idle torso plus a separately animated flipper and desk notebook.
   // This avoids crossfading a second notebook into the character's lap.
   const poseSource = (p: RoomPose) => {
-    const base = C.poses[p === "writing" ? "idle" : p];
+    const base = C.poses[p === "writing" || p === "tea" ? "idle" : p];
     return female ? base.replace(".png", "-pink.png") : base;
   };
   const source = (p: RoomPose) =>
@@ -125,7 +125,7 @@ export function RoomPenguin({
       : !missing.includes(poseSource("idle"))
         ? poseSource("idle")
         : "/art/todo-seated.png";
-  const eyeMap = C.eyes[pose === "tea" ? "tea" : "idle"];
+  const eyeMap = C.eyes.idle;
   return (
     <button
       ref={root}

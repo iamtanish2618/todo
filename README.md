@@ -5,12 +5,12 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 ## Start here
 
 - **Your account:** Google and email/password login are implemented behind a Firebase provider setting, with verification, password reset, remembered sign-in and protected API sessions. The Todo Firebase project and authorized domains are connected. The public homepage needs no ChatGPT account; see [the account setup guide](docs/AUTH.md). Firebase is the default and does not fall back to ChatGPT identity. The shadcn form includes the small penguin that follows field focus and celebrates account/profile setup.
-- **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across a complete round wooden table, a notebook and pen, coffee with rising steam, and a raised circular timer with depth, feet and a contact shadow. Todo reaches for the lamp, turns it on and brings out his notebook as you arrive. Companion and Agent are modes in this room; closing a tool leaves the room in place.
-- **Focus solo:** write your tasks, select up to three, then start using the physical desk clock. Todo writes while you focus and has coffee during breaks. Timer settings let you choose 1–120 minutes, pause, resume, and save progress. The timer continues when you close a tool or refresh.
+- **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across a complete round wooden table, a notebook and pen, coffee with rising steam, and a raised circular timer with depth, feet and a contact shadow. The notebook has curved pages and real page thickness. Todo’s attached flippers write during focus and lift a mug during breaks; the lamp fades gently when clicked. Companion and Agent are modes in this room; closing a tool leaves the room in place.
+- **Focus solo:** write your tasks, select up to three, then start using the physical desk clock. Todo writes while you focus and has coffee during breaks. The physical clock handles pause, resume and finishing, with preset durations on its crown. There is no separate Timer panel. The timer continues when you close a tool or refresh.
 - **Ask Todo:** chat, make notes, summarize text, or ask about an image once an AI provider is connected. Attach `.txt`, `.md`, PNG, JPEG, or WebP files. Image input needs a vision-capable model.
 - **Your notes:** write and save notes and download real multi-page PDFs. This works without AI.
 - **Choose your companion:** scroll between the penguins or click the switch hint. Each character has its own invitation and greeting. They fade away as he closes his eyes and snow fills the screen, then return as she opens hers. The original playful avatar wears separate blue/pink knitted cap and muffler layers. The story now takes one long scroll, with him moving up and her arriving from below. Clicking anywhere on them triggers gentle wiggles, bounces, warmer blush, and occasional little hearts. Clicks do not blink. Your choice is remembered.
-- **Ambience:** switch day/night window light, add rain outside, and choose optional quiet day/night melodies or rain audio. Sounds start only after your choice.
+- **Ambience:** fade between a moonlit night and a sunny morning, add gentle window droplets, and choose quiet ambient notes or a real rainfall recording. Sounds start only after your choice.
 - **Settings:** turn on sound effects or gentler motion.
 
 See [the room guide](docs/ROOM.md) for desktop layout, poses, tasks, ambience, notes, agent limits, and tuning. Phone design is on hold.
@@ -81,7 +81,8 @@ Tests cover pointer tracking, glass hover, scroll selection and reload persisten
 - `components/todo/welcome.tsx`: first-page configuration, eyes, single scroll timeline, snowfall, character choices, and live tuning.
 - `components/todo/welcome.css`: first-page layout, glass materials, accessories, and portrait framing.
 - `components/todo/study-room.tsx`: the shared room flow, tasks and tool panels.
-- `components/todo/room/scene.tsx` and `scene.css`: fixed-camera round table, lamp/book entrance and dimensional timer.
+- `components/todo/room/scene.tsx` and `scene.css`: fixed-camera round table, lamp light and dimensional timer.
+- `components/todo/room/flippers.tsx`, `notebook.tsx`, `window.tsx`, `calm.css`: attached writing/sipping motions, curved notebook pages, morning sky and slow rain.
 - `app/globals.css`: typography, glass materials, spacing, transitions, and responsive layouts.
 - `app/api/`: authenticated tasks, notes, sessions, status, and assistant endpoints.
 - `lib/todo/ai.ts`: model connection and assistant instructions.

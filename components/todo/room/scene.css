@@ -20,122 +20,6 @@
   height: 32%;
   pointer-events: none;
 }
-.round-room-art .room-table-notebook {
-  left: 41%;
-  top: 55%;
-  width: 15%;
-  height: 6.5%;
-  z-index: 6;
-  transform: translate3d(-8px, 20px, 0) rotate(-5deg) skewX(-10deg);
-  opacity: 0;
-  transition:
-    transform 0.85s cubic-bezier(0.2, 0.7, 0.2, 1),
-    opacity 0.5s;
-}
-.round-room-art[data-entry="book"] .room-table-notebook,
-.round-room-art[data-entry="ready"] .room-table-notebook {
-  opacity: 1;
-  transform: translate3d(0, 0, 0) rotate(-5deg) skewX(-10deg);
-}
-.round-room-art .room-table-notebook > span {
-  background: repeating-linear-gradient(
-    transparent 0 7px,
-    #b3a48b38 8px,
-    transparent 9px
-  );
-}
-.round-room-art .room-table-notebook > i {
-  height: 4px;
-  width: 39%;
-  right: 9%;
-  top: 12%;
-  background: linear-gradient(#e4ba5f, #b18638);
-  transition: opacity 0.25s;
-}
-.cozy-room[data-working="true"] .round-room-art .room-table-notebook > i {
-  opacity: 0;
-}
-.round-room-art .room-writing-hand {
-  left: 43%;
-  top: 52.5%;
-  width: 4.6%;
-  height: 3.9%;
-  opacity: 0 !important;
-  animation: none !important;
-}
-.cozy-room[data-working="true"]
-  .round-room-art[data-entry="ready"]
-  .room-writing-hand {
-  opacity: 1 !important;
-  animation: room-write 1.2s ease-in-out infinite !important;
-}
-.round-room-art .room-writing-hand > i {
-  width: 100%;
-  height: 10%;
-  left: 40%;
-  top: 74%;
-}
-.round-resting-flipper {
-  position: absolute;
-  z-index: 6;
-  left: 54.2%;
-  top: 52.5%;
-  width: 4%;
-  height: 3%;
-  border-radius: 55%;
-  background: radial-gradient(ellipse at 40% 10%, #696059, #342e2c);
-  box-shadow: 0 2px 4px #33251525;
-  opacity: 0;
-  transition: opacity 0.4s;
-  pointer-events: none;
-}
-.round-room-art[data-entry="ready"] .round-resting-flipper {
-  opacity: 1;
-}
-.round-reaching-flipper {
-  position: absolute;
-  z-index: 7;
-  left: 54%;
-  top: 50%;
-  width: 6.6%;
-  height: 4.2%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 20% 20%, #6f655c, #393330 78%);
-  box-shadow: 0 2px 3px #31251429;
-  opacity: 0;
-  transform-origin: 0 50%;
-  pointer-events: none;
-}
-.round-room-art[data-active="true"][data-entry="reach"]
-  .round-reaching-flipper {
-  animation: todo-touch-lamp 1.45s cubic-bezier(0.45, 0, 0.25, 1) both;
-}
-@keyframes todo-touch-lamp {
-  0% {
-    opacity: 0;
-    transform: rotate(78deg) scaleX(0.8);
-  }
-  12% {
-    opacity: 1;
-  }
-  38%,
-  58% {
-    opacity: 1;
-    transform: rotate(34deg) scaleX(1.5);
-  }
-  65% {
-    opacity: 1;
-    transform: rotate(35deg) scaleX(1.47);
-  }
-  95% {
-    opacity: 1;
-    transform: rotate(78deg) scaleX(0.8);
-  }
-  100% {
-    opacity: 0;
-    transform: rotate(78deg) scaleX(0.8);
-  }
-}
 .round-desk-lamp {
   position: absolute;
   z-index: 6;
@@ -206,9 +90,6 @@
   outline: 2px solid #f3daa4;
   outline-offset: 6px;
   border-radius: 30%;
-}
-.round-room-art[data-lamp-on="true"] .round-lamp-shade {
-  background: radial-gradient(ellipse at 33% 25%, #ffe8a0, #efb541);
 }
 .round-room-art[data-lamp-on="true"] .round-lamp-shade:after {
   opacity: 1;
@@ -330,18 +211,6 @@
   left: 52%;
   height: 100%;
   background: linear-gradient(105deg, #92b2ab9e, #d8e6d9a1 30%, #8d9a7296);
-}
-.round-room-art .room-window-weather {
-  inset: 8% 47% 55% 27%;
-  clip-path: ellipse(64% 80% at 50% 76%);
-  z-index: 1;
-}
-.round-room-art .room-window-dark {
-  background: linear-gradient(#07172d66, #10223b50);
-}
-.cozy-room[data-tone="morning"] .round-room-art .room-window-dark {
-  background: #ffeacb;
-  opacity: 0.38;
 }
 .cozy-room .round-timer {
   min-width: 0;
@@ -500,15 +369,6 @@
 .cozy-room .room-shelf-keepsakes {
   top: 47%;
   right: 5.5%;
-}
-.cozy-room-reduced .round-reaching-flipper {
-  display: none;
-}
-.cozy-room-reduced .round-room-art .room-writing-hand {
-  animation: none !important;
-}
-.cozy-room-reduced .round-room-art .room-table-notebook {
-  transition: none;
 }
 
 .cozy-room .round-timer .round-timer-face:hover {

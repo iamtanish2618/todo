@@ -1,7 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./config";
 import { RoomPenguin } from "./penguin";
+import { RoomWindow } from "./window";
+import { DeskNotebook } from "./notebook";
+import { WorkingFlippers } from "./flippers";
 
 /** A fixed camera and separate object layers give the table genuine occlusion. */
 export function RoomScene({
@@ -9,55 +12,31 @@ export function RoomScene({
   female,
   reduced,
   active,
+  day,
 }: {
   pose: RoomPose;
   female: boolean;
   reduced: boolean;
   active: boolean;
+  day: boolean;
 }) {
-  const [beat, setBeat] = useState<"reach" | "book" | "ready">("reach");
-  const [lamp, setLamp] = useState(false);
-  const lampTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [ready, setReady] = useState(reduced);
+  const [lamp, setLamp] = useState(true);
   useEffect(() => {
     if (!active) return;
     if (reduced) {
-      setBeat("ready");
-      setLamp(true);
+      setReady(true);
       return;
     }
-    setBeat("reach");
-    setLamp(false);
-    const light = setTimeout(() => setLamp(true), 850);
-    const book = setTimeout(() => setBeat("book"), 1450);
-    const ready = setTimeout(() => setBeat("ready"), 2450);
-    return () => {
-      clearTimeout(light);
-      clearTimeout(book);
-      clearTimeout(ready);
-    };
+    setReady(false);
+    const reveal = setTimeout(() => setReady(true), 250);
+    return () => clearTimeout(reveal);
   }, [active, reduced]);
-  useEffect(
-    () => () => {
-      if (lampTimer.current) clearTimeout(lampTimer.current);
-    },
-    [],
-  );
-  const touchLamp = () => {
-    if (lampTimer.current) clearTimeout(lampTimer.current);
-    if (reduced) {
-      setLamp((v) => !v);
-      return;
-    }
-    setBeat("reach");
-    lampTimer.current = setTimeout(() => {
-      setLamp((v) => !v);
-      setBeat("ready");
-    }, 850);
-  };
   return (
     <div
       className="cozy-room-art round-room-art"
-      data-entry={beat}
+      data-entry={ready ? "ready" : "settling"}
+      data-pose={pose}
       data-lamp-on={lamp}
       data-active={active}
     >
@@ -66,21 +45,9 @@ export function RoomScene({
         src={C.image}
         width={1536}
         height={1024}
-        alt="A miniature cozy room with an arched moonlit window, plants, a chair and a complete round oak study table."
+        alt={`A miniature cozy room with an arched ${day ? "sunlit" : "moonlit"} window, plants, a chair and a complete round oak study table.`}
       />
-      <div className="room-window-weather" aria-hidden="true">
-        <div className="room-window-dark" />
-        {Array.from({ length: 32 }, (_, i) => (
-          <i
-            key={i}
-            style={{
-              left: `${(i * 17) % 100}%`,
-              animationDelay: `${i * -0.19}s`,
-              animationDuration: `${0.65 + (i % 5) * 0.12}s`,
-            }}
-          />
-        ))}
-      </div>
+      <RoomWindow day={day} />
       <div
         className="room-contact-shadow"
         style={zoneStyle(C.shadow)}
@@ -113,22 +80,17 @@ export function RoomScene({
         className="round-desk-lamp"
         aria-label={lamp ? "Turn table lamp off" : "Turn table lamp on"}
         aria-pressed={lamp}
-        onClick={touchLamp}
+        onClick={() => setLamp((v) => !v)}
       >
         <span className="round-lamp-base" />
         <span className="round-lamp-stem" />
-        <span className="round-lamp-shade" />
+        <span className="round-lamp-shade">
+          <span className="round-lamp-shade-lit" />
+        </span>
         <span className="round-lamp-button" />
       </button>
-      <span className="round-reaching-flipper" aria-hidden="true" />
-      <div className="desk-notebook room-table-notebook" aria-hidden="true">
-        <span />
-        <i />
-      </div>
-      <div className="room-writing-hand" aria-hidden="true">
-        <i />
-      </div>
-      <span className="round-resting-flipper" aria-hidden="true" />
+      <DeskNotebook />
+      <WorkingFlippers pose={pose} />
       <div className="round-tea-set" aria-hidden="true">
         <span className="round-tea-pot">
           <i />

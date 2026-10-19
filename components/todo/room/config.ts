@@ -1,6 +1,7 @@
 /** Coordinates are percentages of the uncropped 1536 × 1024 artwork. */
 export const ROOM_CONFIG = {
   image: "/art/study-room-round-v2.png",
+  dayImage: "/art/study-room-morning-v1.png",
   aspectRatio: 3 / 2,
   zones: {
     window: { x: 27, y: 8, width: 26, height: 37 },
