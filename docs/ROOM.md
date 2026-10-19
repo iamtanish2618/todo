@@ -18,9 +18,15 @@ Open `/?debug=1`, then enter Focus with Todo. The room map outlines the window, 
 
 ## Artwork and poses
 
-Room source: `public/art/study-room.png` at its full 1536 × 1024 resolution. This is the existing room matching the supplied map; the brief's generic `room.jpg` was not an additional supplied file. To swap it, keep 3:2 framing, change `ROOM_CONFIG.image`, then use the map to recalibrate the chair, shadow, penguin and panels.
+Room source: `public/art/study-room-round-v2.png` at its full 1536 × 1024 resolution. This is a newly generated miniature scene using the video screenshot for camera/perspective and our established penguin for material style. The earlier room is retained as `study-room.png`. The brief's generic `room.jpg` was not an additional supplied file. To swap it, keep 3:2 framing, change `ROOM_CONFIG.image`, then use the map to recalibrate the chair, shadow, penguin and panels.
 
-The original code-built wooden desk (`desk-surface` and `desk-grain`) is preserved in front of the chair. Its rounded edge, warm gradients and grain remain. The notebook, pen, coffee and live clock sit on it. Todo is enlarged at the chair behind it, with the lower sprite masked behind the desk. The writing flipper and pencil use a small transform-only writing cycle; the pose itself crossfades to writing only while the focus timer is running. The coffee pose replaces it on breaks. `chairFront` remains in config as reference for the former chair-only composition; it is not rendered in the desk layout.
+The round wooden table is fully visible with its legs and rug. A registered second copy of the room, clipped by `ROOM_CONFIG.tableFront`, sits in front of Todo. It masks his lower body behind the tabletop and uses the exact source pixels, avoiding guessed furniture edges. The notebook, writing flipper, coffee, jars, lamp and timer are independent code layers placed on its top surface. The old first-person desk styles and original artwork remain available but are not rendered in this composition.
+
+`room/scene.tsx` owns the short entrance: a rounded flipper reaches toward the lamp, its warm light comes on at 850ms, the flipper returns, and the notebook slides onto the table at 1450ms. At 2450ms the scene settles. Clicking the lamp repeats a reach and toggles its light. Gentler motion skips this entrance and lights the lamp immediately. All timeouts are cleaned up on exit. The writing rig uses the idle torso with a separate flipper/pencil over the desk notebook; this avoids a second baked-in lap notebook. The other pose images crossfade for typing, coffee and sleep.
+
+The live circular timer is a CSS/SVG object with an extruded case, beveled face, dial ticks, progress ring, feet and a separate contact shadow. Its bottom is at ~62.5% image height, safely on the top of the table, above the ~73% front rim. It is not attached to the table edge. Its displayed time and click action use the same real focus timer as the Timer panel.
+
+New room asset and exact generation prompt: `public/art/study-room-round-v2.png` and `docs/ROOM-ART-PROMPT.txt`. Generated with the built-in image tool, not CLI. No character or interactive props are baked into this background.
 
 New transparent pose files, generated with the built-in image tool (not CLI):
 
@@ -32,7 +38,7 @@ New transparent pose files, generated with the built-in image tool (not CLI):
 | Tea      | `public/art/room-todo-tea.png`      | `public/art/room-todo-tea-pink.png`      |
 | Sleeping | `public/art/room-todo-sleeping.png` | `public/art/room-todo-sleeping-pink.png` |
 
-Set the five blue paths in `ROOM_CONFIG.poses`; pink variants use the same filename plus `-pink`. Keep a square transparent canvas and consistent body baseline/camera position. Adjust `penguin` once for both sets. Pose changes crossfade over 250ms. A missing pose falls back to idle. Both eyes blink together; clicks use only brief awe/pop/giggle reactions, with a cooldown, never winks or fingers. Typing and sleeping pause eye tracking.
+Set the five blue paths in `ROOM_CONFIG.poses`; pink variants use the same filename plus `-pink`. Keep a square transparent canvas and consistent body baseline/camera position. Adjust `penguin` once for both sets. Non-writing pose changes crossfade over 250ms; the writing rig uses the idle base as described above. A missing pose falls back to idle. Both eyes blink together; clicks use only brief awe/pop/giggle reactions, with a cooldown, never winks or fingers. Typing and sleeping pause eye tracking.
 
 ### Generation prompt set
 
@@ -69,3 +75,5 @@ No live AI provider key is configured in this project yet. Browser AI tests use 
 ## Verification
 
 Desktop targets: 1440 × 900, 1920 × 1080 and 1024 × 768. `tests/room.spec.ts` checks full image fit, UI count, panel/window/penguin separation, saved tasks and selection limit, deadline/timer persistence, focus versus break history, real multipage PDF output, server-persisted manual flashcards, actual pending browser requests, quota fallback, unavailable AI state, honest friend preview and anonymous/ownership validation. Run with a local server configured for the explicit legacy test identity. Production checks must independently confirm Firebase identity and anonymous API rejection.
+
+The round-room checks additionally verify the lamp entrance, interactive lamp toggle, notebook reveal, circular timer geometry and its contact height above the front rim. The video was inspected through its visible player; no original app source code was available.

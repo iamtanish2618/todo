@@ -66,7 +66,14 @@ export function RoomPenguin({
       x +=
         ((tracking ? (now < glanceUntil ? -0.8 : targetX) : 0) - x) *
         C.timing.lerp;
-      y += ((tracking ? targetY : 0) - y) * C.timing.lerp;
+      y +=
+        ((tracking
+          ? pose === "writing"
+            ? 0.7 + targetY * 0.15
+            : targetY
+          : 0) -
+          y) *
+        C.timing.lerp;
       element.style.setProperty("--gaze-x", `${x * 1.7}px`);
       element.style.setProperty("--gaze-y", `${y * 1.2}px`);
       if (now > nextBlink) {
@@ -106,15 +113,19 @@ export function RoomPenguin({
     if (cleanup.current) clearTimeout(cleanup.current);
     cleanup.current = setTimeout(() => setReaction(""), C.timing.reaction);
   };
-  const poseSource = (p: RoomPose) =>
-    female ? C.poses[p].replace(".png", "-pink.png") : C.poses[p];
+  // The writing rig uses the idle torso plus a separately animated flipper and desk notebook.
+  // This avoids crossfading a second notebook into the character's lap.
+  const poseSource = (p: RoomPose) => {
+    const base = C.poses[p === "writing" ? "idle" : p];
+    return female ? base.replace(".png", "-pink.png") : base;
+  };
   const source = (p: RoomPose) =>
     !missing.includes(poseSource(p))
       ? poseSource(p)
       : !missing.includes(poseSource("idle"))
         ? poseSource("idle")
         : "/art/todo-seated.png";
-  const eyeMap = C.eyes[pose === "writing" || pose === "tea" ? pose : "idle"];
+  const eyeMap = C.eyes[pose === "tea" ? "tea" : "idle"];
   return (
     <button
       ref={root}

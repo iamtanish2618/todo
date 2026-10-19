@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
 import fs from "node:fs/promises";
+import { ROOM_CONFIG } from "../components/todo/room/config";
 
 async function enter(page: Page) {
   await page.goto("/signin-with-chatgpt?return_to=/");
@@ -65,10 +66,10 @@ test("desktop room is fully visible at all requested desktop sizes; one invitati
       card = (await page.locator(".room-home-card").boundingBox())!;
     expect(intersects(pet, card)).toBe(false);
     const window = {
-      x: r.x,
-      y: r.y,
-      width: r.width * 0.29,
-      height: r.height * 0.68,
+      x: r.x + (r.width * ROOM_CONFIG.zones.window.x) / 100,
+      y: r.y + (r.height * ROOM_CONFIG.zones.window.y) / 100,
+      width: (r.width * ROOM_CONFIG.zones.window.width) / 100,
+      height: (r.height * ROOM_CONFIG.zones.window.height) / 100,
     };
     for (const name of ["Timer", "Tasks", "Notes"]) {
       await page.getByRole("button", { name, exact: true }).click();
@@ -515,13 +516,11 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
   await page.getByLabel("Ambience volume", { exact: true }).fill("0.15");
   await page.getByLabel("Soft sounds", { exact: true }).selectOption("off");
   await page.getByRole("button", { name: "Notes", exact: true }).click();
-  await page
-    .getByLabel("Upload study notes", { exact: true })
-    .setInputFiles({
-      name: "chapter.md",
-      mimeType: "text/markdown",
-      buffer: Buffer.from("The water cycle includes evaporation."),
-    });
+  await page.getByLabel("Upload study notes", { exact: true }).setInputFiles({
+    name: "chapter.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("The water cycle includes evaporation."),
+  });
   await expect(page.getByLabel("Your notes", { exact: true })).toHaveValue(
     "The water cycle includes evaporation.",
   );
@@ -530,4 +529,31 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
     .getByRole("button", { name: `Delete ${title}`, exact: true })
     .click();
   expect(errors).toEqual([]);
+});
+
+test("round table has a grounded dimensional timer and a lamp → notebook entrance, with an interactive lamp", async ({
+  page,
+}) => {
+  await enter(page);
+  const scene = page.locator(".round-room-art");
+  await expect(scene).toHaveAttribute("data-entry", "ready");
+  await expect(scene).toHaveAttribute("data-lamp-on", "true");
+  await expect(page.locator(".room-table-notebook")).toHaveCSS("opacity", "1");
+  const clock = (await page.locator(".round-timer").boundingBox())!;
+  expect(clock.width / clock.height).toBeCloseTo(1, 1);
+  const photo = (await page.locator(".cozy-room-image").boundingBox())!;
+  // Feet contact the TOP surface (~62.5%); the front rim is at ~73%.
+  expect((clock.y + clock.height - photo.y) / photo.height).toBeLessThan(0.65);
+  await page
+    .getByRole("button", { name: "Turn table lamp off", exact: true })
+    .click();
+  await expect(scene).toHaveAttribute("data-lamp-on", "false");
+  await expect(scene).toHaveAttribute("data-entry", "ready");
+  await page
+    .getByRole("button", { name: "Turn table lamp on", exact: true })
+    .click();
+  await expect(scene).toHaveAttribute("data-lamp-on", "true");
+  await expect(page.locator(".round-timer-case")).toBeVisible();
+  await expect(page.locator(".round-timer-shadow")).toBeVisible();
+  await page.screenshot({ path: "outputs/todo-round-room-desktop.png" });
 });

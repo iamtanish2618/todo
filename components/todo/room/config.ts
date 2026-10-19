@@ -1,22 +1,24 @@
 /** Coordinates are percentages of the uncropped 1536 × 1024 artwork. */
 export const ROOM_CONFIG = {
-  image: "/art/study-room.png",
+  image: "/art/study-room-round-v2.png",
   aspectRatio: 3 / 2,
   zones: {
-    window: { x: 0, y: 0, width: 29, height: 68 },
-    chair: { x: 39, y: 49, width: 29, height: 29 },
+    window: { x: 27, y: 8, width: 26, height: 37 },
+    chair: { x: 40, y: 40, width: 19, height: 18 },
     wall: { x: 40, y: 3, width: 20, height: 45 },
     painting: { x: 61, y: 15, width: 15, height: 30 },
     lamp: { x: 80, y: 25, width: 10, height: 48 },
     shelf: { x: 90, y: 0, width: 10, height: 77 },
     rug: { x: 0, y: 78, width: 100, height: 22 },
   },
-  penguin: { x: 39.5, y: 31, width: 28, height: 42 },
-  shadow: { x: 44, y: 67, width: 20, height: 3 },
-  home: { x: 32, y: 81, width: 37, height: 16 },
+  penguin: { x: 37, y: 25, width: 25, height: 37.5 },
+  shadow: { x: 42, y: 52, width: 16, height: 3 },
+  home: { x: 33, y: 84, width: 35, height: 13 },
   panel: { x: 71, y: 13, width: 27, height: 64 },
   chat: { x: 70, y: 18, width: 28, height: 57 },
   bubble: { x: 42, y: 41, width: 23, height: 6 },
+  tableFront:
+    "polygon(17.8% 61%, 18.5% 58.7%, 21.3% 56.8%, 26% 55.1%, 33% 53.8%, 41% 53%, 50% 52.8%, 59% 53%, 67% 53.8%, 74% 55.1%, 79% 57%, 81.7% 59.5%, 82% 62%, 82% 100%, 17.8% 100%)",
   chairFront:
     "polygon(39.2% 61%, 40.6% 60%, 41.6% 62%, 41.6% 70%, 46% 68.3%, 60% 68.3%, 65.7% 70%, 65.7% 62%, 66.6% 60%, 67.7% 61%, 67.7% 77.7%, 39.2% 77.7%)",
   poses: {

@@ -5,7 +5,7 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 ## Start here
 
 - **Your account:** Google and email/password login are implemented behind a Firebase provider setting, with verification, password reset, remembered sign-in and protected API sessions. The Todo Firebase project and authorized domains are connected. The public homepage needs no ChatGPT account; see [the account setup guide](docs/AUTH.md). Firebase is the default and does not fall back to ChatGPT identity. The shadcn form includes the small penguin that follows field focus and celebrates account/profile setup.
-- **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across the desk, a notebook and pen, coffee with rising steam, and a physical-looking live clock. Companion and Agent are modes in this room; closing a tool leaves the room in place.
+- **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across a complete round wooden table, a notebook and pen, coffee with rising steam, and a raised circular timer with depth, feet and a contact shadow. Todo reaches for the lamp, turns it on and brings out his notebook as you arrive. Companion and Agent are modes in this room; closing a tool leaves the room in place.
 - **Focus solo:** write your tasks, select up to three, then start using the physical desk clock. Todo writes while you focus and has coffee during breaks. Timer settings let you choose 1–120 minutes, pause, resume, and save progress. The timer continues when you close a tool or refresh.
 - **Ask Todo:** chat, make notes, summarize text, or ask about an image once an AI provider is connected. Attach `.txt`, `.md`, PNG, JPEG, or WebP files. Image input needs a vision-capable model.
 - **Your notes:** write and save notes and download real multi-page PDFs. This works without AI.
@@ -80,7 +80,8 @@ Tests cover pointer tracking, glass hover, scroll selection and reload persisten
 - `components/todo/todo-app.tsx`: screen choices and focus, notes, AI, history, and settings panels.
 - `components/todo/welcome.tsx`: first-page configuration, eyes, single scroll timeline, snowfall, character choices, and live tuning.
 - `components/todo/welcome.css`: first-page layout, glass materials, accessories, and portrait framing.
-- `components/todo/study-room.tsx`: the shared desk scene, companion animation, live clock, and tool dock.
+- `components/todo/study-room.tsx`: the shared room flow, tasks and tool panels.
+- `components/todo/room/scene.tsx` and `scene.css`: fixed-camera round table, lamp/book entrance and dimensional timer.
 - `app/globals.css`: typography, glass materials, spacing, transitions, and responsive layouts.
 - `app/api/`: authenticated tasks, notes, sessions, status, and assistant endpoints.
 - `lib/todo/ai.ts`: model connection and assistant instructions.

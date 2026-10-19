@@ -49,11 +49,12 @@ import {
 } from "@/lib/todo/client";
 import type { Panel } from "./welcome";
 import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./room/config";
-import { RoomPenguin } from "./room/penguin";
+import { RoomScene } from "./room/scene";
 import { RoomChat } from "./room/chat";
 import { startSoundscape, type Soundscape } from "./room/ambience";
 import { makeRoomPDF } from "./room/pdf";
 import "./room/room.css";
+import "./room/scene.css";
 
 type Pane =
   | "ambience"
@@ -1312,81 +1313,12 @@ export function StudyRoom(p: Props) {
         aria-hidden="true"
       />
       <div className="cozy-room-stage">
-        <div className="cozy-room-art">
-          <img
-            className="cozy-room-image"
-            src={C.image}
-            width={1536}
-            height={1024}
-            alt="A warm evening room: a full window, armchair, reading lamp, bookshelf and soft rug."
-          />
-          <div
-            className="room-contact-shadow"
-            style={zoneStyle(C.shadow)}
-            aria-hidden="true"
-          />
-          <div className="room-seated-anchor" style={zoneStyle(C.penguin)}>
-            <RoomPenguin
-              pose={pose}
-              female={p.female}
-              reduced={p.reduced}
-              active={p.active && loaded}
-            />
-          </div>
-          <div
-            className="desk-surface room-kept-table"
-            aria-label="Your wooden study table"
-          >
-            <div className="desk-grain" />
-          </div>
-          <div className="desk-notebook room-table-notebook" aria-hidden="true">
-            <span />
-            <i />
-          </div>
-          <div className="room-writing-hand" aria-hidden="true">
-            <i />
-          </div>
-          <div className="coffee-cup room-table-coffee" aria-hidden="true">
-            <i className="steam steam-one" />
-            <i className="steam steam-two" />
-            <span className="cup-top" />
-            <span className="cup-body" />
-            <span className="cup-handle" />
-            <span className="cup-saucer" />
-          </div>
-          <div className="room-window-weather" aria-hidden="true">
-            <div className="room-window-dark" />
-            {Array.from({ length: 32 }, (_, i) => (
-              <i
-                key={i}
-                style={{
-                  left: `${(i * 17) % 100}%`,
-                  animationDelay: `${i * -0.19}s`,
-                  animationDuration: `${0.65 + (i % 5) * 0.12}s`,
-                }}
-              />
-            ))}
-          </div>
-          <div className="room-lamp-glow" aria-hidden="true" />
-          <div className="room-evening-tint" aria-hidden="true" />
-          <div className="room-city-lights" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => (
-              <i key={i} style={{ animationDelay: `${i * 1.2}s` }} />
-            ))}
-          </div>
-          <div className="room-dust" aria-hidden="true">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <i
-                key={i}
-                style={{
-                  left: `${79 + i * 2.7}%`,
-                  top: `${39 + (i % 3) * 9}%`,
-                  animationDelay: `${i * -2.3}s`,
-                }}
-              />
-            ))}
-          </div>
-        </div>
+        <RoomScene
+          pose={pose}
+          female={p.female}
+          reduced={p.reduced}
+          active={p.active && loaded}
+        />
         <Button
           data-room-ui="back"
           variant="ghost"
@@ -1460,35 +1392,61 @@ export function StudyRoom(p: Props) {
           })}
         </nav>
         <div
-          className="desk-clock room-table-clock"
+          className="room-table-clock round-timer"
           aria-label={`Table timer ${p.clock}`}
         >
-          <span>
-            {p.phase === "break" ? "A LITTLE BREAK" : "FOCUS TOGETHER"}
-          </span>
-          <strong>{p.clock}</strong>
-          <div>
-            <button
-              aria-label={
-                p.running
-                  ? "Pause table timer"
-                  : p.started
-                    ? "Resume table timer"
-                    : "Start table timer"
-              }
-              onClick={
-                p.started || p.phase === "break" ? p.onStart : beginFocus
-              }
+          <span className="round-timer-shadow" aria-hidden="true" />
+          <span className="round-timer-feet" aria-hidden="true" />
+          <span className="round-timer-case" aria-hidden="true" />
+          <button
+            className="round-timer-face"
+            aria-label={
+              p.running
+                ? "Pause table timer"
+                : p.started
+                  ? "Resume table timer"
+                  : "Start table timer"
+            }
+            onClick={p.started || p.phase === "break" ? p.onStart : beginFocus}
+          >
+            <svg
+              viewBox="0 0 120 120"
+              className="round-timer-dial"
+              aria-hidden="true"
             >
-              {p.running ? <Pause size={16} /> : <Play size={16} />}
-            </button>
-            <button
-              aria-label="Adjust focus timer"
-              onClick={() => show("timer")}
-            >
-              <Settings2 size={16} />
-            </button>
-          </div>
+              <circle cx="60" cy="60" r="53" />
+              <circle
+                cx="60"
+                cy="60"
+                r="47"
+                pathLength="60"
+                strokeDasharray=".25 .75"
+              />
+              <circle
+                className="round-timer-progress"
+                cx="60"
+                cy="60"
+                r="53"
+                pathLength="100"
+                strokeDasharray="100"
+                strokeDashoffset={100 * (1 - p.remaining / p.duration)}
+              />
+            </svg>
+            <span className="round-timer-label">
+              {p.phase === "break" ? "BREATHE" : "QUIET FOCUS"}
+            </span>
+            <strong>{p.clock}</strong>
+            <span className="round-timer-action">
+              {p.running ? <Pause size={12} /> : <Play size={12} />}
+            </span>
+          </button>
+          <button
+            className="round-timer-adjust"
+            aria-label="Adjust focus timer"
+            onClick={() => show("timer")}
+          >
+            <Settings2 size={13} />
+          </button>
         </div>
         <div
           className="room-home-card"
