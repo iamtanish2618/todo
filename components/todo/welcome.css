@@ -1208,3 +1208,20 @@
 .intro-greeting {
   overflow-wrap: anywhere;
 }
+/* A feathered light field keeps text readable where a wider portrait crop puts
+   the scarf behind the invitation. It fades with its tray before the whiteout. */
+.intro-cards::before {
+  content: "";
+  position: absolute;
+  inset: 6px -48px -24px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    #fff8edf5 0%,
+    #fff8edd9 38%,
+    #fff8ed00 75%
+  );
+  mask-image: linear-gradient(transparent, #000 22%, #000 75%, transparent);
+  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 75%, transparent);
+}
