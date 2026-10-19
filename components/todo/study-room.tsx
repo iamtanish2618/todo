@@ -1,20 +1,80 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import {
   ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
   CheckCheck,
-  FileText,
-  Headphones,
+  Coffee,
+  CloudRain,
+  Sun,
+  FileDown,
+  LampDesk,
+  Layers,
+  ListTodo,
+  Loader2,
+  Mic,
+  Moon,
   Pause,
   Play,
+  Plus,
+  Send,
   Settings2,
+  Share2,
   Sparkles,
+  Timer as TimerIcon,
+  Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import {
+  api,
+  type Task,
+  type Note,
+  type FocusSession,
+  type Connection,
+} from "@/lib/todo/client";
 import type { Panel } from "./welcome";
+import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./room/config";
+import { RoomPenguin } from "./room/penguin";
+import { RoomChat } from "./room/chat";
+import { startSoundscape, type Soundscape } from "./room/ambience";
+import { makeRoomPDF } from "./room/pdf";
+import "./room/room.css";
 
+type Pane =
+  | "ambience"
+  | "timer"
+  | "tasks"
+  | "notes"
+  | "agent"
+  | "settings"
+  | "month"
+  | "corner"
+  | "friends"
+  | "home"
+  | "break"
+  | "recap";
+type Card = { id: string; question: string; answer: string };
+type Summary = {
+  minutes: number;
+  sits: number;
+  tasksDone: number;
+  totalSits: number;
+};
 type Props = {
   active: boolean;
   female: boolean;
@@ -26,269 +86,1591 @@ type Props = {
   phase: "focus" | "break";
   agentBusy: boolean;
   agentMode: boolean;
+  remaining: number;
+  duration: number;
+  focusMinutes: number;
+  startedAt?: number;
+  focusCompletions: number;
+  onBreak: () => void;
+  userId: string;
+  tasks: Task[];
+  notes: Note[];
+  sessions: FocusSession[];
+  connection: Connection | null;
+  sound: boolean;
+  onTasks: (tasks: Task[]) => void;
+  onNotes: (notes: Note[]) => void;
+  onDuration: (minutes: number) => void;
+  onReduced: (value: boolean) => void;
+  onSound: (value: boolean) => void;
+  onBusy: (value: boolean) => void;
   onAgentMode: (mode: boolean) => void;
-  onTask: (task: string) => void;
+  onTask: (task: string, begin?: boolean) => void;
   onStart: () => void;
-  onFinish: () => void;
+  onFinish: () => Promise<boolean>;
   onExit: () => void;
   onPanel: (panel: Panel) => void;
 };
 
+type SpeechResult = {
+  results: { [index: number]: { [index: number]: { transcript: string } } };
+};
+type Recognition = {
+  lang: string;
+  interimResults: boolean;
+  onresult: ((event: SpeechResult) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
 export function StudyRoom(p: Props) {
-  const [wink, setWink] = useState(false),
-    [peace, setPeace] = useState(false);
+  const [pane, setPane] = useState<Pane | null>(null),
+    [loaded, setLoaded] = useState(false),
+    [loadError, setLoadError] = useState(""),
+    [retry, setRetry] = useState(0),
+    [debug, setDebug] = useState(false);
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [draft, setDraft] = useState(""),
+    [filter, setFilter] = useState("all"),
+    [chosen, setChosen] = useState<string[]>([]);
+  const [noteTitle, setNoteTitle] = useState(""),
+    [noteText, setNoteText] = useState(""),
+    [noteView, setNoteView] = useState<"write" | "saved" | "cards">("write");
+  const [cards, setCards] = useState<Card[]>([]),
+    [question, setQuestion] = useState(""),
+    [answer, setAnswer] = useState(""),
+    [flipped, setFlipped] = useState<string | null>(null);
+  const [summary, setSummary] = useState<Summary | null>(null),
+    [recap, setRecap] = useState({ minutes: 0, tasks: 0 }),
+    [tone, setTone] = useState(() =>
+      new Date().getHours() >= 18 || new Date().getHours() < 7
+        ? "night"
+        : "morning",
+    ),
+    [rain, setRain] = useState(false),
+    [soundscape, setSoundscape] = useState<Soundscape>("off"),
+    [volume, setVolume] = useState(0.35),
+    [sleeping, setSleeping] = useState(false);
+  const [joining, setJoining] = useState("todo"),
+    [friendCode, setFriendCode] = useState(""),
+    [friendNotice, setFriendNotice] = useState("");
+  const [connection, setConnection] = useState(p.connection),
+    [resting, setResting] = useState(false),
+    [speechAvailable, setSpeechAvailable] = useState(false),
+    [listening, setListening] = useState(false);
+  const ambienceAudio =
+    useRef<Awaited<ReturnType<typeof startSoundscape>>>(null);
+  const audioGeneration = useRef(0);
   useEffect(() => {
-    if (!p.active || p.reduced) return;
-    let reset: ReturnType<typeof setTimeout>;
-    const id = setInterval(() => {
-      setWink(true);
-      reset = setTimeout(() => setWink(false), 160);
-    }, 6200);
+    if (!p.active) {
+      audioGeneration.current++;
+      ambienceAudio.current?.stop();
+      ambienceAudio.current = null;
+      setSoundscape("off");
+    }
     return () => {
-      clearInterval(id);
-      clearTimeout(reset);
+      audioGeneration.current++;
+      ambienceAudio.current?.stop();
+      ambienceAudio.current = null;
     };
-  }, [p.active, p.reduced]);
-  const working = p.running || p.agentBusy;
-  const boop = () => {
-    if (p.reduced) return;
-    setWink(true);
-    setPeace(true);
-    setTimeout(() => {
-      setWink(false);
-      setPeace(false);
-    }, 1300);
+  }, [p.active]);
+  const changeSoundscape = async (kind: Soundscape) => {
+    const generation = ++audioGeneration.current;
+    ambienceAudio.current?.stop();
+    ambienceAudio.current = null;
+    setSoundscape(kind);
+    try {
+      const audio = await startSoundscape(kind, volume);
+      if (generation !== audioGeneration.current) {
+        audio?.stop();
+        return;
+      }
+      ambienceAudio.current = audio;
+    } catch {
+      setSoundscape("off");
+      setError("Sound could not start. Please try again.");
+    }
   };
+  const recognizer = useRef<Recognition | null>(null),
+    baseline = useRef(0),
+    roomRoot = useRef<HTMLElement>(null),
+    latest = useRef(p);
+  latest.current = p;
+  const storageKey = `todo.room.focus.${p.userId}`;
+  useEffect(() => {
+    setDebug(new URLSearchParams(location.search).get("debug") === "1");
+    setSpeechAvailable(
+      Boolean(
+        (
+          window as unknown as {
+            SpeechRecognition?: unknown;
+            webkitSpeechRecognition?: unknown;
+          }
+        ).SpeechRecognition ||
+        (window as unknown as { webkitSpeechRecognition?: unknown })
+          .webkitSpeechRecognition,
+      ),
+    );
+    return () => recognizer.current?.stop();
+  }, []);
+  useEffect(() => {
+    let stopped = false;
+    const room = new Image(),
+      idle = new Image();
+    room.src = C.image;
+    idle.src = p.female
+      ? C.poses.idle.replace(".png", "-pink.png")
+      : C.poses.idle;
+    Promise.all([room.decode(), idle.decode()])
+      .then(() => {
+        if (!stopped) setLoaded(true);
+      })
+      .catch(() => {
+        if (!stopped) setLoadError("Your room could not load. Try again?");
+      });
+    return () => {
+      stopped = true;
+    };
+  }, [retry, p.female]);
+  useEffect(() => {
+    setConnection(p.connection);
+    setResting(Boolean(p.connection?.quota?.resting));
+  }, [p.connection]);
+  const refresh = useCallback(async () => {
+    const [stats, status, flashcards] = await Promise.allSettled([
+      api<Summary>("/api/room-summary"),
+      api<Connection>("/api/status"),
+      api<Card[]>("/api/flashcards"),
+    ]);
+    if (stats.status === "fulfilled") setSummary(stats.value);
+    if (status.status === "fulfilled") {
+      setConnection(status.value);
+      setResting(Boolean(status.value.quota?.resting));
+    }
+    if (flashcards.status === "fulfilled") setCards(flashcards.value);
+  }, []);
+  useEffect(() => {
+    if (!p.active) return;
+    void refresh();
+    const focus = () => void refresh();
+    window.addEventListener("focus", focus);
+    let timeout: ReturnType<typeof setTimeout>;
+    const scheduleMidnight = () => {
+      const midnight = new Date();
+      midnight.setUTCHours(24, 0, 0, 50);
+      timeout = setTimeout(
+        () => {
+          void refresh();
+          scheduleMidnight();
+        },
+        Math.max(1, midnight.getTime() - Date.now()),
+      );
+    };
+    scheduleMidnight();
+    return () => {
+      window.removeEventListener("focus", focus);
+      clearTimeout(timeout);
+    };
+  }, [p.active, refresh]);
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      if (Array.isArray(stored))
+        setChosen(stored.filter((x) => typeof x === "string").slice(0, 3));
+    } catch {}
+  }, [storageKey]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(chosen));
+    } catch {}
+  }, [chosen, storageKey]);
+  useEffect(() => {
+    if (resting) {
+      p.onAgentMode(false);
+      setPane((v) => (v === "agent" ? null : v));
+    }
+  }, [resting, p.onAgentMode]);
+  useEffect(() => {
+    if (p.focusCompletions > 0) {
+      setRecap({
+        minutes: p.focusMinutes,
+        tasks: p.tasks.filter(
+          (t) =>
+            t.done &&
+            t.completedAt &&
+            t.completedAt >= (p.startedAt || Date.now()),
+        ).length,
+      });
+      setPane("recap");
+      void refresh();
+    }
+  }, [p.focusCompletions, refresh]);
+  useEffect(() => {
+    if (!p.active) return;
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPane(null);
+        setError("");
+      }
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [p.active]);
+  const show = (next: Pane) => {
+    setError("");
+    setPane((current) => (current === next ? null : next));
+  };
+  const work = async (action: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? e.message
+          : "That did not save. Your words are still here.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const addTask = (e: FormEvent) => {
+    e.preventDefault();
+    if (!draft.trim()) return;
+    void work(async () => {
+      const task = await api<Task>("/api/tasks", "POST", { title: draft });
+      p.onTasks([task, ...p.tasks]);
+      if (!p.started && !p.task) p.onTask(task.title);
+      setDraft("");
+    });
+  };
+  const toggle = async (task: Task) => {
+    await work(async () => {
+      const next = await api<Task>("/api/tasks", "PATCH", {
+        id: task.id,
+        done: !task.done,
+      });
+      p.onTasks(p.tasks.map((t) => (t.id === next.id ? next : t)));
+      if (next.done) setChosen((v) => v.filter((id) => id !== next.id));
+      void refresh();
+      if (
+        next.done &&
+        chosen.includes(next.id) &&
+        p.started &&
+        p.phase === "focus"
+      ) {
+        const minutes = Math.max(
+          0,
+          Math.round((p.duration - p.remaining) / 60),
+        );
+        if (await p.onFinish()) {
+          setRecap({ minutes, tasks: 1 });
+          setPane("recap");
+        }
+      }
+    });
+  };
+  const focusTask = (task: Task) => {
+    if (chosen.includes(task.id))
+      setChosen((v) => v.filter((id) => id !== task.id));
+    else if (chosen.length < 3) {
+      setChosen((v) => [...v, task.id]);
+      if (!p.started && !p.task) p.onTask(task.title);
+    } else
+      setError(
+        "Three is a good little handful. Put one back to choose another.",
+      );
+  };
+  const dictate = () => {
+    const w = window as unknown as {
+      SpeechRecognition?: new () => Recognition;
+      webkitSpeechRecognition?: new () => Recognition;
+    };
+    const Constructor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Constructor) return;
+    if (listening) {
+      recognizer.current?.stop();
+      return;
+    }
+    const recognition = new Constructor();
+    recognizer.current = recognition;
+    recognition.lang = navigator.language;
+    recognition.interimResults = false;
+    recognition.onresult = (e) =>
+      setDraft((v) =>
+        (v + " " + e.results[0][0].transcript).trim().slice(0, 180),
+      );
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => {
+      setListening(false);
+      setError("Dictation could not start. You can still type your task.");
+    };
+    try {
+      recognition.start();
+      setListening(true);
+    } catch {
+      setError("Dictation is unavailable here. Try typing instead.");
+    }
+  };
+  const saveNote = () =>
+    void work(async () => {
+      const note = await api<Note>("/api/notes", "POST", {
+        title: noteTitle || "A little note",
+        content: noteText,
+      });
+      p.onNotes([note, ...p.notes]);
+      setNoteTitle("");
+      setNoteText("");
+      setNoteView("saved");
+    });
+  const exportNote = () =>
+    void work(() => makeRoomPDF(noteTitle || "A little note", noteText));
+  const beginFocus = () => {
+    const tasks = chosen
+      .map((id) => p.tasks.find((t) => t.id === id && !t.done))
+      .filter((t): t is Task => Boolean(t));
+    if (!tasks.length) {
+      setError("Add your tasks and choose up to three before starting.");
+      setPane("tasks");
+      return;
+    }
+    p.onTask(tasks[0].title, true);
+    baseline.current = p.tasks.filter((t) => t.done).length;
+    setPane(null);
+  };
+  const sit = (e: FormEvent) => {
+    e.preventDefault();
+    setPane("tasks");
+  };
+  const done = () =>
+    void work(async () => {
+      if (p.phase === "break") {
+        if (await p.onFinish()) setPane(null);
+        return;
+      }
+      const minutes = Math.max(0, Math.round((p.duration - p.remaining) / 60)),
+        count = p.startedAt
+          ? p.tasks.filter(
+              (t) => t.done && t.completedAt && t.completedAt >= p.startedAt!,
+            ).length
+          : Math.max(
+              0,
+              p.tasks.filter((t) => t.done).length - baseline.current,
+            );
+      if (await p.onFinish()) {
+        setRecap({ minutes, tasks: count });
+        setPane("recap");
+        await refresh();
+      }
+    });
+  const mode = (agent: boolean) => {
+    if (agent && resting) return;
+    p.onAgentMode(agent);
+    setSleeping(false);
+    setPane(agent ? "agent" : null);
+  };
+  const rest = useCallback(() => {
+    setResting(true);
+    latest.current.onAgentMode(false);
+    setPane(null);
+    setConnection((c) =>
+      c
+        ? { ...c, quota: c.quota ? { ...c.quota, resting: true } : undefined }
+        : c,
+    );
+  }, []);
+  const pose: RoomPose = p.agentBusy
+    ? "typing"
+    : p.running
+      ? p.phase === "break"
+        ? "tea"
+        : "writing"
+      : p.phase === "break"
+        ? "tea"
+        : sleeping
+          ? "sleeping"
+          : "idle";
+  const visibleTasks = p.tasks.filter(
+    (t) => filter === "all" || (filter === "done" ? t.done : !t.done),
+  );
+  const selected = chosen
+    .map((id) => p.tasks.find((t) => t.id === id && !t.done))
+    .filter((t): t is Task => Boolean(t));
+  const totalSits = summary?.totalSits || p.sessions.length;
+  const keepsakes = [
+    {
+      at: 1,
+      name: "The Little Lamp",
+      Icon: LampDesk,
+      detail: "For the first time you made a little room for yourself.",
+    },
+    {
+      at: 3,
+      name: "The Full Table",
+      Icon: Coffee,
+      detail: "A few quiet sits, a familiar place to return to.",
+    },
+    {
+      at: 5,
+      name: "The Open Book",
+      Icon: BookOpen,
+      detail: "For all the little pages you have turned.",
+    },
+  ].filter((k) => totalSits >= k.at);
+  const share = async () => {
+    const text = `A little sit with Todo. ${recap.minutes} minutes of company, ${recap.tasks} ${recap.tasks === 1 ? "task" : "tasks"} finished. One small step was enough.`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "My Todo keepsake", text });
+      } catch {}
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "a-little-sit-with-todo.txt";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const close = () => {
+    setPane(null);
+    setError("");
+  };
+  const panelTitle: Record<Pane, string> = {
+    ambience: "Set the mood.",
+    timer: "A little focus.",
+    tasks: "Things waiting",
+    notes: "Your little notebook.",
+    agent: "A little help.",
+    settings: "Make yourself comfortable.",
+    month: "This month",
+    corner: "Your corner",
+    friends: "Bring friends to the table.",
+    home: "Who is joining?",
+    break: "A little breather.",
+    recap: "Session complete",
+  };
+  const panelContent = () => {
+    switch (pane) {
+      case "ambience":
+        return (
+          <>
+            <p className="room-helper">A little atmosphere, at your pace.</p>
+            <div
+              className="room-mini-tabs"
+              role="group"
+              aria-label="Time of day"
+            >
+              <Button
+                variant="ghost"
+                aria-pressed={tone === "morning"}
+                onClick={() => setTone("morning")}
+              >
+                <Sun size={16} />
+                Day
+              </Button>
+              <Button
+                variant="ghost"
+                aria-pressed={tone === "night"}
+                onClick={() => setTone("night")}
+              >
+                <Moon size={16} />
+                Night
+              </Button>
+            </div>
+            <label className="room-setting">
+              <span>Rain outside</span>
+              <Switch checked={rain} onCheckedChange={setRain} />
+            </label>
+            <label className="room-field">
+              Soft sounds
+              <select
+                aria-label="Soft sounds"
+                value={soundscape}
+                onChange={(e) =>
+                  void changeSoundscape(e.target.value as Soundscape)
+                }
+              >
+                <option value="off">Quiet · sound off</option>
+                <option value="day">Day · gentle keys</option>
+                <option value="night">Night · slow lullaby</option>
+                <option value="rain">Soft rain</option>
+              </select>
+            </label>
+            <label className="room-field">
+              Volume
+              <input
+                aria-label="Ambience volume"
+                type="range"
+                min="0"
+                max="1"
+                step=".01"
+                value={volume}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  setVolume(value);
+                  ambienceAudio.current?.setVolume(value);
+                }}
+              />
+            </label>
+            <p className="room-helper">
+              Sounds play only when you choose them. You can keep the room
+              completely quiet.
+            </p>
+          </>
+        );
+
+      case "timer":
+        return (
+          <>
+            <div className="room-ring">
+              <svg viewBox="0 0 180 180" aria-hidden="true">
+                <circle cx="90" cy="90" r="81" />
+                <circle
+                  className="room-ring-progress"
+                  cx="90"
+                  cy="90"
+                  r="81"
+                  pathLength="100"
+                  strokeDasharray="100"
+                  strokeDashoffset={100 * (1 - p.remaining / p.duration)}
+                />
+              </svg>
+              <strong>{p.clock}</strong>
+            </div>
+            <p className="room-session-label">
+              {p.phase === "break"
+                ? "A little breather"
+                : `Focus ${(p.sessions.length % 2) + 1} of 2`}
+            </p>
+            <p className="room-task-title">
+              {p.task || "One small thing, together."}
+            </p>
+            {!p.started && p.phase === "focus" ? (
+              <label className="room-field">
+                Minutes
+                <input
+                  type="number"
+                  aria-label="Focus minutes"
+                  min="1"
+                  max="120"
+                  value={Math.round(p.duration / 60)}
+                  onChange={(e) => {
+                    const n = Number(e.target.value);
+                    if (n >= 1 && n <= 120) p.onDuration(n);
+                  }}
+                />
+              </label>
+            ) : null}
+            <div className="room-button-row">
+              <Button
+                className="room-dark-button"
+                onClick={
+                  p.started || p.phase === "break" ? p.onStart : beginFocus
+                }
+              >
+                {p.running ? <Pause size={16} /> : <Play size={16} />}{" "}
+                {p.running ? "Pause" : p.started ? "Resume" : "Start focus"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={done}
+                disabled={busy || (!p.started && p.phase === "focus")}
+              >
+                <Check size={16} />
+                Done
+              </Button>
+            </div>
+            {selected.length ? (
+              <div className="room-focus-list">
+                {selected.map((task, i) => (
+                  <span key={task.id}>
+                    <i>{i + 1}</i>
+                    {task.title}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            <Button
+              variant="ghost"
+              className="room-panel-link"
+              onClick={() => show("month")}
+            >
+              This month <ArrowRight size={15} />
+            </Button>
+          </>
+        );
+      case "tasks":
+        return (
+          <>
+            <label className="room-field">
+              <span className="sr-only">Task filter</span>
+              <select
+                aria-label="Task filter"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                <option value="all">All tasks</option>
+                <option value="waiting">Waiting</option>
+                <option value="done">Finished</option>
+              </select>
+            </label>
+            <p className="room-helper">Pick up to three to keep you company.</p>
+            <div className="room-task-list">
+              {visibleTasks.length ? (
+                visibleTasks.map((task) => (
+                  <div
+                    className={`room-task-row ${task.done ? "task-finished" : ""}`}
+                    key={task.id}
+                  >
+                    <button
+                      className="room-task-check"
+                      aria-label={
+                        task.done
+                          ? `Reopen ${task.title}`
+                          : `Complete ${task.title}`
+                      }
+                      aria-pressed={task.done}
+                      disabled={busy}
+                      onClick={() => void toggle(task)}
+                    >
+                      {task.done ? <Check size={14} /> : null}
+                    </button>
+                    <span>{task.title}</span>
+                    {!task.done ? (
+                      <button
+                        className="room-task-focus"
+                        aria-label={`Focus on ${task.title}`}
+                        aria-pressed={chosen.includes(task.id)}
+                        onClick={() => focusTask(task)}
+                      >
+                        {chosen.includes(task.id) ? (
+                          chosen.indexOf(task.id) + 1
+                        ) : (
+                          <Plus size={14} />
+                        )}
+                      </button>
+                    ) : null}
+                    <button
+                      className="room-task-delete"
+                      aria-label={`Delete ${task.title}`}
+                      disabled={busy}
+                      onClick={() =>
+                        void work(async () => {
+                          await api("/api/tasks", "DELETE", { id: task.id });
+                          p.onTasks(p.tasks.filter((t) => t.id !== task.id));
+                          setChosen((v) => v.filter((id) => id !== task.id));
+                        })
+                      }
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="room-empty">
+                  Nothing here yet. Leave a thought below.
+                </p>
+              )}
+            </div>
+            {p.tasks.filter((t) => !t.done).length > 3 ? (
+              <p className="room-helper">
+                +{p.tasks.filter((t) => !t.done).length - 3} more in your list
+              </p>
+            ) : null}
+            <form className="room-task-input" onSubmit={addTask}>
+              <Input
+                aria-label="New task"
+                placeholder="Drop it here…"
+                value={draft}
+                maxLength={180}
+                onChange={(e) => setDraft(e.target.value)}
+              />
+              {speechAvailable ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label={listening ? "Stop dictation" : "Dictate a task"}
+                  onClick={dictate}
+                >
+                  <Mic size={16} />
+                </Button>
+              ) : null}
+              <Button
+                size="icon"
+                className="room-dark-button"
+                disabled={!draft.trim() || busy}
+                aria-label="Add task"
+              >
+                <Send size={16} />
+              </Button>
+            </form>
+            <Button
+              className="room-dark-button"
+              disabled={!selected.length}
+              onClick={
+                p.started
+                  ? () => {
+                      close();
+                    }
+                  : beginFocus
+              }
+            >
+              {p.started
+                ? "Back to the table"
+                : `Focus with ${selected.length || "your"} ${selected.length === 1 ? "task" : "tasks"}`}
+              <ArrowRight size={16} />
+            </Button>
+          </>
+        );
+      case "notes":
+        return (
+          <>
+            <div
+              className="room-mini-tabs"
+              role="group"
+              aria-label="Notebook sections"
+            >
+              {(["write", "saved", "cards"] as const).map((view) => (
+                <Button
+                  variant="ghost"
+                  key={view}
+                  aria-pressed={noteView === view}
+                  onClick={() => setNoteView(view)}
+                >
+                  {view === "write"
+                    ? "Write"
+                    : view === "saved"
+                      ? "Saved"
+                      : "Flashcards"}
+                </Button>
+              ))}
+            </div>
+            {noteView === "write" ? (
+              <>
+                <label className="room-field">
+                  Upload study notes (.txt or .md)
+                  <input
+                    type="file"
+                    aria-label="Upload study notes"
+                    accept=".txt,.md,text/plain,text/markdown"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      e.target.value = "";
+                      if (
+                        file.size > 150000 ||
+                        !/\.(txt|md)$/i.test(file.name)
+                      ) {
+                        setError(
+                          "Choose a text or Markdown file up to 150 KB.",
+                        );
+                        return;
+                      }
+                      void file
+                        .text()
+                        .then((text) => {
+                          if (text.length > 50000) {
+                            setError(
+                              "Keep uploaded notes under 50,000 characters.",
+                            );
+                            return;
+                          }
+                          setNoteTitle(file.name.replace(/\.[^.]+$/, ""));
+                          setNoteText(text);
+                        })
+                        .catch(() => setError("That file could not be read."));
+                    }}
+                  />
+                </label>
+                <label className="room-field">
+                  Title
+                  <Input
+                    aria-label="Note title"
+                    value={noteTitle}
+                    maxLength={160}
+                    placeholder="A thought to keep"
+                    onChange={(e) => setNoteTitle(e.target.value)}
+                  />
+                </label>
+                <label className="room-field">
+                  Your notes
+                  <Textarea
+                    aria-label="Your notes"
+                    value={noteText}
+                    maxLength={50000}
+                    placeholder="Start anywhere…"
+                    onChange={(e) => setNoteText(e.target.value)}
+                  />
+                </label>
+                <div className="room-button-row">
+                  <Button
+                    className="room-dark-button"
+                    disabled={!noteText.trim() || busy}
+                    onClick={saveNote}
+                  >
+                    Save note
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={!noteText.trim() || busy}
+                    onClick={exportNote}
+                  >
+                    <FileDown size={16} />
+                    Make a PDF
+                  </Button>
+                </div>
+              </>
+            ) : noteView === "saved" ? (
+              <div className="room-saved-notes">
+                {p.notes.length ? (
+                  p.notes.map((note) => (
+                    <article key={note.id}>
+                      <h3>{note.title}</h3>
+                      <p>{note.content.slice(0, 180)}</p>
+                      <div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setNoteTitle(note.title);
+                            setNoteText(note.content);
+                            setNoteView("write");
+                          }}
+                        >
+                          Open
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            void work(() =>
+                              makeRoomPDF(note.title, note.content),
+                            )
+                          }
+                        >
+                          PDF
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Delete note ${note.title}`}
+                          onClick={() =>
+                            void work(async () => {
+                              await api("/api/notes", "DELETE", {
+                                id: note.id,
+                              });
+                              p.onNotes(
+                                p.notes.filter((n) => n.id !== note.id),
+                              );
+                            })
+                          }
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="room-empty">
+                    A small place for the thoughts you want to keep.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                <p className="room-helper">
+                  Cards you write yourself. No AI needed.
+                </p>
+                {cards.map((card) => (
+                  <article className="room-flashcard" key={card.id}>
+                    <button
+                      onClick={() =>
+                        setFlipped(flipped === card.id ? null : card.id)
+                      }
+                      aria-label={`Flip card: ${card.question}`}
+                    >
+                      {flipped === card.id ? card.answer : card.question}
+                      <small>
+                        {flipped === card.id
+                          ? "ANSWER"
+                          : "QUESTION · TAP TO TURN"}
+                      </small>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete flashcard ${card.question}`}
+                      onClick={() =>
+                        void work(async () => {
+                          await api("/api/flashcards", "DELETE", {
+                            id: card.id,
+                          });
+                          setCards((v) => v.filter((c) => c.id !== card.id));
+                        })
+                      }
+                    >
+                      <Trash2 size={14} />
+                    </Button>
+                  </article>
+                ))}
+                <label className="room-field">
+                  Question
+                  <Input
+                    value={question}
+                    maxLength={500}
+                    onChange={(e) => setQuestion(e.target.value)}
+                  />
+                </label>
+                <label className="room-field">
+                  Answer
+                  <Textarea
+                    value={answer}
+                    maxLength={2000}
+                    onChange={(e) => setAnswer(e.target.value)}
+                  />
+                </label>
+                <Button
+                  className="room-dark-button"
+                  disabled={!question.trim() || !answer.trim() || busy}
+                  onClick={() =>
+                    void work(async () => {
+                      const card = await api<Card>("/api/flashcards", "POST", {
+                        question,
+                        answer,
+                      });
+                      setCards((v) => [card, ...v]);
+                      setQuestion("");
+                      setAnswer("");
+                    })
+                  }
+                >
+                  <Plus size={16} />
+                  Keep this card
+                </Button>
+              </>
+            )}
+          </>
+        );
+      case "settings":
+        return (
+          <>
+            <label className="room-setting">
+              <span>Gentler motion</span>
+              <Switch checked={p.reduced} onCheckedChange={p.onReduced} />
+            </label>
+            <label className="room-setting">
+              <span>Little sound effects</span>
+              <Switch checked={p.sound} onCheckedChange={p.onSound} />
+            </label>
+            <label className="room-field">
+              Room light
+              <select value={tone} onChange={(e) => setTone(e.target.value)}>
+                <option value="evening">Warm evening</option>
+                <option value="night">Quiet night</option>
+                <option value="morning">Soft morning</option>
+              </select>
+            </label>
+            <Button variant="outline" onClick={() => setSleeping((v) => !v)}>
+              <Moon size={16} />
+              {sleeping ? "Wake Todo gently" : "Let Todo rest"}
+            </Button>
+            <div className="room-settings-links">
+              {[
+                ["home", Users, "Who is joining?"],
+                ["month,", TimerIcon, "This month"],
+                ["corner", LampDesk, "Your corner"],
+                ["friends", Users, "Bring friends"],
+              ].map(([id, Icon, label]) => {
+                const I = Icon as typeof Users;
+                return (
+                  <Button
+                    variant="ghost"
+                    key={String(id)}
+                    onClick={() => setPane(String(id).replace(",", "") as Pane)}
+                  >
+                    <I size={17} />
+                    {String(label)}
+                    <ArrowRight size={15} />
+                  </Button>
+                );
+              })}
+            </div>
+          </>
+        );
+      case "month":
+        return (
+          <>
+            <p className="room-helper">Little moments, quietly adding up.</p>
+            <div className="room-month-counters">
+              {[
+                ["minutes", summary?.minutes || 0],
+                ["sits", summary?.sits || 0],
+                ["tasks done", summary?.tasksDone || 0],
+              ].map(([label, value]) => (
+                <div key={String(label)}>
+                  <strong>{value}</strong>
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="room-empty">
+              There’s no pace to keep up with. Just your own.
+            </p>
+          </>
+        );
+      case "corner":
+        return (
+          <>
+            <p className="room-helper">
+              Small reminders of time you made for yourself.
+            </p>
+            {keepsakes.length ? (
+              keepsakes.map((k) => (
+                <article className="room-collectible" key={k.name}>
+                  <k.Icon size={32} />
+                  <h3>{k.name}</h3>
+                  <p>{k.detail}</p>
+                </article>
+              ))
+            ) : (
+              <p className="room-empty">
+                After your first sit, a little lamp will find its way onto your
+                shelf.
+              </p>
+            )}
+          </>
+        );
+      case "friends":
+        return (
+          <>
+            <p className="room-helper">A place for good company.</p>
+            <div
+              className="room-friend-table"
+              aria-label="Preview of a table for you and your friends"
+            >
+              <span>you</span>
+              <i />
+              <span>friend</span>
+              <span>friend</span>
+            </div>
+            <label className="room-field">
+              Join with a code
+              <Input
+                aria-label="Friend room code"
+                value={friendCode}
+                placeholder="Your room code"
+                onChange={(e) => setFriendCode(e.target.value)}
+              />
+            </label>
+            <Button
+              className="room-dark-button"
+              disabled={!friendCode.trim()}
+              onClick={() =>
+                setFriendNotice(
+                  "Shared rooms and microphones are still being built. This table is a preview; no room has been joined.",
+                )
+              }
+            >
+              Join room
+            </Button>
+            <p className="room-soft-notice">
+              {friendNotice ||
+                "A preview for now. Shared rooms and voice are coming later."}
+            </p>
+            <Button variant="ghost" onClick={() => setPane("home")}>
+              Sit with Todo for now <ArrowRight size={15} />
+            </Button>
+          </>
+        );
+      case "home":
+        return (
+          <>
+            <div
+              className="room-mini-tabs"
+              role="group"
+              aria-label="Who is joining?"
+            >
+              {["todo", "friends"].map((v) => (
+                <Button
+                  key={v}
+                  variant="ghost"
+                  aria-pressed={joining === v}
+                  onClick={() => setJoining(v)}
+                >
+                  {v === "todo" ? "Todo" : "Friends"}
+                </Button>
+              ))}
+            </div>
+            <label className="room-field">
+              What are we working on?
+              <Input
+                value={p.task}
+                maxLength={180}
+                onChange={(e) => p.onTask(e.target.value)}
+              />
+            </label>
+            <Button
+              className="room-dark-button"
+              onClick={() =>
+                joining === "friends"
+                  ? setPane("friends")
+                  : p.task.trim()
+                    ? beginFocus()
+                    : setError("Give this sit one small intention first.")
+              }
+            >
+              {joining === "friends" ? "Bring friends" : "Sit with Todo"}
+              <ArrowRight size={16} />
+            </Button>
+          </>
+        );
+      case "break":
+        return (
+          <>
+            <Coffee size={42} className="room-break-cup" />
+            <p className="room-empty">
+              Stretch a little. Sip something warm. Todo will be right here.
+            </p>
+            <div className="room-break-clock">
+              {p.phase === "break" ? p.clock : "05:00"}
+            </div>
+            {p.phase === "break" ? (
+              <Button className="room-dark-button" onClick={p.onStart}>
+                {p.running ? "Pause break" : "Take five minutes"}
+              </Button>
+            ) : (
+              <p className="room-helper">
+                Your break is ready after a full focus session.
+              </p>
+            )}
+            <Button variant="ghost" onClick={close}>
+              Stay in the room
+            </Button>
+          </>
+        );
+      case "recap":
+        return (
+          <>
+            <span className="room-recap-check">
+              <Check size={28} />
+            </span>
+            <h3 className="room-recap-kind">You did great.</h3>
+            <div className="room-recap-stats">
+              <span>
+                <strong>{recap.minutes}</strong>minutes
+              </span>
+              <span>
+                <strong>{recap.tasks}</strong>tasks done
+              </span>
+            </div>
+            <p className="room-helper">Your time together is saved.</p>
+            <Button
+              className="room-dark-button"
+              onClick={() => {
+                p.onBreak();
+                setPane("break");
+              }}
+            >
+              Todo, take a break <Coffee size={16} />
+            </Button>
+            <Button variant="ghost" onClick={() => void share()}>
+              <Share2 size={16} />
+              Share keepsake
+            </Button>
+          </>
+        );
+      default:
+        return null;
+    }
+  };
+  if (!p.active) return null;
   return (
     <section
-      className={`study-room ${p.active ? "room-entered" : "room-hidden"} ${p.reduced ? "room-reduced" : ""} ${working ? "is-working" : ""}`}
+      ref={roomRoot}
+      className={`cozy-room ${p.active ? "cozy-room-active" : ""} ${p.reduced ? "cozy-room-reduced" : ""}`}
       aria-label="Your shared Todo workspace"
       aria-hidden={!p.active}
       inert={!p.active}
       data-character={p.female ? "female" : "male"}
       data-mode={p.agentMode ? "agent" : "companion"}
+      data-loaded={loaded}
+      data-tone={tone}
+      data-rain={rain}
+      data-working={p.running && p.phase === "focus"}
     >
-      <div className="room-backdrop" />
-      <div className="room-vignette" />
-      <header className="room-header">
-        <Button variant="ghost" className="room-back" onClick={p.onExit}>
-          <ArrowLeft size={15} />
-          Choose companion
-        </Button>
-        <div className="room-heading">
-          <strong>Your little corner</strong>
-          <span>
-            {p.phase === "break"
-              ? "A moment to recharge"
-              : p.agentBusy
-                ? "Todo is working on your request"
-                : p.running
-                  ? "A little progress, together"
-                  : "Make yourself comfortable"}
-          </span>
+      <link rel="preload" href={C.image} as="image" />
+      <div
+        className="cozy-room-backdrop"
+        style={{ backgroundImage: `url(${C.image})` }}
+        aria-hidden="true"
+      />
+      <div className="cozy-room-stage">
+        <div className="cozy-room-art">
+          <img
+            className="cozy-room-image"
+            src={C.image}
+            width={1536}
+            height={1024}
+            alt="A warm evening room: a full window, armchair, reading lamp, bookshelf and soft rug."
+          />
+          <div
+            className="room-contact-shadow"
+            style={zoneStyle(C.shadow)}
+            aria-hidden="true"
+          />
+          <div className="room-seated-anchor" style={zoneStyle(C.penguin)}>
+            <RoomPenguin
+              pose={pose}
+              female={p.female}
+              reduced={p.reduced}
+              active={p.active && loaded}
+            />
+          </div>
+          <div
+            className="desk-surface room-kept-table"
+            aria-label="Your wooden study table"
+          >
+            <div className="desk-grain" />
+          </div>
+          <div className="desk-notebook room-table-notebook" aria-hidden="true">
+            <span />
+            <i />
+          </div>
+          <div className="room-writing-hand" aria-hidden="true">
+            <i />
+          </div>
+          <div className="coffee-cup room-table-coffee" aria-hidden="true">
+            <i className="steam steam-one" />
+            <i className="steam steam-two" />
+            <span className="cup-top" />
+            <span className="cup-body" />
+            <span className="cup-handle" />
+            <span className="cup-saucer" />
+          </div>
+          <div className="room-window-weather" aria-hidden="true">
+            <div className="room-window-dark" />
+            {Array.from({ length: 32 }, (_, i) => (
+              <i
+                key={i}
+                style={{
+                  left: `${(i * 17) % 100}%`,
+                  animationDelay: `${i * -0.19}s`,
+                  animationDuration: `${0.65 + (i % 5) * 0.12}s`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="room-lamp-glow" aria-hidden="true" />
+          <div className="room-evening-tint" aria-hidden="true" />
+          <div className="room-city-lights" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <i key={i} style={{ animationDelay: `${i * 1.2}s` }} />
+            ))}
+          </div>
+          <div className="room-dust" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <i
+                key={i}
+                style={{
+                  left: `${79 + i * 2.7}%`,
+                  top: `${39 + (i % 3) * 9}%`,
+                  animationDelay: `${i * -2.3}s`,
+                }}
+              />
+            ))}
+          </div>
         </div>
         <Button
+          data-room-ui="back"
           variant="ghost"
           size="icon"
-          className="room-settings"
-          aria-label="Open room settings"
-          onClick={() => p.onPanel("settings")}
+          className="room-nav-back"
+          aria-label="Choose companion"
+          onClick={() => {
+            close();
+            p.onExit();
+          }}
         >
-          <Settings2 size={18} />
+          <ArrowLeft size={18} />
         </Button>
-      </header>
-      <div
-        className={`room-companion ${p.female ? "room-female" : "room-male"} ${wink ? "room-winking" : ""}`}
-      >
-        <img
-          src="/art/todo-seated.png"
-          alt={
-            p.female
-              ? "Your pink-band penguin companion sitting at her desk"
-              : "Your blue-band penguin companion sitting at his desk"
-          }
-          className="seated-penguin"
-          draggable={false}
-        />
-        <div className="room-character-band">
-          <i />
-        </div>
-        {p.female ? (
-          <>
-            <div className="room-bow">
-              <i />
-              <b />
-              <i />
-            </div>
-            <span className="room-lashes left-lash" />
-            <span className="room-lashes right-lash" />
-          </>
-        ) : null}
-        <div className="room-eye-lid" />
-        <button
-          className="room-beak-hit"
-          aria-label="Boop your penguin"
-          onClick={boop}
-        />
-        {peace ? (
-          <div className="room-peace">
-            <svg viewBox="0 0 120 150">
-              <path
-                d="M25 145 Q4 100 25 78 L16 24 Q15 4 31 12 L51 63 L58 10 Q62 -4 74 10 L73 76 Q108 66 111 99 Q115 130 85 150Z"
-                fill="#383332"
-              />
-              <path
-                d="M31 91 Q62 113 86 90"
-                stroke="#68605a"
-                strokeWidth="3"
-                fill="none"
-              />
-            </svg>
-          </div>
-        ) : null}
-        <div className="typing-flipper left-typing" />
-        <div className="typing-flipper right-typing" />
-      </div>
-      <div className="desk-surface">
-        <div className="desk-grain" />
-      </div>
-      <div className="room-laptop" aria-hidden="true">
-        <div className="laptop-back">
-          <span className="laptop-mark">
-            t<span>•</span>
-          </span>
-        </div>
-        <div className="laptop-base" />
-      </div>
-      <div className="desk-paw left-paw" aria-hidden="true" />
-      <div className="desk-paw right-paw" aria-hidden="true" />
-      <button
-        className="coffee-cup"
-        onClick={() => p.onPanel("solo")}
-        aria-label="Open focus tools"
-      >
-        <i className="steam steam-one" />
-        <i className="steam steam-two" />
-        <i className="steam steam-three" />
-        <span className="cup-top" />
-        <span className="cup-body" />
-        <span className="cup-handle" />
-        <span className="cup-saucer" />
-      </button>
-      <div className="desk-notebook" aria-hidden="true">
-        <span />
-        <i />
-      </div>
-      <div className="desk-clock" aria-label={`Focus timer ${p.clock}`}>
-        <span>
-          {p.phase === "break" ? "TAKE A BREATHER" : "A LITTLE FOCUS"}
-        </span>
-        <strong>{p.clock}</strong>
-        <div>
-          <button
-            aria-label={
-              p.running
-                ? "Pause timer"
-                : p.started
-                  ? "Resume timer"
-                  : "Set up focus timer"
-            }
-            onClick={p.started ? p.onStart : () => p.onPanel("solo")}
-          >
-            {p.running ? <Pause size={13} /> : <Play size={13} />}
-          </button>
-          <button
-            aria-label="Adjust focus timer"
-            onClick={() => p.onPanel("solo")}
-          >
-            <Settings2 size={13} />
-          </button>
-        </div>
-      </div>
-      <div className="room-focus-strip">
-        <div className="room-task-copy">
-          <span>
-            {p.phase === "break" ? "Your break" : "Your little intention"}
-          </span>
-          {p.started ? (
-            <strong>{p.task || "Rest for a moment."}</strong>
-          ) : (
-            <Input
-              aria-label="Room focus task"
-              maxLength={180}
-              placeholder="What are we working on?"
-              value={p.task}
-              onChange={(e) => p.onTask(e.target.value)}
-            />
-          )}
-        </div>
-        <Button className="warm-button" size="sm" onClick={p.onStart}>
-          {p.running ? <Pause size={14} /> : <Play size={14} />}{" "}
-          {p.running
-            ? "Pause"
-            : p.started
-              ? "Keep going"
-              : p.phase === "break"
-                ? "Start break"
-                : "Start focusing"}
-        </Button>
-        {p.started && p.phase === "focus" ? (
+        <div
+          className="room-mode-toggle"
+          data-room-ui="mode"
+          role="group"
+          aria-label="Todo mode"
+        >
           <Button
             variant="ghost"
-            size="icon"
-            aria-label="Finish focus session"
-            onClick={p.onFinish}
-          >
-            <CheckCheck size={18} />
-          </Button>
-        ) : null}
-      </div>
-      <div className="room-dock" aria-label="Room tools">
-        <div className="room-mode-toggle">
-          <Button
-            variant={!p.agentMode ? "secondary" : "ghost"}
-            size="sm"
             aria-pressed={!p.agentMode}
-            onClick={() => p.onAgentMode(false)}
+            onClick={() => mode(false)}
           >
-            <Headphones size={15} />
             Companion
           </Button>
           <Button
-            variant={p.agentMode ? "secondary" : "ghost"}
-            size="sm"
+            variant="ghost"
             aria-pressed={p.agentMode}
-            onClick={() => {
-              p.onAgentMode(true);
-              p.onPanel("agent");
-            }}
+            disabled={resting}
+            onClick={() => mode(true)}
           >
-            <Sparkles size={15} />
+            <Sparkles size={14} />
             Agent
           </Button>
         </div>
-        <span className="dock-divider" />
-        <Button variant="ghost" size="sm" onClick={() => p.onPanel("solo")}>
-          <Headphones size={15} />
-          Focus & tasks
+        <Button
+          data-room-ui="settings"
+          variant="ghost"
+          size="icon"
+          className="room-nav-settings"
+          aria-label="Open room settings"
+          onClick={() => show("settings")}
+        >
+          <Settings2 size={18} />
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => p.onPanel("notes")}>
-          <FileText size={15} />
-          Notes
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => p.onPanel("friends")}>
-          <Users size={15} />
-          Friends
-        </Button>
+        <nav
+          className="room-edge-tabs"
+          data-room-ui="tools"
+          aria-label="Room tools"
+        >
+          {[
+            ["ambience", CloudRain, "Ambience"],
+            ["timer", TimerIcon, "Timer"],
+            ["tasks", ListTodo, "Tasks"],
+            ["notes", BookOpen, "Notes"],
+            ["friends", Users, "Invite friends"],
+          ].map(([id, Icon, label]) => {
+            const I = Icon as typeof TimerIcon;
+            return (
+              <button
+                key={String(id)}
+                className={`room-edge-tab room-edge-${id}`}
+                aria-expanded={pane === id}
+                onClick={() => show(id as Pane)}
+              >
+                <I size={17} />
+                <span>{String(label)}</span>
+              </button>
+            );
+          })}
+        </nav>
+        <div
+          className="desk-clock room-table-clock"
+          aria-label={`Table timer ${p.clock}`}
+        >
+          <span>
+            {p.phase === "break" ? "A LITTLE BREAK" : "FOCUS TOGETHER"}
+          </span>
+          <strong>{p.clock}</strong>
+          <div>
+            <button
+              aria-label={
+                p.running
+                  ? "Pause table timer"
+                  : p.started
+                    ? "Resume table timer"
+                    : "Start table timer"
+              }
+              onClick={
+                p.started || p.phase === "break" ? p.onStart : beginFocus
+              }
+            >
+              {p.running ? <Pause size={16} /> : <Play size={16} />}
+            </button>
+            <button
+              aria-label="Adjust focus timer"
+              onClick={() => show("timer")}
+            >
+              <Settings2 size={16} />
+            </button>
+          </div>
+        </div>
+        <div
+          className="room-home-card"
+          data-room-ui="home"
+          style={zoneStyle(C.home)}
+        >
+          {!p.started && p.phase === "focus" ? (
+            <form onSubmit={sit}>
+              <span className="room-eyebrow">TODAY</span>
+              <h1>What are we working on?</h1>
+              <div className="room-intention-form">
+                <p className="room-helper">
+                  {selected.length
+                    ? `${selected.length} ${selected.length === 1 ? "task" : "tasks"} chosen. Your table is ready.`
+                    : "Write your tasks. Choose up to three."}
+                </p>
+                <Button className="room-dark-button">
+                  {selected.length ? "Edit your tasks" : "Sit with Todo"}
+                  <ArrowRight size={15} />
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="room-sit-status">
+              <div>
+                <span className="room-eyebrow">
+                  {p.phase === "break"
+                    ? "A LITTLE BREATHER"
+                    : "YOUR LITTLE SIT"}
+                </span>
+                <h2>{p.task || "A moment just for you."}</h2>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={() => show("timer")}
+                aria-label={`Open timer ${p.clock}`}
+              >
+                {p.clock}
+                <ArrowRight size={16} />
+              </Button>
+            </div>
+          )}
+        </div>
+        {p.agentBusy || resting ? (
+          <p
+            className={`room-speech-pill ${resting ? "room-rest-message" : ""}`}
+            style={zoneStyle(C.bubble)}
+            role="status"
+          >
+            {p.agentBusy ? (
+              <>
+                Todo is working
+                <span className="room-thinking-dots">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </>
+            ) : (
+              C.restMessage
+            )}
+          </p>
+        ) : null}
+        {keepsakes.length ? (
+          <div
+            className="room-shelf-keepsakes"
+            aria-label="Keepsakes on your shelf"
+          >
+            {keepsakes.map((k) => (
+              <button
+                key={k.name}
+                aria-label={k.name}
+                title={k.name}
+                onClick={() => setPane("corner")}
+              >
+                <k.Icon size={18} />
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {debug ? (
+          <div className="room-debug" aria-hidden="true">
+            {Object.entries(C.zones).map(([name, z]) => (
+              <div key={name} style={zoneStyle(z)}>
+                <span>{name}</span>
+              </div>
+            ))}
+            <div style={zoneStyle(C.penguin)}>
+              <span>penguin</span>
+            </div>
+            <div style={zoneStyle(C.panel)}>
+              <span>panel safe area</span>
+            </div>
+          </div>
+        ) : null}
+        <DialogPrimitive.Root
+          open={Boolean(pane)}
+          onOpenChange={(open) => {
+            if (!open) close();
+          }}
+          modal={false}
+        >
+          {pane ? (
+            <DialogPrimitive.Content
+              className={`room-tool-panel ${pane === "agent" ? "room-chat-panel" : ""}`}
+              style={zoneStyle(pane === "agent" ? C.chat : C.panel)}
+              aria-labelledby="room-panel-title"
+              aria-describedby="room-panel-description"
+              onInteractOutside={(e) => e.preventDefault()}
+              data-lenis-prevent
+            >
+              <DialogPrimitive.Description
+                id="room-panel-description"
+                className="sr-only"
+              >
+                A quiet tool for your sit. Close it to return to the full room.
+              </DialogPrimitive.Description>
+              {pane === "agent" ? (
+                <RoomChat
+                  connection={connection}
+                  onBusy={p.onBusy}
+                  onRest={rest}
+                  onNote={(note) => p.onNotes([note, ...p.notes])}
+                  onClose={close}
+                />
+              ) : (
+                <>
+                  <header className="room-panel-heading">
+                    <div>
+                      <span className="room-eyebrow">YOUR LITTLE CORNER</span>
+                      <DialogPrimitive.Title id="room-panel-title" asChild>
+                        <h2>{panelTitle[pane]}</h2>
+                      </DialogPrimitive.Title>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Close panel"
+                      onClick={close}
+                    >
+                      <X size={18} />
+                    </Button>
+                  </header>
+                  <div className="room-panel-body">{panelContent()}</div>
+                </>
+              )}
+              {error ? (
+                <p className="room-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </DialogPrimitive.Content>
+          ) : null}
+        </DialogPrimitive.Root>
       </div>
-      <p className="room-presence">
-        <span className={working ? "live-dot" : ""} />
-        {p.agentBusy
-          ? "Working on your request."
-          : p.running
-            ? "You do your thing. I’ll do mine."
-            : "Your penguin is right here."}
-      </p>
+      {!loaded ? (
+        <div className="room-loading" role="status">
+          {loadError ? (
+            <>
+              <p>{loadError}</p>
+              <Button
+                onClick={() => {
+                  setLoadError("");
+                  setRetry((v) => v + 1);
+                }}
+              >
+                Try again
+              </Button>
+            </>
+          ) : (
+            <>
+              <Loader2 size={22} className="animate-spin" />
+              <span>Warming your little corner…</span>
+            </>
+          )}
+        </div>
+      ) : null}
+      {error && !pane ? (
+        <p className="room-page-notice" role="alert">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

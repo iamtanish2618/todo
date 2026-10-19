@@ -59,7 +59,7 @@ test("profile saves to the database, greeting returns by name, mascot follows fi
     "Welcome back, Avery.",
   );
   await page.getByRole("button", { name: /Focus with Todo/ }).click();
-  await expect(page.locator(".study-room.room-entered")).toBeVisible();
+  await expect(page.locator(".cozy-room.cozy-room-active")).toBeVisible();
   await page.getByRole("button", { name: "Agent", exact: true }).click();
   await expect(
     page.getByRole("textbox", { name: "Message Todo" }),

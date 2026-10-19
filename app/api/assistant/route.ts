@@ -1,3 +1,6 @@
+import { APICallError } from "ai";
+import { dailyLimit, usageDay } from "@/lib/todo/quota";
+import { ROOM_CONFIG } from "@/components/todo/room/config";
 import { askModel } from "@/lib/todo/ai";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
@@ -11,7 +14,7 @@ import {
 } from "@/lib/todo/server";
 
 const schema = z.object({
-  mode: z.enum(["chat", "notes", "summarize", "explain"]),
+  mode: z.enum(["chat", "notes", "summarize", "explain", "quiz", "flashcards"]),
   messages: z
     .array(
       z.object({
@@ -51,27 +54,33 @@ export async function POST(request: Request) {
         "This AI connection does not have image reading enabled yet.",
         422,
       );
-    const max = Math.min(
-      100,
-      Math.max(1, Number(setting("TODO_AI_DAILY_LIMIT")) || 25),
-    );
+    const max = dailyLimit();
     if (!env.DB)
       throw new ApiError("Todo’s storage is not connected yet.", 503);
     const quota = await env.DB.prepare(
       "INSERT INTO daily_usage (user_id, day, count) VALUES (?, ?, 1) ON CONFLICT(user_id, day) DO UPDATE SET count = count + 1 WHERE count < ? RETURNING count",
     )
-      .bind(userId, new Date().toISOString().slice(0, 10), max)
+      .bind(userId, usageDay(), max)
       .first();
-    if (!quota)
-      throw new ApiError(
-        "You’ve reached today’s AI allowance. Your focus tools and saved notes are still available.",
-        429,
+    if (!quota) throw new ApiError(ROOM_CONFIG.restMessage, 429);
+    let text: string;
+    try {
+      text = await askModel(
+        config,
+        parsed.data,
+        AbortSignal.any([request.signal, AbortSignal.timeout(45000)]),
       );
-    const text = await askModel(
-      config,
-      parsed.data,
-      AbortSignal.any([request.signal, AbortSignal.timeout(45000)]),
-    );
+    } catch (error) {
+      if (APICallError.isInstance(error) && error.statusCode === 429) {
+        await env.DB.prepare(
+          "UPDATE daily_usage SET count = ? WHERE user_id = ? AND day = ?",
+        )
+          .bind(max, userId, usageDay())
+          .run();
+        throw new ApiError(ROOM_CONFIG.restMessage, 429);
+      }
+      throw error;
+    }
     if (!text.trim())
       throw new ApiError(
         "The AI didn’t return text this time. Please try a shorter request.",

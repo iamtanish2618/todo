@@ -47,7 +47,10 @@ export async function PATCH(request: Request) {
     if (!parsed.success) throw new ApiError("Choose a valid task.");
     const result = await getDb()
       .update(tasks)
-      .set({ done: parsed.data.done })
+      .set({
+        done: parsed.data.done,
+        completedAt: parsed.data.done ? Date.now() : null,
+      })
       .where(and(eq(tasks.id, parsed.data.id), eq(tasks.userId, userId)))
       .returning();
     if (!result[0]) throw new ApiError("That task was not found.", 404);

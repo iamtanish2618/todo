@@ -73,6 +73,7 @@ type Timer = {
   phase: "focus" | "break";
   started: boolean;
   id: string;
+  startedAt?: number;
 };
 const freshTimer: Timer = {
   remaining: 25 * 60,
@@ -119,6 +120,7 @@ export default function TodoApp({
     [minutes, setMinutes] = useState(25),
     [taskDraft, setTaskDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [focusCompletions, setFocusCompletions] = useState(0);
   const [inRoom, setInRoom] = useState(false),
     [agentMode, setAgentMode] = useState(false),
     [agentBusy, setAgentBusy] = useState(false);
@@ -189,8 +191,10 @@ export default function TodoApp({
         saved.duration > 0 &&
         saved.duration <= 7200 &&
         (!saved.deadline || Number.isFinite(saved.deadline))
-      )
+      ) {
         setTimer(saved);
+        if (saved.phase === "focus") setMinutes(saved.duration / 60);
+      }
     } catch {}
     hydrated.current = true;
     setTimerReady(true);
@@ -242,8 +246,7 @@ export default function TodoApp({
     const remaining = value.deadline
       ? Math.max(0, Math.ceil((value.deadline - Date.now()) / 1000))
       : value.remaining;
-    const seconds = value.duration - remaining;
-    if (seconds < 1) return true;
+    const seconds = Math.max(1, value.duration - remaining);
     try {
       const result = await api<FocusSession>("/api/sessions", "POST", {
         task: value.task,
@@ -272,15 +275,18 @@ export default function TodoApp({
         if (current.phase === "focus") {
           settling.current = true;
           setTimer({ ...current, remaining: 0, deadline: null });
-          const saved = await saveSession(current);
+          const saved =
+            current.phase === "focus" ? await saveSession(current) : true;
           settling.current = false;
           if (!saved) return;
+          setFocusCompletions((v) => v + 1);
           setTimer({
             ...freshTimer,
             phase: "break",
             remaining: 300,
             duration: 300,
             task: current.task,
+            startedAt: current.startedAt,
             id: crypto.randomUUID(),
           });
           toast.success("Time for a little breather. You did it!");
@@ -290,8 +296,11 @@ export default function TodoApp({
         }
         chime();
         setInRoom(true);
-        setPanel("solo");
-      } else setTimer({ ...current, remaining });
+        setPanel(null);
+      } else
+        setTimer((t) =>
+          t.remaining === remaining ? t : { ...current, remaining },
+        );
     }, 250);
     return () => clearInterval(id);
   }, [timerReady, saveSession, chime]);
@@ -373,12 +382,13 @@ export default function TodoApp({
       ...t,
       deadline: Date.now() + t.remaining * 1000,
       started: true,
+      startedAt: t.startedAt || Date.now(),
       id: t.id || crypto.randomUUID(),
     }));
     chime();
   };
   const finish = async () => {
-    if (settling.current) return;
+    if (settling.current) return false;
     settling.current = true;
     const current = timerRef.current;
     setTimer({
@@ -388,16 +398,25 @@ export default function TodoApp({
         : current.remaining,
       deadline: null,
     });
-    const saved = await saveSession(current);
+    const saved = current.phase === "focus" ? await saveSession(current) : true;
     settling.current = false;
     if (saved) {
       setTimer({ ...freshTimer, task: current.task });
       chime();
     }
+    return saved;
   };
   const clock = `${Math.floor(timer.remaining / 60)
     .toString()
     .padStart(2, "0")}:${(timer.remaining % 60).toString().padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (timer.deadline) document.title = `${clock} - Todo`;
+    else document.title = "Todo — A little company, a little progress";
+    return () => {
+      document.title = "Todo — A little company, a little progress";
+    };
+  }, [clock, timer.deadline]);
 
   return (
     <main
@@ -459,6 +478,40 @@ export default function TodoApp({
       ) : null}
       <StudyRoom
         active={inRoom}
+        userId={identity?.id || "guest"}
+        tasks={tasks}
+        notes={notes}
+        sessions={sessions}
+        connection={connection}
+        onTasks={setTasks}
+        onNotes={setNotes}
+        remaining={timer.remaining}
+        duration={timer.duration}
+        focusMinutes={minutes}
+        startedAt={timer.startedAt}
+        focusCompletions={focusCompletions}
+        onBreak={() =>
+          setTimer((t) => ({
+            ...freshTimer,
+            phase: "break",
+            remaining: 300,
+            duration: 300,
+            task: t.task,
+          }))
+        }
+        sound={sound}
+        onSound={setSound}
+        onReduced={setReduced}
+        onBusy={setAgentBusy}
+        onDuration={(value) => {
+          if (timer.started) return;
+          setMinutes(value);
+          setTimer((t) => ({
+            ...t,
+            remaining: value * 60,
+            duration: value * 60,
+          }));
+        }}
         female={female}
         reduced={reduced}
         clock={clock}
@@ -472,7 +525,21 @@ export default function TodoApp({
           setAgentMode(mode);
           if (!mode) setPanel(null);
         }}
-        onTask={(task) => setTimer((t) => ({ ...t, task }))}
+        onTask={(task, begin) => {
+          setTimer((t) => ({
+            ...t,
+            task,
+            ...(begin
+              ? {
+                  deadline: Date.now() + t.remaining * 1000,
+                  started: true,
+                  startedAt: t.startedAt || Date.now(),
+                  id: t.id || crypto.randomUUID(),
+                }
+              : {}),
+          }));
+          if (begin) chime();
+        }}
         onStart={start}
         onFinish={finish}
         onExit={() => {

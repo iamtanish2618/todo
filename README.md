@@ -5,12 +5,15 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 ## Start here
 
 - **Your account:** Google and email/password login are implemented behind a Firebase provider setting, with verification, password reset, remembered sign-in and protected API sessions. The Todo Firebase project and authorized domains are connected. The public homepage needs no ChatGPT account; see [the account setup guide](docs/AUTH.md). Firebase is the default and does not fall back to ChatGPT identity. The shadcn form includes the small penguin that follows field focus and celebrates account/profile setup.
-- **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across the desk, a laptop, coffee with rising steam, and a physical-looking live clock. Companion and Agent are modes in this room; closing a tool leaves the room in place.
-- **Focus solo:** set your intention and start on the desk, or open Focus & tasks to add tasks, choose 15/25/45 minutes, pause, resume, and save progress. The timer continues when you close a tool or refresh.
+- **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across the desk, a notebook and pen, coffee with rising steam, and a physical-looking live clock. Companion and Agent are modes in this room; closing a tool leaves the room in place.
+- **Focus solo:** write your tasks, select up to three, then start using the physical desk clock. Todo writes while you focus and has coffee during breaks. Timer settings let you choose 1–120 minutes, pause, resume, and save progress. The timer continues when you close a tool or refresh.
 - **Ask Todo:** chat, make notes, summarize text, or ask about an image once an AI provider is connected. Attach `.txt`, `.md`, PNG, JPEG, or WebP files. Image input needs a vision-capable model.
 - **Your notes:** write and save notes and download real multi-page PDFs. This works without AI.
 - **Choose your companion:** scroll between the penguins or click the switch hint. Each character has its own invitation and greeting. They fade away as he closes his eyes and snow fills the screen, then return as she opens hers. The original playful avatar wears separate blue/pink knitted cap and muffler layers. The story now takes one long scroll, with him moving up and her arriving from below. Clicking anywhere on them triggers gentle wiggles, bounces, warmer blush, and occasional little hearts. Clicks do not blink. Your choice is remembered.
+- **Ambience:** switch day/night window light, add rain outside, and choose optional quiet day/night melodies or rain audio. Sounds start only after your choice.
 - **Settings:** turn on sound effects or gentler motion.
+
+See [the room guide](docs/ROOM.md) for desktop layout, poses, tasks, ambience, notes, agent limits, and tuning. Phone design is on hold.
 
 Friends, microphone chat, and synchronized rooms are the next stage. The Friends panel says this explicitly. Games are on hold: there is no race or other game in this version. Breaks are simple rest periods; game ideas will be revisited later.
 
@@ -22,7 +25,7 @@ Friends, microphone chat, and synchronized rooms are the next stage. The Friends
 4. **Database:** Cloudflare D1 keeps your preferred name, tasks, notes, and focus history, with every query restricted to the signed-in owner. Device preferences and the active timer use versioned local storage.
 5. **AI API:** our backend sends a message to an existing model and returns its reply. We do not train our own model. The API key stays on the server. The model can read submitted text and, when enabled, images; it cannot operate other apps or browse the web.
 6. **PDF export:** our code formats your text into a downloadable PDF. No AI call is needed to create the file. The current font supports Latin, Greek, and Cyrillic text; unsupported characters produce a clear error rather than silently disappearing.
-7. **Tests and hosting:** Playwright checks real browser actions and API routes. Sites builds and privately hosts the app and provisions the database.
+7. **Tests and hosting:** Playwright checks real browser actions and API routes. Sites builds and hosts the public app with private account data and provisions the database.
 
 ## Run locally
 
@@ -33,10 +36,11 @@ npm install
 npm run build
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_steady_lenny_balinger.sql
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_freezing_cloak.sql
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_square_master_chief.sql
 npm run dev -- --port 3000
 ```
 
-Open the printed local URL. The starter simulates sign-in on loopback only. Hosted sign-in and private access are handled by Sites. Local and hosted databases are separate. Apply a local SQL migration only once; new schema changes need a new migration.
+Open the printed local URL. Firebase is the default locally and in production. The starter can explicitly use a legacy mock account on loopback for tests; it is never a production authentication fallback. Local and hosted databases are separate. Apply a local SQL migration only once; new schema changes need a new migration.
 
 ## Connect AI privately
 
@@ -69,7 +73,7 @@ npm run test:e2e
 npm run build
 ```
 
-Tests cover pointer tracking, glass hover, scroll selection and reload persistence, task CRUD, timer pause/resume and history, note persistence, a real multi-page PDF download, uploads, unavailable-AI errors and draft preservation, anonymous/forged-identity rejection, cross-origin rejection, input validation, reduced motion, settings, and mobile controls. Additional checks verify hidden image swaps, identical reverse timeline states, fast scrolling, resized eye registration, live timing controls, portrait eye visibility, a stationary room across repeated panel changes, shared timers, and background AI work surviving a panel close. Mocked provider tests verify image/text transport and failure handling; a mocked browser reply verifies saving an AI answer as a note. They do not claim that a live provider or model quality has been tested.
+Tests cover pointer tracking, glass hover, scroll selection and reload persistence, task CRUD, timer pause/resume and history, note persistence, a real multi-page PDF download, uploads, unavailable-AI errors and draft preservation, anonymous/forged-identity rejection, cross-origin rejection, input validation, reduced motion, settings, and the existing homepage portrait controls. Dedicated phone room work is deferred. Additional checks verify hidden image swaps, identical reverse timeline states, fast scrolling, resized eye registration, live timing controls, portrait eye visibility, a stationary room across repeated panel changes, shared timers, and aborting pending chat when its panel closes. Mocked provider tests verify image/text transport and failure handling; a mocked browser reply verifies saving an AI answer as a note. They do not claim that a live provider or model quality has been tested.
 
 ## Files to change
 

@@ -17,6 +17,7 @@ export const tasks = sqliteTable("tasks", {
   userId: text("user_id").notNull(),
   title: text("title").notNull(),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
+  completedAt: integer("completed_at"),
   createdAt: integer("created_at").notNull(),
 });
 export const sessions = sqliteTable("sessions", {
@@ -43,3 +44,11 @@ export const dailyUsage = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.day] })],
 );
+
+export const flashcards = sqliteTable("flashcards", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  createdAt: integer("created_at").notNull(),
+});

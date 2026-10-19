@@ -215,7 +215,7 @@ test("390 × 844 portrait framing keeps both eyes in view with native keyboard s
   await progress(page, 1);
   await page.screenshot({ path: "outputs/intro-portrait-female.png" });
   await page.getByRole("button", { name: /Focus with Todo/ }).click();
-  await expect(page.locator(".study-room.room-entered")).toBeVisible();
+  await expect(page.locator(".cozy-room.cozy-room-active")).toBeVisible();
 });
 
 test("reduced motion uses the quiet crossfade without snow or scripted lids", async ({

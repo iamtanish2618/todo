@@ -2,6 +2,7 @@ export type Task = {
   id: string;
   title: string;
   done: boolean;
+  completedAt?: number | null;
   createdAt: number;
 };
 export type FocusSession = {
@@ -22,7 +23,16 @@ export type Connection = {
   vision: boolean;
   provider: string;
   friends: boolean;
+  quota?: { used: number; limit: number; resting: boolean; resetsAt: string };
 };
+export class RequestError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
 let authTokenGetter: (() => Promise<string | null>) | null = null;
 export function setAuthTokenGetter(getter: typeof authTokenGetter) {
   authTokenGetter = getter;
@@ -31,10 +41,12 @@ export async function api<T>(
   url: string,
   method = "GET",
   data?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const token = authTokenGetter ? await authTokenGetter() : null;
   const response = await fetch(url, {
     method,
+    signal,
     headers: {
       ...(data ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -43,7 +55,10 @@ export async function api<T>(
   });
   const result = (await response.json()) as T & { error?: string };
   if (!response.ok)
-    throw new Error(result.error || "Couldn’t connect. Please try again.");
+    throw new RequestError(
+      result.error || "Couldn’t connect. Please try again.",
+      response.status,
+    );
   return result;
 }
 export async function exportPDF(title: string, content: string) {
