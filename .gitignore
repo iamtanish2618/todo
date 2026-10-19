@@ -59,3 +59,5 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 *.tsbuildinfo
+/firebase-debug*.log
+/ui-debug.log

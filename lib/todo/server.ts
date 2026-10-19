@@ -1,5 +1,6 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-import { env } from "cloudflare:workers";
+import { getTodoUser } from "@/lib/auth/server";
+import { setting } from "./settings";
+export { setting } from "./settings";
 
 export class ApiError extends Error {
   constructor(
@@ -15,9 +16,9 @@ export async function owner(request: Request) {
     if (origin && origin !== new URL(request.url).origin)
       throw new ApiError("This request came from a different website.", 403);
   }
-  const user = await getChatGPTUser();
+  const user = await getTodoUser();
   if (!user) throw new ApiError("Please sign in to keep your work safe.", 401);
-  return user.userId;
+  return user.id;
 }
 export async function body(request: Request, limit = 100_000) {
   if (Number(request.headers.get("content-length")) > limit)
@@ -43,12 +44,6 @@ export function fail(error: unknown) {
       error: "Something went wrong. Your work is still here; please try again.",
     },
     { status: 500 },
-  );
-}
-export function setting(key: string) {
-  return (
-    (env as unknown as Record<string, string | undefined>)[key] ||
-    process.env[key]
   );
 }
 export function aiConfig() {

@@ -192,3 +192,143 @@
 .account-panel [data-slot="dialog-title"] {
   overflow-wrap: anywhere;
 }
+.account-google {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 7px;
+  border: 1px solid #e5ded2;
+  background: #fffefb;
+  color: #655a4d;
+  border-radius: 12px;
+  gap: 11px;
+  font-family: inherit;
+}
+.account-google:hover {
+  background: #f7f3ec;
+}
+.account-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: #b0a496;
+  font-size: 10px;
+  margin: 1px 0 7px;
+}
+.account-divider span {
+  flex: 1;
+  height: 1px;
+  background: #e9e2d7;
+}
+.account-login-form {
+  display: grid;
+  gap: 20px;
+  position: relative;
+}
+.account-login-form .login-mascot {
+  position: absolute;
+  top: -59px;
+  right: 5px;
+  pointer-events: none;
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.login-mascot .pocket-todo {
+  width: 53px;
+}
+.account-login-form.at-name .login-mascot {
+  transform: translate3d(-8px, 0, 0) rotate(-5deg);
+}
+.account-login-form.at-email .login-mascot {
+  transform: translate3d(2px, 82px, 0) rotate(4deg);
+}
+.account-login-form.at-password .login-mascot {
+  transform: translate3d(-5px, 165px, 0) rotate(-6deg);
+}
+.account-login-form:has(
+    #login-password[autocomplete="current-password"]
+  ).at-email
+  .login-mascot,
+.account-login-form:not(:has(#signup-name)).at-email .login-mascot {
+  transform: none;
+}
+.account-login-form:not(:has(#signup-name)).at-password .login-mascot {
+  transform: translate3d(-8px, 82px, 0) rotate(-6deg);
+}
+.account-password {
+  position: relative;
+}
+.account-password input {
+  padding-right: 44px;
+}
+.account-password button {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  color: #9b8a77;
+}
+.account-reset {
+  justify-self: end;
+  color: #9e7e61;
+  font-size: 10px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.account-switch {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #a08f7b;
+  margin-top: 5px;
+}
+.account-switch button {
+  color: #9a704b;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font: inherit;
+  font-weight: 750;
+}
+.account-notice,
+.account-setup {
+  font-size: 11px;
+  line-height: 1.7;
+  border-radius: 12px;
+  padding: 11px 13px;
+  background: #eff3ed;
+  color: #61705d;
+}
+.account-setup {
+  background: #f8efdf;
+  color: #9b7b53;
+}
+.account-verification {
+  display: grid;
+  gap: 12px;
+}
+.account-verification > p {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #9c8b77;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.account-gentle .login-mascot {
+  transition: none;
+}
+.account-switch button:focus-visible,
+.account-reset:focus-visible {
+  outline: 2px solid #b68153;
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-mascot {
+    transition: none !important;
+  }
+}

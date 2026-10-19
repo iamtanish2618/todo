@@ -23,14 +23,22 @@ export type Connection = {
   provider: string;
   friends: boolean;
 };
+let authTokenGetter: (() => Promise<string | null>) | null = null;
+export function setAuthTokenGetter(getter: typeof authTokenGetter) {
+  authTokenGetter = getter;
+}
 export async function api<T>(
   url: string,
   method = "GET",
   data?: unknown,
 ): Promise<T> {
+  const token = authTokenGetter ? await authTokenGetter() : null;
   const response = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
   });
   const result = (await response.json()) as T & { error?: string };

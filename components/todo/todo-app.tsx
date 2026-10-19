@@ -50,6 +50,7 @@ import { toast } from "sonner";
 import { Welcome, type WelcomeHandle, type Panel } from "./welcome";
 import { StudyRoom } from "./study-room";
 import { AccountPanel, type Identity, type Profile } from "./account-panel";
+import type { AuthController } from "@/lib/auth/use-todo-auth";
 import {
   api,
   exportPDF,
@@ -86,10 +87,12 @@ export default function TodoApp({
   identity,
   signInPath,
   signOutPath,
+  auth,
 }: {
   identity: Identity;
   signInPath: string;
   signOutPath: string;
+  auth: AuthController;
 }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [accountMode, setAccountMode] = useState<
@@ -98,6 +101,10 @@ export default function TodoApp({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [returning, setReturning] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const timerStorageKey =
+    auth.provider === "chatgpt"
+      ? "todo.timer.v1"
+      : `todo.timer.v2.${identity?.id || "guest"}`;
   const [panel, setPanel] = useState<Panel>(null),
     [female, setFemale] = useState(false);
   const [reduced, setReduced] = useState(false),
@@ -142,14 +149,14 @@ export default function TodoApp({
     setLoadError(failed?.status === "rejected" ? failed.reason.message : "");
   }, []);
   useEffect(() => {
-    if (!identity) return;
+    if (!identity || !auth.ready) return;
     load();
     let cancelled = false;
     api<Profile | null>("/api/profile")
       .then((result) => {
         if (!cancelled) {
           setProfile(result);
-          setReturning(Boolean(result));
+          setReturning(Boolean(result) && !auth.newAccount);
         }
       })
       .catch(() => {
@@ -161,7 +168,7 @@ export default function TodoApp({
     return () => {
       cancelled = true;
     };
-  }, [load, identity]);
+  }, [load, identity, auth.ready, auth.newAccount]);
   useEffect(() => {
     const preference = matchMedia("(prefers-reduced-motion: reduce)");
     try {
@@ -170,7 +177,9 @@ export default function TodoApp({
       );
       setReduced(Boolean(settings.reduced || preference.matches));
       setSound(settings.sound ?? false);
-      const saved = JSON.parse(localStorage.getItem("todo.timer.v1") || "null");
+      const saved = identity
+        ? JSON.parse(localStorage.getItem(timerStorageKey) || "null")
+        : null;
       if (
         saved &&
         typeof saved.remaining === "number" &&
@@ -188,7 +197,7 @@ export default function TodoApp({
     return () => {
       audio.current?.close();
     };
-  }, []);
+  }, [timerStorageKey, identity?.id]);
   useEffect(() => {
     if (!hydrated.current) return;
     try {
@@ -202,9 +211,10 @@ export default function TodoApp({
     timerRef.current = timer;
     if (timerReady)
       try {
-        localStorage.setItem("todo.timer.v1", JSON.stringify(timer));
+        if (identity)
+          localStorage.setItem(timerStorageKey, JSON.stringify(timer));
       } catch {}
-  }, [timer, timerReady]);
+  }, [timer, timerReady, timerStorageKey, identity]);
   const chime = useCallback(() => {
     if (!sound) return;
     try {
@@ -397,7 +407,7 @@ export default function TodoApp({
       <Welcome
         ref={introRef}
         reduced={reduced}
-        ready={timerReady}
+        ready={timerReady && auth.ready}
         active={!inRoom}
         blocked={Boolean(panel) || accountOpen}
         greeting={
@@ -429,12 +439,18 @@ export default function TodoApp({
           signInPath={signInPath}
           signOutPath={signOutPath}
           reduced={reduced}
+          auth={auth}
           onSaved={(next) => {
             setProfile(next);
             setReturning(false);
             setProfileError("");
           }}
         />
+      ) : null}
+      {auth.error ? (
+        <p className="profile-load-error" role="alert">
+          {auth.error}
+        </p>
       ) : null}
       {profileError ? (
         <p className="profile-load-error" role="status">

@@ -1,0 +1,18 @@
+{
+  "auth": {
+    "authorizedDomains": [
+      "todo-penguin.aniketyadav982.chatgpt.site",
+      "localhost",
+      "todo-penguin-26a9f3.firebaseapp.com",
+      "todo-penguin-26a9f3.web.app"
+    ],
+    "providers": {
+      "anonymous": false,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Todo",
+        "supportEmail": "iamtanish2618@gmail.com"
+      }
+    }
+  }
+}

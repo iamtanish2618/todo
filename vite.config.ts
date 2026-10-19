@@ -1,5 +1,5 @@
 import vinext from "vinext";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
@@ -36,7 +36,7 @@ const localBindingConfig = {
     : [],
 };
 
-export default defineConfig(async ({ command }) => {
+export default defineConfig(async ({ command, mode }) => {
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
   process.env.CLOUDFLARE_CF_FETCH_ENABLED ??= "false";
   process.env.WRANGLER_SEND_METRICS ??= "false";
@@ -69,6 +69,12 @@ export default defineConfig(async ({ command }) => {
         inspectorPort: false,
         config: {
           ...localBindingConfig,
+          // The dev Worker has its own environment. Passing a shell variable to
+          // Vite alone does not set a Worker binding. Keep local TODO_* values
+          // server-side and omit them entirely from production build metadata.
+          ...(command === "serve"
+            ? { vars: loadEnv(mode, process.cwd(), "TODO_") }
+            : {}),
           ...(command === "serve"
             ? {
                 services: [
