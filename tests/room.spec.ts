@@ -121,6 +121,17 @@ test("tasks persist, three can be selected, completion is saved and privately ow
     .getByRole("button", { name: `Complete ${names[0]}`, exact: true })
     .click();
   await expect(
+    page.getByRole("heading", { name: "You did it!", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Continue focusing", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Finished tasks", exact: true })
+    .click();
+  await expect(
     page.getByRole("button", { name: `Reopen ${names[0]}`, exact: true }),
   ).toBeVisible();
   await page.reload();
@@ -187,22 +198,18 @@ test("a sit persists its timer, updates the document title, saves once, then off
     .getByRole("button", { name: "Finish focus session", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Session complete", exact: true }),
+    page.getByRole("heading", { name: "You did it!", exact: true }),
   ).toBeVisible();
   const after = await (await page.request.get("/api/room-summary")).json();
   expect(after.totalSits).toBe(before.totalSits + 1);
-  await page
-    .getByRole("button", { name: "Todo, take a break", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Take a break", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Take five minutes", exact: true }),
+    page.getByRole("button", { name: "Start break", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
-  await page
-    .getByRole("button", { name: "Take five minutes", exact: true })
-    .click();
   await expect(page).toHaveTitle(/04:5\d - Todo/);
-  await page.getByRole("button", { name: "Finish break", exact: true }).click();
+  await page.getByRole("button", { name: "End break", exact: true }).click();
   expect(
     (await (await page.request.get("/api/room-summary")).json()).totalSits,
   ).toBe(after.totalSits);
@@ -397,7 +404,7 @@ test("unconfigured AI is honest, uploads still read locally, settings and friend
   await expect(page.locator(".race-track")).toHaveCount(0);
 });
 
-test("natural timer completion shows recap and the calm break, with no games", async ({
+test("natural timer completion celebrates before a calm break, with no games", async ({
   page,
 }) => {
   await page.goto("/signin-with-chatgpt?return_to=/");
@@ -418,14 +425,13 @@ test("natural timer completion shows recap and the calm break, with no games", a
   );
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Session complete", exact: true }),
+    page.getByRole("heading", { name: "You did it!", exact: true }),
   ).toBeVisible({ timeout: 10000 });
-  await page
-    .getByRole("button", { name: "Todo, take a break", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Take a break", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "A little breather.", exact: true }),
+    page.getByRole("heading", { name: "Take a break.", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
   await expect(page.locator(".race-track")).toHaveCount(0);
 });
@@ -507,13 +513,12 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
     .getByRole("button", { name: `Complete ${title}`, exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Finished tasks.", exact: true }),
+    page.getByRole("heading", { name: "You did it!", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Todo, take a break", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Take a break", exact: true }).click();
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
-  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.getByRole("button", { name: "End break", exact: true }).click();
   await page.getByRole("button", { name: "Ambience", exact: true }).click();
   await page.getByRole("button", { name: "Night", exact: true }).click();
   await expect(page.locator(".cozy-room")).toHaveAttribute(
@@ -636,15 +641,14 @@ test("morning replaces the moon; lamp leaves no hand; real writing and coffee fl
   await page
     .getByRole("button", { name: "Finish focus session", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Todo, take a break", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Take a break", exact: true }).click();
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
   await expect(page.locator(".todo-coffee-rig")).toHaveCSS("opacity", "1");
   const cup = await matrix(".todo-sip-cup");
   await page.waitForTimeout(4900);
   expect(await matrix(".todo-sip-cup")).not.toBe(cup);
-  await page.getByRole("button", { name: "Close panel", exact: true }).click();
   await page.screenshot({ path: "outputs/todo-coffee-sip.png" });
+  await page.getByRole("button", { name: "End break", exact: true }).click();
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   await page
     .getByRole("button", { name: `Delete ${title}`, exact: true })
@@ -1011,7 +1015,7 @@ test("ambience uses three weather cards and three sound cards; timer opens direc
   await page.keyboard.press("Escape");
 });
 
-test("Finish task saves only its linked focus time, opens finished history, and persists across reload", async ({
+test("Finish task saves linked focus time, celebrates, and preserves finished history", async ({
   page,
 }) => {
   await enter(page);
@@ -1051,6 +1055,17 @@ test("Finish task saves only its linked focus time, opens finished history, and 
   await page.waitForTimeout(1800);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Finish task", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "You did it!", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Continue focusing", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Finished tasks", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Finished tasks.", exact: true }),
   ).toBeVisible();
@@ -1139,3 +1154,219 @@ test("task duration aggregation uses owned task IDs across all sits, including d
   for (const task of [first, second])
     await page.request.delete("/api/tasks", { data: { id: task.id } });
 });
+
+test("completion has exactly two choices; custom breaks hide tools, survive refresh, and Focus again returns home", async ({
+  page,
+}) => {
+  await enter(page);
+  const before = await (await page.request.get("/api/room-summary")).json();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  const title = `Celebration ${Date.now()}`;
+  await page.getByLabel("New task", { exact: true }).fill(title);
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Complete ${title}`, exact: true })
+    .click();
+  const celebration = page.getByRole("dialog", {
+    name: "You did it!",
+    exact: true,
+  });
+  await expect(celebration).toBeVisible();
+  await expect(celebration.getByRole("button")).toHaveCount(2);
+  await expect(
+    celebration.getByRole("button", { name: "Take a break", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(celebration).toBeVisible();
+  await page.screenshot({ path: "outputs/todo-completion-celebration.png" });
+  await celebration
+    .getByRole("button", { name: "Take a break", exact: true })
+    .click();
+  await page.getByLabel("Break minutes", { exact: true }).fill("0");
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-resting",
+    "false",
+  );
+  await page.getByLabel("Break minutes", { exact: true }).fill("7");
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-resting",
+    "true",
+  );
+  await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Ambience", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .getByRole("group", { name: "Break controls", exact: true })
+      .getByRole("button"),
+  ).toHaveCount(2);
+  await expect(page).toHaveTitle(/0[67]:[0-5]\d - Todo/);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-resting",
+    "true",
+  );
+  await expect(page.locator(".round-timer-face strong")).toHaveText(
+    /0[67]:[0-5]\d/,
+  );
+  await page.screenshot({ path: "outputs/todo-custom-break.png" });
+  await page.getByRole("button", { name: "Focus again", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Focus with Todo", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".cozy-room")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-resting",
+    "false",
+  );
+  await expect(
+    page.getByRole("heading", { name: "You did it!", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "What are we doing?", exact: true }),
+  ).toBeVisible();
+  expect(
+    (await (await page.request.get("/api/room-summary")).json()).totalSits,
+  ).toBe(before.totalSits);
+  const tasks = await (await page.request.get("/api/tasks")).json();
+  const task = tasks.find((task: { title: string }) => task.title === title);
+  expect(task.done).toBe(true);
+  await page.request.delete("/api/tasks", { data: { id: task.id } });
+});
+
+test("a completed break stays calm at zero; End break restores the room without saving focus", async ({
+  page,
+}) => {
+  await page.goto("/signin-with-chatgpt?return_to=/");
+  const before = await (await page.request.get("/api/room-summary")).json();
+  await page.evaluate(() =>
+    localStorage.setItem(
+      "todo.timer.v1",
+      JSON.stringify({
+        remaining: 1,
+        duration: 60,
+        deadline: Date.now() + 800,
+        phase: "break",
+        started: true,
+        task: "A little rest",
+        id: crypto.randomUUID(),
+        startedAt: Date.now() - 59000,
+      }),
+    ),
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Break complete", exact: true }),
+  ).toBeDisabled({ timeout: 10000 });
+  await expect(
+    page.getByRole("group", { name: "Break controls", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
+  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "What are we doing?", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".room-break-actions")).toHaveCount(0);
+  expect(
+    (await (await page.request.get("/api/room-summary")).json()).totalSits,
+  ).toBe(before.totalSits);
+});
+
+for (const sound of [true, false]) {
+  test(`celebration chime ${sound ? "plays two soft notes and cleans up" : "honors muted effects"}`, async ({
+    page,
+  }) => {
+    await page.addInitScript(
+      ({ sound }) => {
+        localStorage.setItem(
+          "todo.settings.v1",
+          JSON.stringify({ reduced: true, sound }),
+        );
+        const Original = window.AudioContext;
+        const observations: {
+          contexts: AudioContext[];
+          oscillators: OscillatorNode[];
+        } = { contexts: [], oscillators: [] };
+        (
+          window as unknown as { __celebrationAudio: typeof observations }
+        ).__celebrationAudio = observations;
+        window.AudioContext = class extends Original {
+          constructor(options?: AudioContextOptions) {
+            super(options);
+            observations.contexts.push(this);
+          }
+          createOscillator() {
+            const oscillator = super.createOscillator();
+            observations.oscillators.push(oscillator);
+            return oscillator;
+          }
+        };
+      },
+      { sound },
+    );
+    await enter(page);
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const title = `Chime check ${sound} ${Date.now()}`;
+    await page.getByLabel("New task", { exact: true }).fill(title);
+    await page.getByRole("button", { name: "Add task", exact: true }).click();
+    await page
+      .getByRole("button", { name: `Complete ${title}`, exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "You did it!", exact: true }),
+    ).toBeVisible();
+    const frequencies = () =>
+      page.evaluate(() =>
+        (
+          window as unknown as {
+            __celebrationAudio: { oscillators: OscillatorNode[] };
+          }
+        ).__celebrationAudio.oscillators.map(
+          (oscillator) => oscillator.frequency.value,
+        ),
+      );
+    if (sound) {
+      await expect.poll(frequencies).toContain(783.989990234375);
+      await expect.poll(frequencies).toContain(1046.5);
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            (
+              window as unknown as {
+                __celebrationAudio: { oscillators: OscillatorNode[] };
+              }
+            ).__celebrationAudio.oscillators
+              .filter(
+                (oscillator) =>
+                  Math.abs(oscillator.frequency.value - 1046.5) < 0.01,
+              )
+              .every((oscillator) => oscillator.context.state === "closed"),
+          ),
+        )
+        .toBe(true);
+    } else expect(await frequencies()).toEqual([]);
+    await expect(page.locator(".todo-celebration")).toHaveClass(
+      /celebration-gentle/,
+    );
+    await page
+      .getByRole("button", { name: "Continue focusing", exact: true })
+      .click();
+    await expect(page.locator(".cozy-room")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Your tasks.", exact: true }),
+    ).toBeVisible();
+    const tasks = await (await page.request.get("/api/tasks")).json();
+    const task = tasks.find((task: { title: string }) => task.title === title);
+    await page.request.delete("/api/tasks", { data: { id: task.id } });
+  });
+}

@@ -303,21 +303,12 @@ export default function TodoApp({
           settling.current = false;
           if (!saved) return;
           setFocusCompletions((v) => v + 1);
-          setTimer({
-            ...freshTimer,
-            phase: "break",
-            remaining: 300,
-            duration: 300,
-            task: current.task,
-            startedAt: current.startedAt,
-            id: crypto.randomUUID(),
-          });
-          toast.success("Time for a little breather. You did it!");
-        } else {
           setTimer({ ...freshTimer, task: current.task });
-          toast.success("Ready for another little step?");
+        } else {
+          // Keep a completed break calm until the user chooses their next step.
+          setTimer({ ...current, remaining: 0, deadline: null });
+          chime();
         }
-        chime();
         setInRoom(true);
         setPanel(null);
       } else
@@ -425,7 +416,6 @@ export default function TodoApp({
     settling.current = false;
     if (saved) {
       setTimer({ ...freshTimer, task: current.task });
-      chime();
     }
     return saved;
   };
@@ -513,15 +503,20 @@ export default function TodoApp({
         focusMinutes={minutes}
         startedAt={timer.startedAt}
         focusCompletions={focusCompletions}
-        onBreak={() =>
+        onBreak={(breakMinutes) => {
+          const seconds = breakMinutes * 60;
           setTimer((t) => ({
             ...freshTimer,
             phase: "break",
-            remaining: 300,
-            duration: 300,
+            remaining: seconds,
+            duration: seconds,
             task: t.task,
-          }))
-        }
+            started: true,
+            deadline: Date.now() + seconds * 1000,
+            startedAt: Date.now(),
+            id: crypto.randomUUID(),
+          }));
+        }}
         sound={sound}
         onSound={setSound}
         onReduced={setReduced}

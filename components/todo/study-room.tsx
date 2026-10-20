@@ -31,7 +31,6 @@ import {
   Plus,
   Send,
   Settings2,
-  Share2,
   Sparkles,
   Timer as TimerIcon,
   Trash2,
@@ -51,6 +50,7 @@ import {
 } from "@/lib/todo/client";
 import type { Panel } from "./welcome";
 import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./room/config";
+import { CompletionCelebration } from "./room/celebration";
 import { RoomScene } from "./room/scene";
 import { RoomChat } from "./room/chat";
 import { startSoundscape, type Soundscape } from "./room/ambience";
@@ -59,6 +59,7 @@ import "./room/room.css";
 import "./room/scene.css";
 import "./room/calm.css";
 import "./room/controls.css";
+import "./room/celebration.css";
 
 type Pane =
   | "focus"
@@ -72,8 +73,7 @@ type Pane =
   | "corner"
   | "friends"
   | "home"
-  | "break"
-  | "recap";
+  | "break";
 type Card = { id: string; question: string; answer: string };
 type Summary = {
   minutes: number;
@@ -98,7 +98,7 @@ type Props = {
   focusMinutes: number;
   startedAt?: number;
   focusCompletions: number;
-  onBreak: () => void;
+  onBreak: (minutes: number) => void;
   userId: string;
   tasks: Task[];
   notes: Note[];
@@ -134,7 +134,14 @@ type Recognition = {
 
 export function StudyRoom(p: Props) {
   const [focusTime, setFocusTime] = useState("25");
+  const [breakTime, setBreakTime] = useState("5");
+  const [celebrating, setCelebrating] = useState(false);
+  const handledCompletions = useRef(0);
+  const celebrationOpen = useRef(celebrating);
+  celebrationOpen.current = celebrating;
   const quietFocus = p.running && p.phase === "focus";
+  const quietBreak = p.started && p.phase === "break";
+  const quietRoom = quietFocus || quietBreak || celebrating;
   const [pane, setPane] = useState<Pane | null>(null),
     [loaded, setLoaded] = useState(false),
     [loadError, setLoadError] = useState(""),
@@ -152,7 +159,6 @@ export function StudyRoom(p: Props) {
     [answer, setAnswer] = useState(""),
     [flipped, setFlipped] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null),
-    [recap, setRecap] = useState({ minutes: 0, tasks: 0 }),
     [tone, setTone] = useState(() =>
       new Date().getHours() >= 18 || new Date().getHours() < 7
         ? "night"
@@ -161,7 +167,6 @@ export function StudyRoom(p: Props) {
     [soundscape, setSoundscape] = useState<Soundscape>("off"),
     [sleeping, setSleeping] = useState(false);
   const rain = tone === "rain";
-  const [finishedAfterFocus, setFinishedAfterFocus] = useState(false);
   const [joining, setJoining] = useState("todo"),
     [friendCode, setFriendCode] = useState(""),
     [friendNotice, setFriendNotice] = useState("");
@@ -316,25 +321,17 @@ export function StudyRoom(p: Props) {
     }
   }, [resting, p.onAgentMode]);
   useEffect(() => {
-    if (p.focusCompletions > 0) {
-      setRecap({
-        minutes: p.focusMinutes,
-        tasks: p.tasks.filter(
-          (t) =>
-            t.done &&
-            t.completedAt &&
-            t.completedAt >= (p.startedAt || Date.now()),
-        ).length,
-      });
-      setPane("recap");
-      void refresh();
-    }
+    if (p.focusCompletions <= handledCompletions.current) return;
+    handledCompletions.current = p.focusCompletions;
+    setPane(null);
+    setCelebrating(true);
+    void refresh();
   }, [p.focusCompletions, refresh]);
   useEffect(() => {
     if (!p.active) return;
     const escape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (latest.current.running && latest.current.phase === "focus") {
+        if (latest.current.running) {
           latest.current.onStart();
         }
         setPane(null);
@@ -345,14 +342,14 @@ export function StudyRoom(p: Props) {
     return () => window.removeEventListener("keydown", escape);
   }, [p.active]);
   useEffect(() => {
-    if (!quietFocus) return;
+    if (!quietFocus && !quietBreak) return;
     roomRoot.current
       ?.querySelector<HTMLButtonElement>(".round-timer-face")
       ?.focus({ preventScroll: true });
     // Keep the setup mounted just long enough to dissolve with the other tools.
     const dismiss = setTimeout(() => setPane(null), p.reduced ? 0 : 650);
     return () => clearTimeout(dismiss);
-  }, [quietFocus, p.reduced]);
+  }, [quietFocus, quietBreak, p.reduced]);
   const show = (next: Pane) => {
     setError("");
     setPane((current) => (current === next ? null : next));
@@ -396,8 +393,9 @@ export function StudyRoom(p: Props) {
       p.onTasks(p.tasks.map((t) => (t.id === next.id ? next : t)));
       if (next.done) {
         setChosen((v) => v.filter((id) => id !== next.id));
-        setFinishedAfterFocus(finishSit);
-        setPane("finished");
+        if (!finishSit && p.running) p.onStart();
+        setPane(null);
+        setCelebrating(true);
       }
       void refresh();
     });
@@ -478,7 +476,6 @@ export function StudyRoom(p: Props) {
     const task = chosen
       .map((id) => p.tasks.find((t) => t.id === id && !t.done))
       .find(Boolean);
-    setFinishedAfterFocus(false);
     p.onDuration(minutes);
     p.onTask(task?.title || "Quiet focus", true, task?.id);
     baseline.current = p.tasks.filter((t) => t.done).length;
@@ -489,24 +486,53 @@ export function StudyRoom(p: Props) {
   };
   const done = () =>
     void work(async () => {
-      if (p.phase === "break") {
-        if (await p.onFinish()) setPane(null);
-        return;
-      }
-      const minutes = Math.max(0, Math.round((p.duration - p.remaining) / 60)),
-        count = p.startedAt
-          ? p.tasks.filter(
-              (t) => t.done && t.completedAt && t.completedAt >= p.startedAt!,
-            ).length
-          : Math.max(
-              0,
-              p.tasks.filter((t) => t.done).length - baseline.current,
-            );
       if (await p.onFinish()) {
-        setRecap({ minutes, tasks: count });
-        setPane("recap");
+        setPane(null);
+        if (p.phase === "focus") setCelebrating(true);
         await refresh();
       }
+    });
+  const takeBreak = () =>
+    void work(async () => {
+      // A different paused task may still have an unsaved sit. Keep its work before resting.
+      if (p.started && p.phase === "focus" && !(await p.onFinish())) return;
+      setCelebrating(false);
+      setBreakTime("5");
+      setPane("break");
+    });
+  const continueFocusing = () => {
+    setCelebrating(false);
+    setError("");
+    if (p.started && p.phase === "focus") {
+      setPane(null);
+      if (!p.running) p.onStart();
+    } else {
+      setFocusTime(String(p.focusMinutes));
+      setPane(
+        chosen.some((id) =>
+          p.tasks.some((task) => task.id === id && !task.done),
+        )
+          ? "focus"
+          : "tasks",
+      );
+    }
+  };
+  const launchBreak = (event: FormEvent) => {
+    event.preventDefault();
+    const minutes = Number(breakTime);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
+      setError("Choose 1 to 120 whole minutes.");
+      return;
+    }
+    p.onAgentMode(false);
+    setSleeping(false);
+    p.onBreak(minutes);
+  };
+  const endBreak = (goHome: boolean) =>
+    void work(async () => {
+      if (!(await p.onFinish())) return;
+      setPane(null);
+      if (goHome) p.onExit();
     });
   const mode = (agent: boolean) => {
     if (agent && resting) return;
@@ -567,21 +593,6 @@ export function StudyRoom(p: Props) {
       detail: "For all the little pages you have turned.",
     },
   ].filter((k) => totalSits >= k.at);
-  const share = async () => {
-    const text = `A little sit with Todo. ${recap.minutes} minutes of company, ${recap.tasks} ${recap.tasks === 1 ? "task" : "tasks"} finished. One small step was enough.`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: "My Todo keepsake", text });
-      } catch {}
-      return;
-    }
-    const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "a-little-sit-with-todo.txt";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
   const close = () => {
     setPane(null);
     setError("");
@@ -598,8 +609,7 @@ export function StudyRoom(p: Props) {
     corner: "Your corner",
     friends: "Bring friends to the table.",
     home: "Who is joining?",
-    break: "A little breather.",
-    recap: "Session complete",
+    break: "Take a break.",
   };
   const panelContent = () => {
     switch (pane) {
@@ -733,17 +743,6 @@ export function StudyRoom(p: Props) {
             <Button variant="ghost" onClick={() => setPane("tasks")}>
               Back to tasks <ArrowLeft size={14} />
             </Button>
-            {finishedAfterFocus ? (
-              <Button
-                className="room-dark-button"
-                onClick={() => {
-                  p.onBreak();
-                  setPane("break");
-                }}
-              >
-                Todo, take a break <Coffee size={15} />
-              </Button>
-            ) : null}
           </>
         );
       case "tasks":
@@ -1274,61 +1273,54 @@ export function StudyRoom(p: Props) {
         );
       case "break":
         return (
-          <>
-            <Coffee size={42} className="room-break-cup" />
-            <p className="room-empty">
-              Stretch a little. Sip something warm. Todo will be right here.
-            </p>
-            {p.phase === "break" ? (
-              <Button
-                className="room-dark-button"
-                onClick={() => {
-                  p.onStart();
-                  close();
+          <form
+            className="room-focus-form room-break-setup"
+            onSubmit={launchBreak}
+          >
+            <label className="sr-only" htmlFor="break-minutes">
+              Break minutes
+            </label>
+            <div className="room-minute-field">
+              <Input
+                id="break-minutes"
+                aria-label="Break minutes"
+                type="number"
+                min={1}
+                max={120}
+                step={1}
+                required
+                value={breakTime}
+                onChange={(e) => {
+                  setBreakTime(e.target.value);
+                  setError("");
                 }}
-              >
-                {p.running ? "Pause break" : "Take five minutes"}
-              </Button>
-            ) : (
-              <p className="room-helper">
-                Your break is ready after a full focus session.
-              </p>
-            )}
-            <Button variant="ghost" onClick={close}>
-              Stay in the room
-            </Button>
-          </>
-        );
-      case "recap":
-        return (
-          <>
-            <span className="room-recap-check">
-              <Check size={28} />
-            </span>
-            <h3 className="room-recap-kind">You did great.</h3>
-            <div className="room-recap-stats">
-              <span>
-                <strong>{recap.minutes}</strong>minutes
-              </span>
-              <span>
-                <strong>{recap.tasks}</strong>tasks done
-              </span>
+              />
+              <span>minutes</span>
             </div>
-            <p className="room-helper">Your time together is saved.</p>
-            <Button
-              className="room-dark-button"
-              onClick={() => {
-                p.onBreak();
-                setPane("break");
-              }}
+            <div
+              className="room-time-presets"
+              role="group"
+              aria-label="Suggested break times"
             >
-              Todo, take a break <Coffee size={16} />
+              {[3, 5, 10, 15, 20, 30].map((minutes) => (
+                <Button
+                  key={minutes}
+                  type="button"
+                  variant="ghost"
+                  aria-pressed={Number(breakTime) === minutes}
+                  onClick={() => setBreakTime(String(minutes))}
+                >
+                  {minutes} min
+                </Button>
+              ))}
+            </div>
+            <Button
+              type="submit"
+              className="room-dark-button room-focus-launch"
+            >
+              Start break <Coffee size={16} />
             </Button>
-            <Button variant="ghost" onClick={() => void share()}>
-              <Share2 size={16} />
-              Share keepsake
-            </Button>
-          </>
+          </form>
         );
       default:
         return null;
@@ -1348,7 +1340,8 @@ export function StudyRoom(p: Props) {
       data-tone={tone}
       data-rain={rain}
       data-working={quietFocus}
-      data-quiet={quietFocus}
+      data-quiet={quietRoom}
+      data-resting={quietBreak}
     >
       <link rel="preload" href={C.image} as="image" />
       <div
@@ -1365,7 +1358,7 @@ export function StudyRoom(p: Props) {
             active={p.active && loaded}
             day={tone === "morning"}
             focusing={quietFocus}
-            clock={p.started && p.phase === "focus" ? p.clock : null}
+            clock={p.started ? p.clock : null}
           />
           <div
             className="room-table-clock round-timer"
@@ -1377,12 +1370,15 @@ export function StudyRoom(p: Props) {
             <button
               className="round-timer-face"
               aria-label={
-                p.running
-                  ? "Pause table timer"
-                  : p.started
-                    ? "Resume table timer"
-                    : "Start table timer"
+                p.phase === "break" && p.remaining === 0
+                  ? "Break complete"
+                  : p.running
+                    ? "Pause table timer"
+                    : p.started
+                      ? "Resume table timer"
+                      : "Start table timer"
               }
+              disabled={p.phase === "break" && p.remaining === 0}
               onClick={() => {
                 if (p.started || p.phase === "break") {
                   close();
@@ -1421,7 +1417,7 @@ export function StudyRoom(p: Props) {
                 {p.running ? <Pause size={12} /> : <Play size={12} />}
               </span>
             </button>
-            {p.started && !quietFocus ? (
+            {p.started && !quietRoom ? (
               <button
                 className="round-timer-done"
                 aria-label={
@@ -1442,7 +1438,8 @@ export function StudyRoom(p: Props) {
         </p>
         <Button
           data-room-ui="back"
-          inert={quietFocus}
+          inert={quietRoom}
+          aria-hidden={quietRoom}
           variant="ghost"
           size="icon"
           className="room-nav-back"
@@ -1457,7 +1454,8 @@ export function StudyRoom(p: Props) {
         <div
           className="room-mode-toggle"
           data-room-ui="mode"
-          inert={quietFocus}
+          inert={quietRoom}
+          aria-hidden={quietRoom}
           role="group"
           aria-label="Todo mode"
         >
@@ -1480,7 +1478,8 @@ export function StudyRoom(p: Props) {
         </div>
         <Button
           data-room-ui="settings"
-          inert={quietFocus}
+          inert={quietRoom}
+          aria-hidden={quietRoom}
           variant="ghost"
           size="icon"
           className="room-nav-settings"
@@ -1492,7 +1491,8 @@ export function StudyRoom(p: Props) {
         <nav
           className="room-edge-tabs"
           data-room-ui="tools"
-          inert={quietFocus}
+          inert={quietRoom}
+          aria-hidden={quietRoom}
           aria-label="Room tools"
         >
           {[
@@ -1518,10 +1518,11 @@ export function StudyRoom(p: Props) {
         <div
           className="room-home-card"
           data-room-ui="home"
-          inert={quietFocus}
+          inert={quietRoom}
+          aria-hidden={quietRoom}
           style={zoneStyle(C.home)}
         >
-          {!p.started && p.phase === "focus" ? (
+          {quietBreak ? null : !p.started && p.phase === "focus" ? (
             <form onSubmit={sit}>
               <h1>What are we doing?</h1>
               <div className="room-intention-form">
@@ -1570,6 +1571,24 @@ export function StudyRoom(p: Props) {
             </div>
           )}
         </div>
+        {quietBreak ? (
+          <div
+            className="room-break-actions"
+            role="group"
+            aria-label="Break controls"
+          >
+            <Button onClick={() => endBreak(true)} disabled={busy}>
+              Focus again <ArrowRight size={15} />
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => endBreak(false)}
+              disabled={busy}
+            >
+              End break
+            </Button>
+          </div>
+        ) : null}
         {p.agentBusy || resting ? (
           <p
             className={`room-speech-pill ${resting ? "room-rest-message" : ""}`}
@@ -1593,7 +1612,8 @@ export function StudyRoom(p: Props) {
         {keepsakes.length ? (
           <div
             className="room-shelf-keepsakes"
-            inert={quietFocus}
+            inert={quietRoom}
+            aria-hidden={quietRoom}
             aria-label="Keepsakes on your shelf"
           >
             {keepsakes.map((k) => (
@@ -1632,9 +1652,9 @@ export function StudyRoom(p: Props) {
         >
           {pane ? (
             <DialogPrimitive.Content
-              className={`room-tool-panel ${pane === "agent" ? "room-chat-panel" : ""} ${pane === "focus" ? "room-focus-panel" : ""}`}
+              className={`room-tool-panel ${pane === "agent" ? "room-chat-panel" : ""} ${pane === "focus" || pane === "break" ? "room-focus-panel" : ""}`}
               style={
-                pane === "focus"
+                pane === "focus" || pane === "break"
                   ? undefined
                   : {
                       ...zoneStyle(pane === "agent" ? C.chat : C.panel),
@@ -1648,11 +1668,13 @@ export function StudyRoom(p: Props) {
               onInteractOutside={(e) => e.preventDefault()}
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
+                if (celebrationOpen.current) return;
                 roomRoot.current
                   ?.querySelector<HTMLButtonElement>(".round-timer-face")
                   ?.focus({ preventScroll: true });
               }}
-              inert={quietFocus}
+              inert={quietRoom}
+              aria-hidden={quietRoom}
               data-lenis-prevent
             >
               <DialogPrimitive.Description
@@ -1698,6 +1720,15 @@ export function StudyRoom(p: Props) {
           ) : null}
         </DialogPrimitive.Root>
       </div>
+      <CompletionCelebration
+        open={celebrating}
+        female={p.female}
+        reduced={p.reduced}
+        sound={p.sound}
+        busy={busy}
+        onBreak={takeBreak}
+        onContinue={continueFocusing}
+      />
       {!loaded ? (
         <div className="room-loading" role="status">
           {loadError ? (
