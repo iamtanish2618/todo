@@ -1465,7 +1465,7 @@ test("Agent is a single bottom composer, hides tools, frames Todo on laptops, an
     "data-agent",
     "true",
   );
-  await expect(page.getByRole("dialog")).toHaveAccessibleName("Talk with Todo");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo");
   await expect(page.getByLabel("Message Todo")).toBeFocused();
   for (const name of [
     "Ambience",

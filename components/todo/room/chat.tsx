@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
+import Markdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Connection, type Note } from "@/lib/todo/client";
@@ -122,8 +123,14 @@ export function RoomChat({
     }
   };
   useEffect(() => {
-    if (transcript.current)
-      transcript.current.scrollTop = transcript.current.scrollHeight;
+    const log = transcript.current;
+    if (!log) return;
+    const last = log.lastElementChild as HTMLElement | null;
+    // Start a long reply at its beginning, rather than dropping the reader at its end.
+    log.scrollTop =
+      messages.at(-1)?.role === "assistant" && last
+        ? Math.max(0, last.offsetTop - 8)
+        : log.scrollHeight;
   }, [messages, busy]);
   const upload = async (file: File | undefined) => {
     if (!file) return;
@@ -231,7 +238,7 @@ export function RoomChat({
     <>
       <header className="room-agent-heading">
         <DialogPrimitive.Title id="room-panel-title">
-          Talk with Todo
+          Todo
         </DialogPrimitive.Title>
         <Button
           variant="ghost"
@@ -248,21 +255,30 @@ export function RoomChat({
           it is being connected.
         </p>
       ) : null}
-      <div
-        className="room-chat-transcript"
-        ref={transcript}
-        role="log"
-        aria-label="Conversation with Todo"
-        aria-live="polite"
-        aria-relevant="additions text"
-      >
-        {!messages.length ? (
-          <p className="room-chat-welcome">What’s on your mind?</p>
-        ) : (
-          messages.map((m, i) => (
-            <article key={i} className={`room-chat-message ${m.role}`}>
-              <span>{m.role === "user" ? "You" : "Todo"}</span>
-              <p>{m.content}</p>
+      {messages.length || busy ? (
+        <div
+          className="room-chat-transcript"
+          ref={transcript}
+          role="log"
+          aria-label="Conversation with Todo"
+          aria-live="polite"
+          aria-relevant="additions text"
+        >
+          {messages.map((m, i) => (
+            <article
+              key={i}
+              className={`room-chat-message ${m.role}`}
+              aria-label={m.role === "user" ? "Your message" : "Todo's reply"}
+            >
+              {m.role === "user" ? (
+                <p>{m.content}</p>
+              ) : (
+                <div className="room-chat-body">
+                  <Markdown skipHtml disallowedElements={["img"]}>
+                    {m.content}
+                  </Markdown>
+                </div>
+              )}
               {m.role === "assistant" ? (
                 <div className="room-message-actions">
                   <Button
@@ -288,15 +304,15 @@ export function RoomChat({
                 </div>
               ) : null}
             </article>
-          ))
-        )}
-        {busy ? (
-          <p className="room-pending">
-            <Loader2 size={15} className="animate-spin" />
-            Thinking it through…
-          </p>
-        ) : null}
-      </div>
+          ))}
+          {busy ? (
+            <p className="room-pending">
+              <Loader2 size={15} className="animate-spin" />
+              Thinking it through…
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {error ? (
         <p role="status" className="room-error">
           {error}
@@ -325,7 +341,7 @@ export function RoomChat({
         ) : null}
         <Textarea
           aria-label="Message Todo"
-          placeholder="Tell Todo, or paste your notes…"
+          placeholder="Message Todo…"
           value={draft}
           disabled={busy}
           maxLength={20000}

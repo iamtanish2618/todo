@@ -52,6 +52,10 @@ export const INTRO_CONFIG = {
     mobileWidth: 640,
     dpr: 2,
     seed: 9481,
+    idleDensity: 0.1,
+    idleSpeed: 0.34,
+    repelRadius: 120,
+    repelForce: 210,
     far: { radius: [1, 2], speed: [20, 40], alpha: 0.35 },
     mid: { radius: [2, 4], speed: [50, 90], alpha: 0.6 },
     near: { radius: [5, 9], speed: [110, 180], alpha: 0.85 },
@@ -82,6 +86,9 @@ export const INTRO_CONFIG = {
     reactionSeconds: 1.35,
     pupilReachX: 0.18,
     pupilReachY: 0.14,
+    cardRange: 18,
+    cardTravel: 5,
+    cardTilt: 3,
   },
   caption: "Please choose your companion.",
   sectionHeight: "180svh",
@@ -331,6 +338,14 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         );
         const cardBounds = new Float32Array(24),
           cardNear = new Float32Array(6);
+        const cardMotion = glass.map(() => ({
+          x: 0,
+          y: 0,
+          rx: 0,
+          ry: 0,
+          lineX: 0,
+          lineY: 0,
+        }));
         const pupilOffsets = new Float32Array(8);
         let cached = { width: 1, height: 1 },
           dpr = Math.min(devicePixelRatio || 1, INTRO_CONFIG.snow.dpr),
@@ -383,6 +398,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
         const initialMotion = { ...motion };
         // Fixed-capacity pool. No particle objects are allocated, added, or removed inside the frame loop.
         const pool = new Float32Array(INTRO_CONFIG.snow.desktop * 8);
+        // Persistent velocities give cursor repulsion a soft release instead of a jump.
+        const snowVelocity = new Float32Array(INTRO_CONFIG.snow.desktop * 2);
         for (let i = 0; i < INTRO_CONFIG.snow.desktop; i++) {
           const j = i * 8,
             layer =
@@ -981,7 +998,8 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           const lerp = 1 - Math.pow(0.9, dt * 60);
           for (let i = 0; i < glass.length; i++) {
             const j = i * 4,
-              enabled = pointer.present && !transitioning && !reduced;
+              enabled =
+                finePointer && pointer.present && !transitioning && !reduced;
             const distance = enabled
               ? Math.hypot(
                   Math.max(
@@ -995,9 +1013,37 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                     pointer.y - cardBounds[j + 3],
                   ),
                 )
-              : 180;
-            cardNear[i] += (clamp(1 - distance / 160) - cardNear[i]) * lerp;
-            glass[i].style.setProperty("--near", cardNear[i].toFixed(3));
+              : INTRO_CONFIG.interaction.cardRange;
+            const near = clamp(
+                1 - distance / INTRO_CONFIG.interaction.cardRange,
+              ),
+              width = Math.max(1, cardBounds[j + 2] - cardBounds[j]),
+              height = Math.max(1, cardBounds[j + 3] - cardBounds[j + 1]),
+              localX = clamp(pointer.x - cardBounds[j], 0, width),
+              localY = clamp(pointer.y - cardBounds[j + 1], 0, height),
+              nx = (localX / width - 0.5) * 2,
+              ny = (localY / height - 0.5) * 2,
+              state = cardMotion[i];
+            cardNear[i] += (near - cardNear[i]) * lerp;
+            state.x +=
+              (nx * near * INTRO_CONFIG.interaction.cardTravel - state.x) *
+              lerp;
+            state.y += (ny * near * 3 - near * 2 - state.y) * lerp;
+            state.rx +=
+              (-ny * near * INTRO_CONFIG.interaction.cardTilt - state.rx) *
+              lerp;
+            state.ry +=
+              (nx * near * INTRO_CONFIG.interaction.cardTilt - state.ry) * lerp;
+            state.lineX += (localX - state.lineX) * lerp;
+            state.lineY += (localY - state.lineY) * lerp;
+            const style = glass[i].style;
+            style.setProperty("--near", cardNear[i].toFixed(3));
+            style.setProperty("--magnet-x", `${state.x.toFixed(2)}px`);
+            style.setProperty("--magnet-y", `${state.y.toFixed(2)}px`);
+            style.setProperty("--magnet-rx", `${state.rx.toFixed(2)}deg`);
+            style.setProperty("--magnet-ry", `${state.ry.toFixed(2)}deg`);
+            style.setProperty("--line-x", `${state.lineX.toFixed(2)}px`);
+            style.setProperty("--line-y", `${state.lineY.toFixed(2)}px`);
           }
           for (let i = 0; i < 4; i++) {
             const female = i >= 2,
@@ -1149,34 +1195,64 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
           element.dataset.reaction = reacting
             ? ["wiggle", "bounce", "nuzzle"][reaction.kind]
             : "idle";
+          const idleSnow =
+              INTRO_CONFIG.snow.idleDensity *
+              (1 - clamp((p - currentTimings.holdEnd) / 0.1)),
+            snowDensity = Math.max(motion.density, idleSnow),
+            storm = clamp(motion.density / 0.35);
           const count = reduced
             ? 0
-            : Math.floor(maximum * motion.density * budget);
+            : Math.floor(maximum * snowDensity * budget);
           if (ctx && count > 0) {
             ctx.clearRect(0, 0, cached.width, cached.height);
             const cx = cached.width * 0.5,
               cy = cached.height * 0.48;
             for (let i = 0; i < count; i++) {
               const j = i * 8,
-                radius = pool[j + 2];
+                k = i * 2,
+                radius = Math.min(pool[j + 2], 3.5 + storm * 5.5);
+              // Gentle separation inside a small cursor halo; the whiteout keeps its own wind.
+              if (finePointer && pointer.present && !transitioning) {
+                const dx = pool[j] - pointer.x,
+                  dy = pool[j + 1] - pointer.y,
+                  distance = Math.hypot(dx, dy),
+                  push =
+                    Math.pow(
+                      clamp(1 - distance / INTRO_CONFIG.snow.repelRadius),
+                      2,
+                    ) *
+                    INTRO_CONFIG.snow.repelForce *
+                    dt;
+                snowVelocity[k] += (distance > 0.1 ? dx / distance : 1) * push;
+                snowVelocity[k + 1] +=
+                  (distance > 0.1 ? dy / distance : -1) * push;
+              }
+              const drag = Math.exp(-dt * 3.2);
+              snowVelocity[k] *= drag;
+              snowVelocity[k + 1] *= drag;
               pool[j] +=
                 (Math.sin(time * pool[j + 6] + pool[j + 5]) * pool[j + 7] +
                   motion.wind +
+                  snowVelocity[k] +
                   ((cx - pool[j]) * 0.18 - (cy - pool[j + 1]) * 0.08) *
                     motion.swirl) *
                 dt;
               pool[j + 1] +=
-                (pool[j + 3] +
+                (pool[j + 3] *
+                  (INTRO_CONFIG.snow.idleSpeed +
+                    (1 - INTRO_CONFIG.snow.idleSpeed) * storm) +
+                  snowVelocity[k + 1] +
                   ((cy - pool[j + 1]) * 0.1 + (cx - pool[j]) * 0.04) *
                     motion.swirl) *
                 dt;
               if (pool[j + 1] > cached.height + radius) {
                 pool[j + 1] = -radius - random() * 25;
                 pool[j] = random() * cached.width;
+                snowVelocity[k] = snowVelocity[k + 1] = 0;
               }
               if (pool[j] < -radius) pool[j] = cached.width + radius;
               else if (pool[j] > cached.width + radius) pool[j] = -radius;
-              ctx.globalAlpha = pool[j + 4];
+              ctx.globalAlpha = pool[j + 4] * (0.62 + storm * 0.38);
               ctx.drawImage(
                 sprite,
                 pool[j] - radius,
@@ -1455,11 +1531,10 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                       <Icon size={22} strokeWidth={1.6} />
                     </span>
                     <span className="intro-focus-label">{label}</span>
-                    <ArrowRight
-                      className="intro-focus-arrow"
-                      size={18}
-                      aria-hidden="true"
-                    />
+                    <span className="intro-focus-trace" aria-hidden="true" />
+                    <span className="intro-focus-arrow" aria-hidden="true">
+                      <ArrowRight size={19} strokeWidth={1.7} />
+                    </span>
                   </button>
                 ))}
               </div>

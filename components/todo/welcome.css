@@ -1091,13 +1091,25 @@
   color: #705540;
 }
 .intro-focus-arrow {
+  display: grid;
+  place-items: center;
   margin-left: auto;
-  flex-shrink: 0;
-  color: #ac8059;
-  transition: transform 0.35s ease;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #fff7e9;
+  background: #51382c;
+  box-shadow:
+    inset 0 1px 0 #ffffff20,
+    0 3px 8px #51382c14;
 }
-.intro-glass:hover .intro-focus-arrow {
-  transform: translateX(3px);
+.intro-focus-arrow svg {
+  transform: rotate(-55deg);
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.intro-glass:is(:hover, :focus-visible) .intro-focus-arrow svg {
+  transform: rotate(0deg);
 }
 .intro-glass > div {
   float: left;
@@ -1336,7 +1348,51 @@
     transform: rotate(12deg);
   }
 }
+/* The existing ticker eases these tiny offsets; the scroll/room zoom stays on its parent. */
+.intro-card-row {
+  perspective: 900px;
+}
+.intro-glass.intro-primary {
+  isolation: isolate;
+  transform: translate3d(var(--magnet-x, 0px), var(--magnet-y, 0px), 0)
+    rotateX(var(--magnet-rx, 0deg)) rotateY(var(--magnet-ry, 0deg))
+    scale(var(--press, 1));
+  transition:
+    background-color 0.4s,
+    border-color 0.4s,
+    color 0.4s;
+}
+.intro-glass.intro-primary:active {
+  --press: 0.98;
+}
+.intro-focus-trace {
+  position: absolute;
+  inset: 5px;
+  border: 1px solid #72513c59;
+  border-radius: 18px;
+  pointer-events: none;
+  opacity: var(--near, 0);
+  mask-image: radial-gradient(
+    90px circle at var(--line-x, 50%) var(--line-y, 50%),
+    #000,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    90px circle at var(--line-x, 50%) var(--line-y, 50%),
+    #000,
+    transparent 100%
+  );
+}
 @media (prefers-reduced-motion: reduce) {
+  .intro-glass.intro-primary {
+    transform: none;
+  }
+  .intro-focus-arrow svg {
+    transition: none;
+  }
+  .intro-focus-trace {
+    display: none;
+  }
   .intro-playmate .pocket-todo,
   .intro-playmate svg > path:first-of-type {
     animation: none;
