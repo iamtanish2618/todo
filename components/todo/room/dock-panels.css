@@ -1,0 +1,418 @@
+/* Shared shell only: task storage, timer deadlines, AI requests, and notes stay in StudyRoom. */
+.cozy-room[data-dock="true"] {
+  --glass-tint: 0;
+  --glass-alpha: calc(0.52 + var(--glass-tint) * 0.28);
+  --glass-blur: calc(24px + var(--glass-tint) * 8px);
+}
+.cozy-room[data-dock="true"] .room-scene-world {
+  filter: none !important;
+}
+.cozy-room[data-dock="true"] .cinema-panel-shade {
+  z-index: 18;
+  background: rgba(20, 17, 24, 0.1);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  visibility: hidden;
+}
+.cozy-room[data-dock="true"][data-panel-open="true"] .cinema-panel-shade {
+  visibility: visible;
+}
+.cozy-room[data-dock="true"] .dock-panel {
+  position: absolute;
+  z-index: 25;
+  left: 2%;
+  top: 18%;
+  width: 24%;
+  height: auto;
+  max-height: 64%;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(14px, 1.55cqw, 24px);
+  gap: 12px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, var(--glass-alpha)),
+    rgba(255, 255, 255, calc(var(--glass-alpha) - 0.22))
+  );
+  border: 1px solid #ffffff99;
+  border-radius: 30px;
+  box-shadow:
+    inset 0 1px 0 #ffffffd9,
+    0 12px 32px #1e143c4d;
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.7);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.7);
+  color: #2a2622;
+  animation: none !important;
+  will-change: transform, opacity;
+  font-family: var(--font-nunito), "Nunito", system-ui, sans-serif;
+}
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="friends"],
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="settings"],
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="month"],
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="corner"],
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="home"] {
+  left: 65%;
+  top: 20%;
+  width: 32%;
+  max-height: 61%;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel:is([data-dock-pane="tasks"], [data-dock-pane="finished"]) {
+  top: 45%;
+  left: 3%;
+  width: 36%;
+  max-height: 36%;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel:is([data-dock-pane="focus"], [data-dock-pane="break"]) {
+  left: 21%;
+  top: auto;
+  bottom: 18.5%;
+  width: 58%;
+  max-height: 22%;
+  padding: 14px 22px;
+  border-radius: 26px;
+}
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="agent"] {
+  left: 60%;
+  top: 13%;
+  bottom: 18%;
+  width: 37%;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #f5eadce8, #e9dfd2e6);
+}
+.cozy-room[data-dock="true"] .dock-panel .room-panel-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 1px 3px 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: clamp(12px, 1.05cqw, 15px);
+}
+.cozy-room[data-dock="true"] .dock-panel .room-panel-body > * {
+  animation: none;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-panel-heading {
+  padding: 0;
+  margin: 0;
+  min-height: 28px;
+  flex: none;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-panel-heading h2 {
+  font-size: clamp(16px, 1.5cqw, 22px);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  color: #2a2622;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-panel-heading button {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 50%;
+  background: #ffffff66;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel
+  :is(
+    .room-helper,
+    .room-field,
+    .room-soft-notice,
+    .room-empty,
+    .room-setting,
+    .room-eyebrow
+  ) {
+  color: #4f443b;
+}
+.cozy-room[data-dock="true"] .dock-panel :is(input, textarea, select) {
+  color: #2a2622;
+  background: #fffaf0c9;
+  border: 1px solid #ffffffb3;
+  border-radius: 14px;
+  font-weight: 550;
+  font-size: inherit;
+}
+.cozy-room[data-dock="true"] .dock-panel :is(input, textarea)::placeholder {
+  color: #645b51;
+  opacity: 1;
+}
+.cozy-room[data-dock="true"] .dock-panel button {
+  font-size: inherit;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-dark-button {
+  background: #3d3029;
+  color: #fff7e9;
+  border-radius: 999px;
+}
+.cozy-room[data-dock="true"] .dock-panel button:focus-visible {
+  outline: 2px solid #8a5a16;
+  outline-offset: 3px;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-weather-choices {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-weather-choices button {
+  height: 76px;
+  border-radius: 18px;
+  color: #302a25;
+  background: #ffffff66;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel
+  .room-weather-choices
+  button[aria-pressed="true"] {
+  outline: 2px solid #947138;
+  outline-offset: -2px;
+  background: #fff7dcb3;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-sound-choices {
+  grid-template-columns: 1fr;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-task-row {
+  background: #fffaf0b3;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-task-row.task-selected {
+  background: #3d3029;
+  color: #fff7e9;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-task-row.task-selected button {
+  color: #fff7e9;
+}
+.dock-focus-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dock-focus-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.dock-focus-row > strong {
+  flex: 0 0 36px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #4f443b;
+}
+.dock-task-chips,
+.dock-time-chips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.dock-task-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.dock-task-chips button,
+.dock-time-chips button {
+  padding: 7px 11px;
+  min-height: 32px;
+  background: #fffcf1c2;
+  border: 1px solid #ffffffa6;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 12px !important;
+}
+.dock-task-chips button {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock-task-chips button[aria-pressed="true"],
+.dock-time-chips button[aria-pressed="true"] {
+  background: #3d3029;
+  color: #fff7e9;
+  border-color: #3d3029;
+}
+.dock-custom-time {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.dock-custom-time input {
+  width: 62px;
+  height: 32px;
+  padding: 4px 7px;
+}
+.dock-focus-manage {
+  padding: 0;
+  font-size: 11px !important;
+  color: #4f443b;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.dock-focus-setup > .room-focus-launch {
+  display: inline-flex;
+}
+.dock-focus-setup > .room-focus-launch:focus-visible {
+  position: static;
+  width: auto;
+  height: 36px;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: #3d3029;
+  color: #fff7e9;
+}
+.dock-glass-setting {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.dock-glass-setting span {
+  display: flex;
+  justify-content: space-between;
+}
+.dock-glass-setting small {
+  font-size: 11px;
+}
+.dock-glass-setting input,
+.dock-mix input {
+  accent-color: #6d4c32;
+}
+.dock-mix {
+  display: grid;
+  gap: 12px;
+}
+.dock-mix label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.dock-mix input {
+  width: 55%;
+}
+.cozy-room[data-dock="true"][data-quality="low"]
+  :is(.dock-panel, .cinema-panel-shade) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.cozy-room[data-dock="true"][data-quality="low"] .dock-panel {
+  background: #f2e8daeb;
+}
+.cozy-room[data-dock="true"] .dock-panel .cinema-word {
+  animation: none;
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .cozy-room[data-dock="true"] .dock-panel,
+  .todo-dock-glass {
+    background: #f2e8daeb;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .cozy-room[data-dock="true"] :is(.dock-panel, .todo-dock-glass) {
+    background: #f2e8daeb;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .cozy-room[data-dock="true"] .cinema-panel-shade {
+    backdrop-filter: none;
+  }
+}
+@media (pointer: coarse) and (max-width: 700px) {
+  .cozy-room[data-dock="true"] .dock-panel {
+    position: fixed;
+    left: 4% !important;
+    top: auto !important;
+    bottom: 15% !important;
+    width: 92% !important;
+    max-height: 65svh !important;
+    border-radius: 26px;
+  }
+  .todo-dock {
+    position: fixed;
+    left: 6%;
+    width: 88%;
+    height: 70px;
+    bottom: 3%;
+    --dock-unit: 1px;
+  }
+  .cozy-room[data-dock="true"] .dock-panel[data-dock-pane="agent"] {
+    height: 65svh;
+  }
+}
+.cozy-room[data-dock="true"] .dock-panel[data-dock-pane="agent"] {
+  transform: none;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel[data-dock-pane="agent"]
+  > :is(
+    .room-agent-heading,
+    .room-soft-notice,
+    .room-chat-transcript,
+    .room-chat-compose,
+    .room-agent-attachments
+  ) {
+  margin-left: 18px;
+  margin-right: 18px;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel[data-dock-pane="agent"]
+  .room-agent-heading {
+  padding-top: 18px;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel[data-dock-pane="agent"]
+  .room-chat-compose {
+  margin-bottom: 18px;
+}
+.cozy-room[data-dock="true"]
+  .dock-panel[data-dock-pane="agent"]
+  .room-chat-transcript {
+  max-height: none;
+}
+/* Preserve Sunset as a quieter fifth scene rather than removing an existing option. */
+.cozy-room[data-dock="true"]
+  .dock-panel
+  .room-weather-choices
+  > button:last-child {
+  grid-column: 1/-1;
+  height: 36px;
+  flex-direction: row;
+  gap: 8px;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-sound-choices {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-sound-choices button {
+  min-height: 34px;
+  height: auto;
+  padding: 9px 7px;
+  font-size: 11px;
+}
+.cozy-room[data-dock="true"][data-agent="true"] .room-speech-pill {
+  opacity: 1;
+  visibility: visible;
+  left: 40%;
+  top: 19%;
+  width: 19%;
+  z-index: 23;
+}
+.cozy-room[data-dock="true"][data-working="true"] .todo-dock-center {
+  visibility: visible;
+}
+.cozy-room[data-dock="true"][data-panel-open="true"] .cinema-panel-shade {
+  pointer-events: auto;
+}
+.cozy-room[data-dock="true"] :is(.room-nav-back, .room-nav-settings) {
+  z-index: 24;
+}
+.cozy-room[data-dock="true"] .dock-panel .room-weather-choices > button:last-child { min-height:36px; }
+.cozy-room[data-dock="true"] .dock-panel .room-sound-choices { display:grid; }
+/* Small labels use the stronger ink over glass; muted ink stays on cream fields. */
+.cozy-room[data-dock="true"] .dock-panel :is(.room-helper,.room-field,.room-soft-notice,.room-empty,.room-setting,.room-eyebrow,.cinema-time-match,.dock-focus-row > strong,.dock-mix label) { color:#2a2622; }
+.cozy-room[data-dock="true"] .dock-panel .room-sound-choices button { color:#3b3029; }

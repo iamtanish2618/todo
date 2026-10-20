@@ -44,9 +44,15 @@ async function readyRoom(page: Page, before: { totalSits: number }) {
     "data-working",
     "false",
   );
-  await expect(
-    page.getByRole("heading", { name: "What are we doing?", exact: true }),
-  ).toBeVisible();
+  if (await page.locator(".todo-dock").count()) {
+    await expect(
+      page.getByRole("button", { name: "Start focusing", exact: true }),
+    ).toBeVisible();
+  } else {
+    await expect(
+      page.getByRole("heading", { name: "What are we doing?", exact: true }),
+    ).toBeVisible();
+  }
   await expect(page.locator(".cozy-room-stage")).not.toHaveAttribute("inert");
   expect(
     (await (await page.request.get("/api/room-summary")).json()).totalSits,

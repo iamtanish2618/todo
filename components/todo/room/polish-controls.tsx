@@ -11,6 +11,7 @@ import {
 } from "./cinema-config";
 export const POLISH_DEFAULTS = {
   volume: 0.5,
+  glass: 0,
   muted: false,
   mix: EMPTY_MIX,
   matchTime: false,
@@ -32,6 +33,8 @@ export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
           typeof p.volume === "number"
             ? Math.max(0, Math.min(1, p.volume))
             : v.volume,
+        glass:
+          typeof p.glass === "number" ? Math.max(0, Math.min(1, p.glass)) : 0,
         muted: p.muted === true,
         matchTime: p.matchTime === true,
         thunder: p.thunder === true,

@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type FormEvent,
+  type CSSProperties,
 } from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import {
@@ -68,6 +69,12 @@ import "./room/controls.css";
 import "./room/celebration.css";
 import "./room/agent.css";
 import "./room/polish.css";
+import { RoomDock, DOCK_CONFIG, type DockItem } from "./room/dock";
+import {
+  useDockPanelMotion,
+  trapDockPanel,
+  dockOrigin,
+} from "./room/dock-panels";
 import { RoomArrival } from "./room/arrival";
 import { BreakReturn } from "./room/break-return";
 import { RoomCursor, useRoomCinema } from "./room/cinematic";
@@ -158,6 +165,13 @@ type Recognition = {
 };
 
 export function StudyRoom(p: Props) {
+  const [dockEnabled, setDockEnabled] = useState(DOCK_CONFIG.enabled);
+  useEffect(() => {
+    setDockEnabled(
+      new URLSearchParams(location.search).get("dock") !== "0" &&
+        DOCK_CONFIG.enabled,
+    );
+  }, []);
   const [focusTime, setFocusTime] = useState("25");
   const [breakTime, setBreakTime] = useState("5");
   const [celebrating, setCelebrating] = useState(false);
@@ -292,6 +306,12 @@ export function StudyRoom(p: Props) {
   currentPane.current = pane;
   latest.current = p;
   const polish = useRoomPolish(setTone);
+  const panelReturn = useDockPanelMotion(
+    roomRoot,
+    pane,
+    dockEnabled,
+    p.reduced,
+  );
   const [completionStats, setCompletionStats] = useState({
     minutes: 0,
     tasks: 0,
@@ -400,7 +420,9 @@ export function StudyRoom(p: Props) {
     setBreakReturn(null);
     requestAnimationFrame(() =>
       roomRoot.current
-        ?.querySelector<HTMLButtonElement>(".room-home-card button")
+        ?.querySelector<HTMLButtonElement>(
+          "[data-dock-item=focus],.room-home-card button",
+        )
         ?.focus({ preventScroll: true }),
     );
   }, []);
@@ -553,7 +575,26 @@ export function StudyRoom(p: Props) {
   const show = (next: Pane) => {
     setError("");
     if (currentPane.current === next) closePanel.current();
-    else setPane(next);
+    else {
+      closingTween.current?.kill();
+      const node = roomRoot.current?.querySelector(".dock-panel");
+      if (dockEnabled && node && !p.reduced) {
+        const previous = currentPane.current;
+        void import("gsap").then(({ gsap }) => {
+          if (currentPane.current !== previous || !node.isConnected) return;
+          closingTween.current = gsap.to(node, {
+            opacity: 0,
+            scale: 0.85,
+            y: 10,
+            duration: 0.1,
+            overwrite: true,
+            onComplete: () => {
+              if (currentPane.current === previous) setPane(next);
+            },
+          });
+        });
+      } else setPane(next);
+    }
   };
   const work = async (action: () => Promise<void>) => {
     if (busy) return;
@@ -666,6 +707,7 @@ export function StudyRoom(p: Props) {
   const exportNote = () =>
     void work(() => printNote(noteTitle || "A little note", noteText));
   const beginFocus = () => {
+    closingTween.current?.kill();
     setFocusTime(String(p.duration / 60));
     setError("");
     setPane("focus");
@@ -756,6 +798,7 @@ export function StudyRoom(p: Props) {
       }
     });
   const mode = (agent: boolean) => {
+    closingTween.current?.kill();
     if (agent && resting) return;
     p.onAgentMode(agent);
     setSleeping(false);
@@ -827,7 +870,7 @@ export function StudyRoom(p: Props) {
       ".room-tool-panel,.room-agent-panel",
     );
     const closing = pane;
-    if (!node || p.reduced) {
+    if (!node || (p.reduced && !dockEnabled)) {
       setPane(null);
       return;
     }
@@ -835,9 +878,10 @@ export function StudyRoom(p: Props) {
       if (!node.isConnected || currentPane.current !== closing) return;
       closingTween.current = gsap.to(node, {
         opacity: 0,
-        x: -14,
-        scale: 0.985,
-        duration: 0.18,
+        x: dockEnabled ? 0 : -14,
+        y: dockEnabled && !p.reduced ? 16 : 0,
+        scale: dockEnabled ? (p.reduced ? 1 : 0.6) : 0.985,
+        duration: dockEnabled ? (p.reduced ? 0.15 : 0.2) : 0.18,
         ease: "power2.in",
         overwrite: true,
         onComplete: () => {
@@ -848,22 +892,98 @@ export function StudyRoom(p: Props) {
   };
   closePanel.current = close;
   const panelTitle: Record<Pane, string> = {
-    focus: "Todo.",
+    focus: dockEnabled ? "Start focusing" : "Todo.",
     finished: "Finished tasks.",
-    ambience: "Set the mood.",
+    ambience: dockEnabled ? "Ambience" : "Set the mood.",
     tasks: "Your tasks.",
-    notes: "Your little notebook.",
+    notes: dockEnabled ? "Notes" : "Your little notebook.",
     agent: "Talk with Todo",
     settings: "Make yourself comfortable.",
     month: "This month",
     corner: "Your corner",
-    friends: "Bring friends to the table.",
+    friends: dockEnabled ? "Friends" : "Bring friends to the table.",
     home: "Who is joining?",
     break: "Take a break.",
   };
   const panelContent = () => {
     switch (pane) {
       case "focus":
+        if (dockEnabled)
+          return (
+            <form
+              id="dock-focus-form"
+              className="dock-focus-setup"
+              onSubmit={launchFocus}
+            >
+              <div className="dock-focus-row">
+                <strong>TASK</strong>
+                <div className="dock-task-chips">
+                  {[
+                    ...selected,
+                    ...visibleTasks.filter((t) => !chosen.includes(t.id)),
+                  ]
+                    .slice(0, 3)
+                    .map((task) => (
+                      <button
+                        type="button"
+                        key={task.id}
+                        aria-pressed={chosen.includes(task.id)}
+                        onClick={() => focusTask(task)}
+                      >
+                        {task.title}
+                      </button>
+                    ))}
+                  <button
+                    type="button"
+                    aria-label="Add or edit tasks"
+                    onClick={() => show("tasks")}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+              <div className="dock-focus-row">
+                <strong>TIME</strong>
+                <div className="dock-time-chips">
+                  {[15, 25, 45, 60, 90].map((minutes) => (
+                    <button
+                      type="button"
+                      key={minutes}
+                      aria-pressed={Number(focusTime) === minutes}
+                      onClick={() => setFocusTime(String(minutes))}
+                    >
+                      {minutes}
+                    </button>
+                  ))}
+                  <label className="dock-custom-time">
+                    Custom{" "}
+                    <Input
+                      id="focus-minutes"
+                      aria-label="Focus minutes"
+                      type="number"
+                      required
+                      min={1}
+                      max={120}
+                      step={1}
+                      value={focusTime}
+                      onChange={(e) => setFocusTime(e.target.value)}
+                    />{" "}
+                    min
+                  </label>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="dock-focus-manage"
+                onClick={() => show("tasks")}
+              >
+                Edit tasks &amp; finished tasks
+              </button>
+              <button type="submit" className="room-focus-launch sr-only">
+                Focus
+              </button>
+            </form>
+          );
         return (
           <form className="room-focus-form" onSubmit={launchFocus}>
             <p className="room-helper">Todo will work beside you.</p>
@@ -988,6 +1108,38 @@ export function StudyRoom(p: Props) {
                 setTone(value);
               }}
             />
+            {dockEnabled ? (
+              <div className="dock-mix" role="group" aria-label="Room textures">
+                {(
+                  [
+                    ["rain", "Rain"],
+                    ["fire", "Fire"],
+                    ["cafe", "Café"],
+                    ["pad", "Lo-fi hush"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label key={key}>
+                    <span>{label}</span>
+                    <input
+                      aria-label={label}
+                      type="range"
+                      min="0"
+                      max="1"
+                      step=".01"
+                      value={polish.settings.mix[key]}
+                      onChange={(e) =>
+                        polish.update({
+                          mix: {
+                            ...polish.settings.mix,
+                            [key]: Number(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            ) : null}
             <SoundMixControls
               settings={polish.settings}
               update={polish.update}
@@ -1427,6 +1579,24 @@ export function StudyRoom(p: Props) {
       case "settings":
         return (
           <>
+            {dockEnabled ? (
+              <label className="dock-glass-setting">
+                <span>
+                  Glass <small>Clear → Tinted</small>
+                </span>
+                <input
+                  aria-label="Glass tint"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step=".01"
+                  value={polish.settings.glass}
+                  onChange={(e) =>
+                    polish.update({ glass: Number(e.target.value) })
+                  }
+                />
+              </label>
+            ) : null}
             <label className="room-setting">
               <span>Gentler motion</span>
               <Switch checked={p.reduced} onCheckedChange={p.onReduced} />
@@ -1712,6 +1882,8 @@ export function StudyRoom(p: Props) {
       aria-label="Your shared Todo workspace"
       aria-hidden={!p.active}
       inert={!p.active}
+      data-dock={dockEnabled}
+      style={{ "--glass-tint": polish.settings.glass } as CSSProperties}
       data-character={p.female ? "female" : "male"}
       data-mode={p.agentMode ? "agent" : "companion"}
       data-agent={agentView}
@@ -1893,31 +2065,33 @@ export function StudyRoom(p: Props) {
         >
           <ArrowLeft size={18} />
         </Button>
-        <div
-          className="room-mode-toggle"
-          data-room-ui="mode"
-          inert={quietRoom}
-          aria-hidden={quietRoom}
-          role="group"
-          aria-label="Todo mode"
-        >
-          <Button
-            variant="ghost"
-            aria-pressed={!p.agentMode}
-            onClick={() => mode(false)}
+        {!dockEnabled ? (
+          <div
+            className="room-mode-toggle"
+            data-room-ui="mode"
+            inert={quietRoom}
+            aria-hidden={quietRoom}
+            role="group"
+            aria-label="Todo mode"
           >
-            Companion
-          </Button>
-          <Button
-            variant="ghost"
-            aria-pressed={p.agentMode}
-            disabled={resting}
-            onClick={() => mode(true)}
-          >
-            <Sparkles size={14} />
-            Agent
-          </Button>
-        </div>
+            <Button
+              variant="ghost"
+              aria-pressed={!p.agentMode}
+              onClick={() => mode(false)}
+            >
+              Companion
+            </Button>
+            <Button
+              variant="ghost"
+              aria-pressed={p.agentMode}
+              disabled={resting}
+              onClick={() => mode(true)}
+            >
+              <Sparkles size={14} />
+              Agent
+            </Button>
+          </div>
+        ) : null}
         <Button
           data-room-ui="settings"
           inert={quietRoom}
@@ -1930,89 +2104,124 @@ export function StudyRoom(p: Props) {
         >
           <Settings2 size={18} />
         </Button>
-        <nav
-          className="room-edge-tabs"
-          data-room-ui="tools"
-          inert={quietRoom}
-          aria-hidden={quietRoom}
-          aria-label="Room tools"
-        >
-          {[
-            ["ambience", CloudRain, "Ambience"],
-            ["tasks", ListTodo, "Tasks"],
-            ["notes", BookOpen, "Notes"],
-            ["friends", Users, "Invite friends"],
-          ].map(([id, Icon, label]) => {
-            const I = Icon as typeof TimerIcon;
-            return (
-              <button
-                key={String(id)}
-                className={`room-edge-tab room-edge-${id}`}
-                aria-expanded={pane === id}
-                onClick={() => show(id as Pane)}
-              >
-                <I size={17} />
-                <span>{String(label)}</span>
-              </button>
-            );
-          })}
-        </nav>
-        <div
-          className="room-home-card"
-          data-room-ui="home"
-          inert={quietRoom}
-          aria-hidden={quietRoom}
-          style={zoneStyle(C.home)}
-        >
-          {quietBreak ? null : !p.started && p.phase === "focus" ? (
-            <form onSubmit={sit}>
-              <h1>What are we doing?</h1>
-              <div className="room-intention-form">
-                <Button className="room-dark-button">
-                  {selected.length ? "Edit your tasks" : "Sit with Todo"}
-                  <ArrowRight size={15} />
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <div className="room-sit-status">
-              <div>
-                <span className="room-eyebrow">
+        {!dockEnabled ? (
+          <nav
+            className="room-edge-tabs"
+            data-room-ui="tools"
+            inert={quietRoom}
+            aria-hidden={quietRoom}
+            aria-label="Room tools"
+          >
+            {[
+              ["ambience", CloudRain, "Ambience"],
+              ["tasks", ListTodo, "Tasks"],
+              ["notes", BookOpen, "Notes"],
+              ["friends", Users, "Invite friends"],
+            ].map(([id, Icon, label]) => {
+              const I = Icon as typeof TimerIcon;
+              return (
+                <button
+                  key={String(id)}
+                  className={`room-edge-tab room-edge-${id}`}
+                  aria-expanded={pane === id}
+                  onClick={() => show(id as Pane)}
+                >
+                  <I size={17} />
+                  <span>{String(label)}</span>
+                </button>
+              );
+            })}
+          </nav>
+        ) : null}
+        {!dockEnabled ? (
+          <div
+            className="room-home-card"
+            data-room-ui="home"
+            inert={quietRoom}
+            aria-hidden={quietRoom}
+            style={zoneStyle(C.home)}
+          >
+            {quietBreak ? null : !p.started && p.phase === "focus" ? (
+              <form onSubmit={sit}>
+                <h1>What are we doing?</h1>
+                <div className="room-intention-form">
+                  <Button className="room-dark-button">
+                    {selected.length ? "Edit your tasks" : "Sit with Todo"}
+                    <ArrowRight size={15} />
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="room-sit-status">
+                <div>
+                  <span className="room-eyebrow">
+                    {p.phase === "break"
+                      ? "A LITTLE BREATHER"
+                      : "YOUR LITTLE SIT"}
+                  </span>
+                  <h2>{p.task || "A moment just for you."}</h2>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    const activeTask = p.tasks.find(
+                      (task) => task.id === p.taskId && !task.done,
+                    );
+                    if (p.phase === "focus" && activeTask)
+                      void toggle(activeTask);
+                    else done();
+                  }}
+                  disabled={busy}
+                  aria-label={
+                    p.phase === "break"
+                      ? "End break"
+                      : p.taskId
+                        ? "Finish task"
+                        : "Done for now"
+                  }
+                >
                   {p.phase === "break"
-                    ? "A LITTLE BREATHER"
-                    : "YOUR LITTLE SIT"}
-                </span>
-                <h2>{p.task || "A moment just for you."}</h2>
-              </div>
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  const activeTask = p.tasks.find(
-                    (task) => task.id === p.taskId && !task.done,
-                  );
-                  if (p.phase === "focus" && activeTask)
-                    void toggle(activeTask);
-                  else done();
-                }}
-                disabled={busy}
-                aria-label={
-                  p.phase === "break"
                     ? "End break"
                     : p.taskId
                       ? "Finish task"
-                      : "Done for now"
+                      : "Done for now"}
+                  <Check size={16} />
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {dockEnabled ? (
+          <RoomDock
+            active={pane === "tasks" || pane === "finished" ? "focus" : pane}
+            reduced={p.reduced}
+            focus={quietFocus}
+            hidden={quietBreak || celebrating}
+            agent={p.agentMode}
+            resting={resting}
+            onChoose={(item: DockItem) => {
+              if (item === "agent") mode(!p.agentMode);
+              else if (item === "focus") {
+                if (p.started && p.phase === "focus") {
+                  close();
+                  p.onStart();
+                } else if (pane === "focus")
+                  roomRoot.current
+                    ?.querySelector<HTMLFormElement>("#dock-focus-form")
+                    ?.requestSubmit();
+                else {
+                  if (p.agentMode) p.onAgentMode(false);
+                  beginFocus();
                 }
-              >
-                {p.phase === "break"
-                  ? "End break"
-                  : p.taskId
-                    ? "Finish task"
-                    : "Done for now"}
-                <Check size={16} />
-              </Button>
-            </div>
-          )}
-        </div>
+              } else {
+                if (p.agentMode) p.onAgentMode(false);
+                show(item);
+              }
+            }}
+            onPause={p.onStart}
+            onEnd={done}
+          />
+        ) : null}
         {p.active && !agentView && soundscape !== "off" ? (
           <RoomSoundPlayer
             key={soundscape}
@@ -2106,13 +2315,19 @@ export function StudyRoom(p: Props) {
           {pane ? (
             <DialogPrimitive.Content
               key={pane}
+              data-dock-pane={dockEnabled ? pane : undefined}
+              onKeyDown={dockEnabled ? trapDockPanel : undefined}
               className={
-                pane === "agent"
+                (dockEnabled ? "dock-panel " : "") +
+                (pane === "agent"
                   ? "room-agent-panel"
-                  : `room-tool-panel ${pane === "focus" || pane === "break" ? "room-focus-panel" : ""}`
+                  : `room-tool-panel ${pane === "focus" || pane === "break" ? "room-focus-panel" : ""}`)
               }
               style={
-                pane === "focus" || pane === "break" || pane === "agent"
+                dockEnabled ||
+                pane === "focus" ||
+                pane === "break" ||
+                pane === "agent"
                   ? undefined
                   : {
                       ...zoneStyle(C.panel),
@@ -2123,8 +2338,27 @@ export function StudyRoom(p: Props) {
               }
               aria-labelledby="room-panel-title"
               aria-describedby="room-panel-description"
-              onInteractOutside={(e) => e.preventDefault()}
+              onInteractOutside={(e) => {
+                e.preventDefault();
+                if (
+                  dockEnabled &&
+                  !(e.target as Element)?.closest?.(
+                    ".todo-dock,.room-nav-settings",
+                  )
+                )
+                  close();
+              }}
+              onFocusOutside={(e) => e.preventDefault()}
               onOpenAutoFocus={(event) => {
+                if (dockEnabled) {
+                  event.preventDefault();
+                  roomRoot.current
+                    ?.querySelector<HTMLElement>(
+                      ".dock-panel button,.dock-panel input,.dock-panel textarea",
+                    )
+                    ?.focus({ preventScroll: true });
+                  return;
+                }
                 if (pane !== "agent" && pane !== "focus") return;
                 event.preventDefault();
                 roomRoot.current
@@ -2139,8 +2373,15 @@ export function StudyRoom(p: Props) {
                 event.preventDefault();
                 if (celebrationOpen.current) return;
                 if (currentPane.current && currentPane.current !== pane) return;
+                const anchor = panelReturn.current;
                 roomRoot.current
-                  ?.querySelector<HTMLButtonElement>(".round-timer-face")
+                  ?.querySelector<HTMLButtonElement>(
+                    dockEnabled
+                      ? anchor === "settings"
+                        ? ".room-nav-settings"
+                        : `[data-dock-item="${anchor}"]`
+                      : ".round-timer-face",
+                  )
                   ?.focus({ preventScroll: true });
               }}
               inert={pane !== "agent" && quietRoom}

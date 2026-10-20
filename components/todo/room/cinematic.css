@@ -962,14 +962,15 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f2d7a4;
-  box-shadow: 0 0 10px #ffe6ab70;
+  background: #a9671d;
+  border: 1px solid #fff1ba;
+  box-shadow: 0 0 0 1px #6d3d16, 0 0 8px 3px #ffd67cb3, 0 0 20px #ffce6873;
 }
 .cinema-cursor-trail {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #efd49e;
+  background: #bb7c2c;
   opacity: 0;
 }
 .cinema-cursor-ring {
@@ -977,7 +978,8 @@
   height: 25px;
   margin: -12.5px 0 0 -12.5px;
   border-radius: 50%;
-  border: 1px solid #f1d6a4;
+  border: 1px solid #a56829;
+  box-shadow: 0 0 0 1px #fff0b8a6, 0 0 12px #ffd07173;
   transition: opacity 0.3s;
 }
 .cinema-click-spark {
@@ -1823,8 +1825,8 @@
 }
 .cinema-snow-sky {
   background:
-    linear-gradient(#dceef24d, #dceef280),
-    url("/art/study-room-morning-v1.png") center/100% 100% no-repeat;
+    linear-gradient(#b8d6e2c9, #dbeaf0b3),
+    url("/art/study-room-evening-v1.png") center/100% 100% no-repeat;
 }
 /* A software renderer must keep the timer/UI responsive, even when full-screen blends are costly. */
 .cozy-room[data-quality="low"]
@@ -1995,3 +1997,8 @@
   outline-offset: 2px;
   border-radius: 5px;
 }
+
+/* Overcast winter light: no day-image sun or night-image moon behind the snow. */
+.cinema-snow-sky { filter: saturate(.3) brightness(1.12); }
+.room-window-world[data-weather="snow"] :is(.room-morning-sky,.room-evening-sky) { opacity:0; }
+.room-window-world[data-weather="snow"] .cinema-window-frost { inset:7% 46% 56% 27%; background:radial-gradient(ellipse at 0 0,#eafaffcc,transparent 65%),radial-gradient(ellipse at 100% 100%,#eafaffaa,transparent 60%); }

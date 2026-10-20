@@ -1,0 +1,417 @@
+import { test, expect, type Page } from "@playwright/test";
+import { promises as fs } from "node:fs";
+test.use({ channel: "chrome", launchOptions: { args: [] } });
+async function enter(page: Page, query = "") {
+  await page.goto(
+    "/signin-with-chatgpt?return_to=" + encodeURIComponent("/" + query),
+  );
+  await expect(page.locator(".todo-root")).toHaveAttribute(
+    "data-ready",
+    "true",
+  );
+  await page
+    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-arriving",
+    "false",
+    { timeout: 45000 },
+  );
+  await expect(page.locator(".round-room-art")).toHaveAttribute(
+    "data-intro",
+    "awake",
+    { timeout: 15000 },
+  );
+}
+const dock = (page: Page, id: string) =>
+  page.locator(`[data-dock-item="${id}"]`);
+
+test("dock replaces the old controls, waves without overlap and settles after repeated launch", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await enter(page);
+  await expect(
+    page.getByRole("navigation", { name: "Room dock" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".room-edge-tabs,.room-home-card,.room-mode-toggle"),
+  ).toHaveCount(0);
+  for (const id of ["notes", "ambience", "friends", "agent"]) {
+    await dock(page, id).hover();
+    await page.waitForTimeout(350);
+    const geometry = await page
+      .locator(".todo-dock-button")
+      .evaluateAll((nodes) =>
+        nodes.map((n) => {
+          const r = n.getBoundingClientRect();
+          return {
+            left: r.left,
+            right: r.right,
+            scale: getComputedStyle(n.parentElement!.parentElement!).transform,
+          };
+        }),
+      );
+    for (let i = 1; i < geometry.length; i++)
+      expect(geometry[i].left - geometry[i - 1].right).toBeGreaterThan(-2);
+  }
+  await dock(page, "notes").click();
+  await dock(page, "ambience").click();
+  await dock(page, "friends").click();
+  await expect(page.locator(".dock-panel")).toHaveCount(1);
+  await expect(page.locator(".dock-panel")).toHaveAttribute(
+    "data-dock-pane",
+    "friends",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".dock-panel")).toHaveCount(0);
+  await page.mouse.move(100, 100);
+  await page.waitForTimeout(1100);
+  const settled = await page
+    .locator(".todo-dock-hop")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => new DOMMatrix(getComputedStyle(n).transform).m42),
+    );
+  expect(settled.every((y) => Math.abs(y) < 0.1)).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test("glass panels avoid Todo and window, switch one at a time, close outside and restore focus", async ({
+  page,
+}) => {
+  await enter(page);
+  for (const id of ["notes", "ambience", "friends"]) {
+    await dock(page, id).click();
+    const panel = page.locator(".dock-panel");
+    await expect(panel).toHaveAttribute("data-dock-pane", id);
+    await page.waitForTimeout(500);
+    const safe = await panel.evaluate((n) => {
+      const r = n.getBoundingClientRect(),
+        s = n.closest(".cozy-room-stage")!.getBoundingClientRect();
+      return {
+        left: (r.left - s.left) / s.width,
+        right: (r.right - s.left) / s.width,
+        top: (r.top - s.top) / s.height,
+      };
+    });
+    expect(safe.right <= 0.43 || safe.left >= 0.57).toBe(true);
+    if (id !== "friends") expect(safe.right).toBeLessThan(0.27);
+    await expect(page.getByRole("dialog")).toHaveCount(1);
+  }
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await expect(dock(page, "friends")).toBeFocused();
+  await dock(page, "notes").click();
+  await page.mouse.click(900, 650);
+  await expect(page.locator(".dock-panel")).toHaveCount(0);
+});
+
+test("focus reuses saved tasks and real timer deadline; pause and extend remain usable", async ({
+  page,
+}) => {
+  await enter(page);
+  await dock(page, "focus").click();
+  await expect(page.locator(".dock-focus-setup")).toBeVisible();
+  await page.getByRole("button", { name: "Add or edit tasks" }).click();
+  const title = `Dock focus ${Date.now()}`;
+  await page.getByRole("textbox", { name: "New task" }).fill(title);
+  await page.getByRole("button", { name: "Add task", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Focus on ${title}`, exact: true })
+    .click();
+  await page.getByRole("button", { name: "Choose timer", exact: true }).click();
+  await page.getByRole("spinbutton", { name: "Focus minutes" }).fill("16");
+  await dock(page, "focus").click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-working",
+    "true",
+  );
+  await expect(page.locator(".dock-panel")).toHaveCount(0);
+  const timer = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("todo.timer.v1")!),
+  );
+  expect(timer.task).toBe(title);
+  expect(timer.duration).toBe(960);
+  expect(timer.deadline).toBeGreaterThan(Date.now());
+  await page.getByRole("button", { name: "Add five minutes" }).click();
+  await page.getByRole("button", { name: "Pause focus", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-working",
+    "false",
+  );
+  expect(
+    await page.evaluate(
+      () => JSON.parse(localStorage.getItem("todo.timer.v1")!).remaining,
+    ),
+  ).toBeGreaterThan(1200);
+});
+
+test("keyboard trap, arrows, reduced motion, tint persistence, winter sky and cursor contrast", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await enter(page);
+  await dock(page, "notes").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(dock(page, "ambience")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".dock-panel")).toHaveAttribute(
+    "data-dock-pane",
+    "ambience",
+  );
+  const close = page.getByRole("button", { name: "Close panel", exact: true });
+  await close.focus();
+  await page.keyboard.press("Shift+Tab");
+  expect(
+    await page
+      .locator(".dock-panel")
+      .evaluate((n) => n.contains(document.activeElement)),
+  ).toBe(true);
+  await page.getByRole("button", { name: "Snow", exact: true }).click();
+  await expect(page.locator(".room-window-world")).toHaveAttribute(
+    "data-weather",
+    "snow",
+  );
+  const bg = await page
+    .locator(".cinema-snow-sky")
+    .evaluate((n) => getComputedStyle(n).backgroundImage);
+  expect(bg).toContain("evening");
+  expect(bg).not.toContain("morning");
+  const day = await page
+    .locator(".room-morning-sky")
+    .evaluate((n) => getComputedStyle(n).opacity);
+  expect(day).toBe("0");
+  const color = await page
+    .locator(".cinema-cursor-dot")
+    .evaluate((n) => getComputedStyle(n).backgroundColor);
+  expect(color).toBe("rgb(169, 103, 29)");
+  await page.keyboard.press("Escape");
+  await expect(dock(page, "ambience")).toBeFocused();
+  await page.getByRole("button", { name: "Open room settings" }).click();
+  await page.getByRole("slider", { name: "Glass tint" }).fill("0.7");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem("todo.room.polish.v1")!).glass,
+      ),
+    )
+    .toBe(0.7);
+});
+
+test("AI toggle, genuine pending status and quota response preserve companion mode", async ({
+  page,
+}) => {
+  const ready = {
+    ai: true,
+    vision: true,
+    provider: "gemini",
+    friends: false,
+    quota: { used: 0, limit: 20, resting: false, resetsAt: "tomorrow" },
+  };
+  await page.route("**/api/status", (route) => route.fulfill({ json: ready }));
+  await page.route("**/api/chat", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await route.fulfill({
+      status: 429,
+      json: { error: "A little rest. Back tomorrow." },
+    });
+  });
+  await enter(page);
+  await dock(page, "agent").click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-mode",
+    "agent",
+  );
+  await expect(
+    page.getByRole("textbox", { name: "Message Todo" }),
+  ).toBeVisible();
+  await dock(page, "agent").click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-mode",
+    "companion",
+  );
+  await dock(page, "agent").click();
+  await page.getByRole("textbox", { name: "Message Todo" }).fill("Hello Todo");
+  await page.getByRole("button", { name: "Send to Todo", exact: true }).click();
+  await expect(page.locator(".room-speech-pill")).toContainText(
+    "Todo is working",
+  );
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-mode",
+    "companion",
+  );
+  await expect(page.locator(".dock-panel")).toHaveCount(0);
+  await expect(dock(page, "agent")).toHaveAttribute("aria-disabled", "true");
+});
+
+test("legacy feature flag preserves the old room controls", async ({
+  page,
+}) => {
+  await enter(page, "?dock=0");
+  await expect(page.locator(".todo-dock")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Ambience", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".room-home-card")).toBeVisible();
+  await page
+    .getByRole("button", { name: "Start table timer", exact: true })
+    .click();
+  await expect(
+    page.getByRole("spinbutton", { name: "Focus minutes" }),
+  ).toBeVisible();
+});
+
+test("hardware frame budget while moving across dock and glass panel", async ({
+  page,
+}) => {
+  await enter(page);
+  await dock(page, "ambience").click();
+  await page.waitForTimeout(1000);
+  const sampling = page.evaluate(
+    () =>
+      new Promise<number[]>((resolve) => {
+        const values: number[] = [];
+        let last = performance.now();
+        const tick = (now: number) => {
+          values.push(now - last);
+          last = now;
+          if (values.length === 120) resolve(values.slice(5));
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  const dockRect = (await page.locator(".todo-dock").boundingBox())!;
+  for (let step = 0; step < 28; step++) {
+    const x = dockRect.x + dockRect.width * (0.1 + (0.8 * (step % 14)) / 13);
+    await page.mouse.move(x, dockRect.y + dockRect.height / 2);
+    await page.waitForTimeout(35);
+  }
+  const samples = await sampling;
+  const sorted = [...samples].sort((a, b) => a - b);
+  const mean = samples.reduce((a, b) => a + b, 0) / samples.length,
+    p95 = sorted[Math.floor(sorted.length * 0.95)];
+  await fs.mkdir("outputs", { recursive: true });
+  await fs.writeFile(
+    "outputs/todo-dock-frame-budget.json",
+    JSON.stringify({ mean, p95, samples: samples.length }, null, 2),
+  );
+  expect(mean).toBeLessThan(25);
+  expect(p95).toBeLessThan(34);
+  await page.screenshot({ path: "outputs/todo-dock-ambience.png" });
+});
+
+test("notes still save, import, export PDF and create flashcards inside the dock shell", async ({
+  page,
+}) => {
+  await enter(page);
+  await dock(page, "notes").click();
+  await page.getByLabel("Upload study notes", { exact: true }).setInputFiles({
+    name: "dock-note.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("A quiet note from the new dock."),
+  });
+  await expect(
+    page.getByRole("textbox", { name: "Your notes", exact: true }),
+  ).toHaveValue("A quiet note from the new dock.");
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Make a PDF", exact: true }).click();
+  expect((await download).suggestedFilename()).toMatch(/\.pdf$/);
+  await page.getByRole("button", { name: "Save note", exact: true }).click();
+  await expect(page.locator(".room-saved-notes")).toContainText("dock-note");
+  await page.getByRole("button", { name: "Flashcards", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Question", exact: true })
+    .fill("What does Todo do?");
+  await page
+    .getByRole("textbox", { name: "Answer", exact: true })
+    .fill("Keeps you company.");
+  await page
+    .getByRole("button", { name: "Keep this card", exact: true })
+    .click();
+  await expect(
+    page
+      .locator(".room-flashcard")
+      .filter({ hasText: "What does Todo do?" })
+      .first(),
+  ).toContainText("What does Todo do?");
+});
+
+test("resize leaves no stuck animation or off-screen panel", async ({
+  page,
+}) => {
+  await enter(page);
+  await dock(page, "notes").click();
+  await page.setViewportSize({ width: 1050, height: 740 });
+  await expect(page.locator(".dock-panel")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".dock-panel")).toHaveCount(0);
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await dock(page, "focus").click();
+  await expect(page.locator(".dock-focus-setup")).toBeVisible();
+});
+
+test.describe("touch dock", () => {
+  test.use({
+    hasTouch: true,
+    isMobile: true,
+    viewport: { width: 390, height: 844 },
+  });
+  test("tap opens a reachable sheet without magnification", async ({
+    page,
+  }) => {
+    await enter(page);
+    await dock(page, "notes").tap();
+    const panel = page.locator(".dock-panel");
+    await expect(panel).toBeVisible();
+    const r = await panel.boundingBox();
+    expect(r!.x).toBeGreaterThanOrEqual(0);
+    expect(r!.x + r!.width).toBeLessThanOrEqual(391);
+    await page.getByRole("button", { name: "Close panel", exact: true }).tap();
+    await expect(panel).toHaveCount(0);
+  });
+});
+
+test("keyboard can start from the focus form without leaving the dialog", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await enter(page);
+  await dock(page, "focus").click();
+  await page.getByRole("spinbutton", { name: "Focus minutes" }).fill("12");
+  await page.getByRole("spinbutton", { name: "Focus minutes" }).press("Enter");
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-working",
+    "true",
+  );
+});
+
+test("expanded focus pill leaves its neighbors clear and fast mode switches cannot restore stale panels", async ({
+  page,
+}) => {
+  await enter(page);
+  await dock(page, "focus").click();
+  for (const id of ["ambience", "friends", "focus"]) {
+    await dock(page, id).hover();
+    await page.waitForTimeout(350);
+    const rects = await page.locator(".todo-dock-button").evaluateAll((nodes) =>
+      nodes.map((n) => {
+        const r = n.getBoundingClientRect();
+        return { left: r.left, right: r.right };
+      }),
+    );
+    for (let i = 1; i < rects.length; i++)
+      expect(rects[i].left - rects[i - 1].right).toBeGreaterThan(-2);
+  }
+  await dock(page, "notes").click({ force: true });
+  await dock(page, "agent").click({ force: true });
+  await expect(page.locator(".dock-panel")).toHaveAttribute(
+    "data-dock-pane",
+    "agent",
+  );
+  await page.waitForTimeout(400);
+  await expect(page.locator(".dock-panel")).toHaveAttribute(
+    "data-dock-pane",
+    "agent",
+  );
+});

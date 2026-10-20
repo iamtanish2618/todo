@@ -356,14 +356,17 @@ export function useRoomCinema(
         low = true;
         resize();
       }
+      // Keep the glass backdrop stable while using a dock panel. The room still follows
+      // the cursor when tools are closed; this avoids repainting three frosted surfaces.
+      const panelStill = element.dataset.dock === "true" && Boolean(s.panel);
       const targetX =
-          motion && !calm && !low
+          motion && !calm && !low && !panelStill
             ? pointerMedia.matches
               ? tx
               : Math.sin(seconds * 0.13) * 0.25
             : 0,
         targetY =
-          motion && !calm && !low
+          motion && !calm && !low && !panelStill
             ? pointerMedia.matches
               ? ty
               : Math.cos(seconds * 0.11) * 0.18
