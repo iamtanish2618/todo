@@ -56,11 +56,10 @@ import {
 import type { Panel } from "./welcome";
 import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./room/config";
 import { CompletionCelebration } from "./room/celebration";
-import { RoomScene } from "./room/scene";
-import { RoomChat } from "./room/chat";
 import { SOUND_RECORDINGS, type Soundscape } from "./room/ambience";
 import { RoomSoundPlayer } from "./room/sound-player";
-import "./room/sound-player.css";
+import { RoomScene } from "./room/scene";
+import { RoomChat } from "./room/chat";
 import { makeRoomPDF } from "./room/pdf";
 import "./room/room.css";
 import "./room/scene.css";
@@ -78,11 +77,9 @@ import {
 import { RoomArrival } from "./room/arrival";
 import { BreakReturn } from "./room/break-return";
 import { RoomCursor, useRoomCinema } from "./room/cinematic";
-import { WeatherMatch } from "./room/weather-match";
 import { useRoomSound } from "./room/sound";
 import {
   useRoomPolish,
-  SoundMixControls,
   CountUp,
   ClockDigits,
   WordReveal,
@@ -217,7 +214,9 @@ export function StudyRoom(p: Props) {
     );
   }, []);
   const rain = tone === "rain";
-  const [weatherChoice, setWeatherChoice] = useState(0);
+  useEffect(() => {
+    if (!p.active) setSoundscape("off");
+  }, [p.active]);
   const [dragOver, setDragOver] = useState(false),
     [printing, setPrinting] = useState(false),
     [taskOrder, setTaskOrder] = useState<string[]>([]);
@@ -287,9 +286,6 @@ export function StudyRoom(p: Props) {
     [resting, setResting] = useState(false),
     [speechAvailable, setSpeechAvailable] = useState(false),
     [listening, setListening] = useState(false);
-  useEffect(() => {
-    if (!p.active || p.agentMode) setSoundscape("off");
-  }, [p.active, p.agentMode]);
   const recognizer = useRef<Recognition | null>(null),
     baseline = useRef(0),
     roomRoot = useRef<HTMLElement>(null),
@@ -334,9 +330,7 @@ export function StudyRoom(p: Props) {
     p.active && arrived,
     p.sound && !polish.settings.muted && !celebrating && !breakReturn,
     polish.settings.muted ? 0 : polish.settings.volume,
-    celebrating || breakReturn || polish.settings.muted
-      ? EMPTY_MIX
-      : polish.settings.mix,
+    EMPTY_MIX,
   );
   useEffect(
     () => () => {
@@ -584,8 +578,8 @@ export function StudyRoom(p: Props) {
           if (currentPane.current !== previous || !node.isConnected) return;
           closingTween.current = gsap.to(node, {
             opacity: 0,
-            scale: 0.85,
-            y: 10,
+            scale: 0.97,
+            y: 5,
             duration: 0.1,
             overwrite: true,
             onComplete: () => {
@@ -713,7 +707,6 @@ export function StudyRoom(p: Props) {
     setPane("focus");
   };
   const chooseWeather = (next: RoomWeather) => {
-    setWeatherChoice((v) => v + 1);
     polish.update({ matchTime: false });
     setTone(next);
   };
@@ -879,8 +872,8 @@ export function StudyRoom(p: Props) {
       closingTween.current = gsap.to(node, {
         opacity: 0,
         x: dockEnabled ? 0 : -14,
-        y: dockEnabled && !p.reduced ? 16 : 0,
-        scale: dockEnabled ? (p.reduced ? 1 : 0.6) : 0.985,
+        y: dockEnabled && !p.reduced ? 6 : 0,
+        scale: dockEnabled ? (p.reduced ? 1 : 0.96) : 0.985,
         duration: dockEnabled ? (p.reduced ? 0.15 : 0.2) : 0.18,
         ease: "power2.in",
         overwrite: true,
@@ -1071,7 +1064,6 @@ export function StudyRoom(p: Props) {
                 aria-label="Match my time of day"
                 checked={polish.settings.matchTime}
                 onCheckedChange={(matchTime) => {
-                  setWeatherChoice((v) => v + 1);
                   polish.update({ matchTime });
                 }}
               />
@@ -1100,56 +1092,6 @@ export function StudyRoom(p: Props) {
                 </Button>
               ))}
             </div>
-            <WeatherMatch
-              scene={tone}
-              sceneVersion={weatherChoice}
-              onChoose={(value) => {
-                polish.update({ matchTime: false });
-                setTone(value);
-              }}
-            />
-            {dockEnabled ? (
-              <div className="dock-mix" role="group" aria-label="Room textures">
-                {(
-                  [
-                    ["rain", "Rain"],
-                    ["fire", "Fire"],
-                    ["cafe", "Café"],
-                    ["pad", "Lo-fi hush"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label key={key}>
-                    <span>{label}</span>
-                    <input
-                      aria-label={label}
-                      type="range"
-                      min="0"
-                      max="1"
-                      step=".01"
-                      value={polish.settings.mix[key]}
-                      onChange={(e) =>
-                        polish.update({
-                          mix: {
-                            ...polish.settings.mix,
-                            [key]: Number(e.target.value),
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                ))}
-              </div>
-            ) : null}
-            <SoundMixControls
-              settings={polish.settings}
-              update={polish.update}
-              onQuiet={() => {
-                polish.update({ muted: true });
-                p.onReduced(true);
-                p.onSound(false);
-                setSoundscape("off");
-              }}
-            />
           </>
         );
       case "finished":
@@ -1622,16 +1564,6 @@ export function StudyRoom(p: Props) {
               <Moon size={16} />
               {sleeping ? "Wake Todo gently" : "Let Todo rest"}
             </Button>
-            <SoundMixControls
-              settings={polish.settings}
-              update={polish.update}
-              onQuiet={() => {
-                polish.update({ muted: true });
-                p.onReduced(true);
-                p.onSound(false);
-                setSoundscape("off");
-              }}
-            />
             <div
               className="cinema-outfit-choices"
               role="group"
@@ -2222,14 +2154,11 @@ export function StudyRoom(p: Props) {
             onEnd={done}
           />
         ) : null}
-        {p.active && !agentView && soundscape !== "off" ? (
+        {p.active && soundscape !== "off" ? (
           <RoomSoundPlayer
-            key={soundscape}
             recording={soundscape}
-            paused={
-              celebrating || Boolean(breakReturn) || polish.settings.muted
-            }
-            volume={polish.settings.volume}
+            paused={celebrating || Boolean(breakReturn)}
+            volume={0.5}
             onStop={() => setSoundscape("off")}
           />
         ) : null}

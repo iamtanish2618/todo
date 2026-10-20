@@ -266,6 +266,11 @@ test("hardware frame budget while moving across dock and glass panel", async ({
 }) => {
   await enter(page);
   await dock(page, "ambience").click();
+  await page.getByRole("button", { name: "Rainy noise", exact: true }).click();
+  await expect(page.locator(".room-audio-state")).toHaveAttribute(
+    "data-state",
+    "playing",
+  );
   await page.waitForTimeout(1000);
   const sampling = page.evaluate(
     () =>
@@ -414,4 +419,230 @@ test("expanded focus pill leaves its neighbors clear and fast mode switches cann
     "data-dock-pane",
     "agent",
   );
+});
+
+test("retired Quiet shortcut restores motion once and Ambience contains only scene and recording controls", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "todo.settings.v1",
+      JSON.stringify({ reduced: true, sound: false }),
+    );
+    localStorage.setItem(
+      "todo.room.polish.v1",
+      JSON.stringify({ muted: true, mix: { rain: 1, fire: 1 } }),
+    );
+  });
+  await enter(page);
+  await expect(page.locator(".cozy-room")).not.toHaveClass(/cozy-room-reduced/);
+  await dock(page, "ambience").click();
+  await expect(
+    page.getByRole("button", { name: "Weather nearby", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Room sounds & comfort", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Quiet mode", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("group", { name: "Room textures", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem("todo.settings.v1")!).version,
+      ),
+    )
+    .toBe(2);
+});
+
+test("stopping motion mid-blink always opens both eyes", async ({ page }) => {
+  await enter(page);
+  await page.getByRole("button", { name: "Open room settings" }).click();
+  // Reproduce the exact stuck state at the instant the animation ticker stops.
+  await page
+    .locator(".room-pet")
+    .evaluate((n) => n.setAttribute("data-blink", "true"));
+  await page
+    .getByRole("switch", { name: "Gentler motion", exact: true })
+    .click();
+  await expect(page.locator(".room-pet")).toHaveAttribute(
+    "data-blink",
+    "false",
+  );
+  const eyes = await page
+    .locator(".room-idle-lid")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => new DOMMatrix(getComputedStyle(n).transform).m22),
+    );
+  expect(eyes).toEqual([0, 0]);
+  await page
+    .getByRole("switch", { name: "Gentler motion", exact: true })
+    .click();
+  await expect(page.locator(".cozy-room")).not.toHaveClass(/cozy-room-reduced/);
+});
+
+test("OS reduced motion keeps visible open eyes and remains respected", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "todo.settings.v1",
+      JSON.stringify({ reduced: true, sound: false }),
+    );
+    localStorage.setItem(
+      "todo.room.polish.v1",
+      JSON.stringify({ muted: true }),
+    );
+  });
+  await enter(page);
+  await expect(page.locator(".cozy-room")).toHaveClass(/cozy-room-reduced/);
+  await expect(page.locator(".room-pet")).toHaveAttribute(
+    "data-blink",
+    "false",
+  );
+  await expect(page.locator(".room-live-eye")).toHaveCount(2);
+});
+
+test("supplied audio loops play without an iframe, switch and stop; weather never selects audio", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await enter(page);
+  await dock(page, "ambience").click();
+  for (const [name, id] of [
+    ["Brown noise", "brown"],
+    ["White noise", "white"],
+    ["Rainy noise", "rain"],
+  ]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(page.locator(".room-audio-state")).toHaveAttribute(
+      "data-state",
+      "playing",
+    );
+    await expect(page.locator(".room-audio-state")).toHaveAttribute(
+      "data-recording",
+      id,
+    );
+    await expect(page.locator(".room-audio-state")).toHaveAttribute(
+      "data-loop",
+      "true",
+    );
+    expect(
+      Number(
+        await page.locator(".room-audio-state").getAttribute("data-frames"),
+      ),
+    ).toBeGreaterThan(350000);
+    await page.getByRole("button", { name: "Day", exact: true }).click();
+    await expect(page.locator(".room-audio-state")).toHaveAttribute(
+      "data-recording",
+      id,
+    );
+  }
+  await page.getByRole("button", { name: "Sound off", exact: true }).click();
+  await expect(page.locator(".room-audio-state")).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("decoded audio crosses each loop boundary with no inserted silence", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const checks = await page.evaluate(async () => {
+    const results = [];
+    for (const id of ["white", "brown", "rain"]) {
+      const offline = new OfflineAudioContext(2, 13230, 44100);
+      const bytes = await (
+        await fetch(`/audio/${id}-noise-loop.wav`)
+      ).arrayBuffer();
+      const buffer = await offline.decodeAudioData(bytes);
+      const source = offline.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.connect(offline.destination);
+      const boundary = 6615;
+      source.start(0, (buffer.length - boundary) / 44100);
+      const rendered = await offline.startRendering();
+      const data = rendered.getChannelData(0),
+        original = buffer.getChannelData(0);
+      const rms = (start: number) =>
+        Math.sqrt(
+          data.slice(start, start + 441).reduce((sum, v) => sum + v * v, 0) /
+            441,
+        );
+      results.push({
+        id,
+        before: rms(boundary - 441),
+        after: rms(boundary),
+        boundaryError: Math.abs(data[boundary] - original[0]),
+        tailError: Math.abs(data[boundary - 1] - original[buffer.length - 1]),
+      });
+    }
+    return results;
+  });
+  for (const check of checks) {
+    expect(check.before).toBeGreaterThan(0.001);
+    expect(check.after).toBeGreaterThan(0.001);
+    expect(check.boundaryError).toBeLessThan(0.00001);
+    expect(check.tailError).toBeLessThan(0.00001);
+  }
+  await fs.writeFile(
+    "outputs/todo-audio-browser-checks.json",
+    JSON.stringify(checks, null, 2),
+  );
+});
+
+test("shooting-star cursor stays visible on the light rendering path and dock hover stays gentle", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "hardwareConcurrency", {
+      configurable: true,
+      get: () => 4,
+    }),
+  );
+  await enter(page);
+  await page.mouse.move(1050, 700, { steps: 8 });
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-quality",
+    "low",
+  );
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-custom-cursor",
+    "true",
+  );
+  const star = await page
+    .locator(".cinema-cursor-dot")
+    .evaluate((n) => getComputedStyle(n, "::after").content);
+  expect(star).toContain("✦");
+  await dock(page, "notes").hover();
+  await page.waitForTimeout(350);
+  const scales = await page
+    .locator(".todo-dock-wave")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => new DOMMatrix(getComputedStyle(n).transform).m11),
+    );
+  expect(Math.max(...scales)).toBeLessThanOrEqual(1.251);
+  await dock(page, "notes").click();
+  const sizes = await page.locator(".dock-panel").evaluate(
+    (n) =>
+      new Promise<number[]>((resolve) => {
+        const samples: number[] = [];
+        const tick = () => {
+          samples.push(new DOMMatrix(getComputedStyle(n).transform).m11);
+          if (samples.length === 35) resolve(samples);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+  );
+  expect(Math.max(...sizes)).toBeLessThanOrEqual(1.001);
+  expect(Math.min(...sizes)).toBeGreaterThanOrEqual(0.95);
+  await page.screenshot({ path: "outputs/todo-gentle-dock-cursor.png" });
 });

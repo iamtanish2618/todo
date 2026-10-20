@@ -1,8 +1,8 @@
-/** Exact user-selected recordings. Weather deliberately has no audio mapping. */
+/** User-supplied recordings, trimmed and circularly crossfaded. Weather stays independent. */
 export const SOUND_RECORDINGS = {
-  white: { label: "White noise", videoId: "ooyuJ-01TS0" },
-  brown: { label: "Brown noise", videoId: "InlECJg9FFw" },
-  rain: { label: "Rainy noise", videoId: "CpS5Ex1Wx-4" },
+  white: { label: "White noise", src: "/audio/white-noise-loop.wav" },
+  brown: { label: "Brown noise", src: "/audio/brown-noise-loop.wav" },
+  rain: { label: "Rainy noise", src: "/audio/rain-noise-loop.wav" },
 } as const;
 export type Recording = keyof typeof SOUND_RECORDINGS;
 export type Soundscape = "off" | Recording;

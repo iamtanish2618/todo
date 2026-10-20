@@ -348,7 +348,7 @@ export function useRoomCinema(
       setData(
         element,
         "customCursor",
-        pointerMedia.matches && motion && pointerSeen && !low,
+        pointerMedia.matches && motion && pointerSeen,
       );
       // Coarse frame-time adaptation only decreases decorative work; it cannot affect timers.
       if (frame++ < 45 && dt > 0.028) slowFrames++;
@@ -380,16 +380,16 @@ export function useRoomCinema(
         element.style.setProperty("--depth-x", depthX);
       if (element.style.getPropertyValue("--depth-y") !== depthY)
         element.style.setProperty("--depth-y", depthY);
-      if (motion && pointerMedia.matches && !low) {
+      if (motion && pointerMedia.matches) {
         dot.style.transform = `translate3d(${px}px,${py}px,0) scale(${hover ? 1.2 : 1})`;
         trailPoints.forEach((point, i) => {
           const prev = i ? trailPoints[i - 1] : { x: px, y: py };
           point.x += (prev.x - point.x) * 0.25;
           point.y += (prev.y - point.y) * 0.25;
           trails[i].style.transform =
-            `translate3d(${point.x}px,${point.y}px,0)`;
+            `translate3d(${point.x}px,${point.y}px,0) scale(${1 - i * 0.13})`;
           trails[i].style.opacity = String(
-            now - lastInput < 350 ? 0.15 * (1 - i / 5) : 0,
+            now - lastInput < 350 ? 0.3 * (1 - i / 5) : 0,
           );
         });
         ring.style.transform = `translate3d(${trailPoints[0].x}px,${trailPoints[0].y}px,0) scale(${hover ? 1 : 0.35})`;

@@ -187,7 +187,21 @@ export default function TodoApp({
       const settings = JSON.parse(
         localStorage.getItem("todo.settings.v1") || "{}",
       );
-      setReduced(Boolean(settings.reduced || preference.matches));
+      let wasMuted = false;
+      try {
+        wasMuted =
+          JSON.parse(localStorage.getItem("todo.room.polish.v1") || "{}")
+            .muted === true;
+      } catch {}
+      // Retire the old Quiet-mode shortcut once, while honoring OS accessibility.
+      const oldQuiet =
+        settings.version !== 2 &&
+        settings.reduced === true &&
+        settings.sound === false &&
+        wasMuted;
+      setReduced(
+        Boolean((!oldQuiet && settings.reduced) || preference.matches),
+      );
       setSound(settings.sound ?? false);
       const saved = identity
         ? JSON.parse(localStorage.getItem(timerStorageKey) || "null")
@@ -217,7 +231,7 @@ export default function TodoApp({
     try {
       localStorage.setItem(
         "todo.settings.v1",
-        JSON.stringify({ reduced, sound }),
+        JSON.stringify({ version: 2, reduced, sound }),
       );
     } catch {}
   }, [reduced, sound]);

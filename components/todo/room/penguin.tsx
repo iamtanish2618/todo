@@ -31,8 +31,13 @@ export function RoomPenguin({
     [],
   );
   useEffect(() => {
-    if (!active || reduced || !root.current) return;
+    if (!root.current) return;
     const element = root.current;
+    // Stopping the ticker during a blink must never freeze the eyelids shut.
+    element.dataset.blink = "false";
+    element.style.setProperty("--gaze-x", "0px");
+    element.style.setProperty("--gaze-y", "0px");
+    if (!active || reduced) return;
     let removeTick = () => {},
       disposed = false,
       rect = element.getBoundingClientRect();
@@ -107,6 +112,7 @@ export function RoomPenguin({
     return () => {
       disposed = true;
       removeTick();
+      element.dataset.blink = "false";
       window.removeEventListener("pointermove", pointer);
       window.removeEventListener("resize", measure);
       document.removeEventListener("pointerleave", leave);

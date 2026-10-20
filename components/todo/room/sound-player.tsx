@@ -1,70 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, VolumeX } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { SOUND_RECORDINGS, type Recording } from "./ambience";
 
-type Player = {
-  playVideo: () => void;
-  pauseVideo: () => void;
-  setVolume: (volume: number) => void;
-  destroy: () => void;
-};
-type PlayerEvent = { target: Player; data: number };
-type YouTube = {
-  Player: new (
-    element: HTMLElement,
-    options: {
-      videoId: string;
-      host: string;
-      width: string;
-      height: string;
-      playerVars: Record<string, string | number>;
-      events: {
-        onReady: (event: PlayerEvent) => void;
-        onStateChange: (event: PlayerEvent) => void;
-        onError: (event: PlayerEvent) => void;
-        onAutoplayBlocked: () => void;
-      };
-    },
-  ) => Player;
-};
-declare global {
-  interface Window {
-    YT?: YouTube;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-let apiReady: Promise<YouTube> | null = null;
-/** Load the official player only after a recording is explicitly selected. */
-function loadPlayerAPI() {
-  if (window.YT?.Player) return Promise.resolve(window.YT);
-  if (apiReady) return apiReady;
-  apiReady = new Promise<YouTube>((resolve, reject) => {
-    const previous = window.onYouTubeIframeAPIReady;
-    const script = document.createElement("script");
-    const fail = () => {
-      clearTimeout(timeout);
-      script.remove();
-      window.onYouTubeIframeAPIReady = previous;
-      apiReady = null;
-      reject(new Error("YouTube could not load."));
-    };
-    const timeout = setTimeout(fail, 15000);
-    window.onYouTubeIframeAPIReady = () => {
-      clearTimeout(timeout);
-      previous?.();
-      if (window.YT?.Player) resolve(window.YT);
-      else fail();
-    };
-    script.src = "https://www.youtube.com/iframe_api";
-    script.onerror = fail;
-    document.head.appendChild(script);
-  });
-  return apiReady;
-}
-
-/** The video stays visible during focus; we never extract or hide YouTube audio. */
+/** Decode once, then let the audio thread loop sample-accurately. No media player,
+ * encoder padding, onended restart, or main-thread timer sits at the loop boundary. */
 export function RoomSoundPlayer({
   recording,
   paused,
@@ -76,144 +15,125 @@ export function RoomSoundPlayer({
   volume?: number;
   onStop: () => void;
 }) {
-  const mount = useRef<HTMLDivElement>(null);
-  const player = useRef<Player | null>(null);
-  const volumeRef = useRef(volume);
-  volumeRef.current = volume;
+  const context = useRef<AudioContext | null>(null);
+  const gain = useRef<GainNode | null>(null);
+  const buffers = useRef(new Map<Recording, AudioBuffer>());
+  const latest = useRef({ paused, volume });
+  latest.current = { paused, volume };
+  const [status, setStatus] = useState("loading");
+  const [frames, setFrames] = useState(0);
   useEffect(() => {
-    player.current?.setVolume(Math.round(volume * 50));
-  }, [volume]);
-  const suspended = useRef(paused);
-  suspended.current = paused;
-  const wasPlaying = useRef(false);
-  const resumeAfterCelebration = useRef(false);
-  const [status, setStatus] = useState("Loading recording…");
-  const [failed, setFailed] = useState(false);
-  const source = SOUND_RECORDINGS[recording];
+    const ctx = new AudioContext({ sampleRate: 44100 });
+    context.current = ctx;
+    void ctx.resume().catch(() => setStatus("blocked"));
+    return () => {
+      context.current = null;
+      // Give the source cleanup its short fade before releasing the audio device.
+      setTimeout(() => {
+        void ctx.close().catch(() => {});
+      }, 200);
+    };
+  }, []);
   useEffect(() => {
-    let disposed = false;
-    let current: Player | null = null;
-    let readiness: ReturnType<typeof setTimeout> | undefined;
-    setStatus("Loading recording…");
-    setFailed(false);
-    // YouTube replaces its mount node; isolate that mutation from React's DOM.
-    const container = mount.current!;
-    const target = document.createElement("div");
-    container.appendChild(target);
-    void loadPlayerAPI()
-      .then((YT) => {
-        if (disposed) return;
-        readiness = setTimeout(() => {
-          if (!disposed) {
-            setStatus("Press play in the video, or open it on YouTube.");
-            setFailed(true);
-          }
-        }, 15000);
-        current = new YT.Player(target, {
-          host: "https://www.youtube-nocookie.com",
-          width: "100%",
-          height: "200",
-          videoId: source.videoId,
-          playerVars: {
-            origin: window.location.origin,
-            autoplay: 0,
-            playsinline: 1,
-            controls: 1,
-            loop: 1,
-            playlist: source.videoId,
-            rel: 0,
-          },
-          events: {
-            onReady: ({ target: ready }) => {
-              if (disposed) return;
-              clearTimeout(readiness);
-              player.current = ready;
-              ready.setVolume(Math.round(volumeRef.current * 50));
-              setStatus("Press play in the video if it hasn't started.");
-              if (!suspended.current) ready.playVideo();
-            },
-            onStateChange: ({ data }) => {
-              if (disposed) return;
-              if (data === 1 && suspended.current) {
-                player.current?.pauseVideo();
-                return;
-              }
-              if (data === 1) {
-                setStatus("Playing on YouTube");
-                setFailed(false);
-              } else if (data === 2) setStatus("Paused");
-              else if (data === 3) setStatus("Buffering…");
-              wasPlaying.current = data === 1;
-            },
-            onAutoplayBlocked: () => {
-              if (!disposed) setStatus("Press play in the video to listen.");
-            },
-            onError: () => {
-              if (disposed) return;
-              clearTimeout(readiness);
-              setStatus("This recording can't play here. Open it on YouTube.");
-              setFailed(true);
-            },
-          },
+    const ctx = context.current;
+    if (!ctx) return;
+    const controller = new AbortController();
+    let disposed = false,
+      source: AudioBufferSourceNode | null = null,
+      level: GainNode | null = null;
+    setStatus("loading");
+    void (async () => {
+      let buffer = buffers.current.get(recording);
+      if (!buffer) {
+        const response = await fetch(SOUND_RECORDINGS[recording].src, {
+          signal: controller.signal,
         });
-      })
-      .catch(() => {
-        if (!disposed) {
-          setFailed(true);
-          setStatus("YouTube couldn't load. Open the recording below.");
-        }
-      });
+        if (!response.ok) throw new Error("Recording unavailable");
+        buffer = await ctx.decodeAudioData(await response.arrayBuffer());
+        if (disposed) return;
+        buffers.current.set(recording, buffer);
+      }
+      if (disposed) return;
+      if (ctx.state !== "running") setStatus("blocked");
+      await ctx.resume();
+      if (disposed) return;
+      source = ctx.createBufferSource();
+      level = ctx.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      source.loopStart = 0;
+      source.loopEnd = buffer.duration;
+      level.gain.setValueAtTime(0, ctx.currentTime);
+      level.gain.linearRampToValueAtTime(
+        latest.current.paused ? 0 : latest.current.volume,
+        ctx.currentTime + 0.25,
+      );
+      source.connect(level);
+      level.connect(ctx.destination);
+      gain.current = level;
+      source.start(ctx.currentTime + 0.015);
+      setFrames(buffer.length);
+      setStatus(ctx.state === "running" ? "playing" : "blocked");
+    })().catch(() => {
+      if (!disposed) setStatus("error");
+    });
     return () => {
       disposed = true;
-      clearTimeout(readiness);
-      current?.destroy();
-      player.current = null;
-      container.replaceChildren();
+      controller.abort();
+      if (gain.current === level) gain.current = null;
+      if (source && level && ctx.state !== "closed") {
+        const oldSource = source,
+          oldLevel = level;
+        oldLevel.gain.cancelScheduledValues(ctx.currentTime);
+        oldLevel.gain.setValueAtTime(oldLevel.gain.value, ctx.currentTime);
+        oldLevel.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.15);
+        oldSource.stop(ctx.currentTime + 0.17);
+        oldSource.onended = () => {
+          oldSource.disconnect();
+          oldLevel.disconnect();
+        };
+      }
     };
-  }, [source.videoId]);
+  }, [recording]);
   useEffect(() => {
-    if (paused) {
-      resumeAfterCelebration.current = wasPlaying.current;
-      player.current?.pauseVideo();
-    } else if (resumeAfterCelebration.current) {
-      resumeAfterCelebration.current = false;
-      player.current?.playVideo();
-    }
-  }, [paused]);
+    const ctx = context.current,
+      level = gain.current;
+    if (!ctx || !level || ctx.state === "closed") return;
+    level.gain.cancelScheduledValues(ctx.currentTime);
+    level.gain.setTargetAtTime(paused ? 0 : volume, ctx.currentTime, 0.08);
+  }, [paused, volume]);
+  if (status === "error" || status === "blocked")
+    return (
+      <p className="room-audio-notice" role="status">
+        {status === "blocked"
+          ? "Tap to play your sound."
+          : "That recording could not load."}
+        {status === "blocked" ? (
+          <button
+            onClick={() =>
+              void context.current
+                ?.resume()
+                .then(() => setStatus("playing"))
+                .catch(() => setStatus("error"))
+            }
+          >
+            Play sound
+          </button>
+        ) : null}
+        <button onClick={onStop}>Sound off</button>
+      </p>
+    );
   return (
-    <section
-      className="room-recording-player"
-      aria-label={`${source.label} player`}
+    <span
+      className="room-audio-state sr-only"
+      role="status"
+      data-state={paused ? "paused" : status}
+      data-recording={recording}
+      data-loop="true"
+      data-frames={frames}
+      data-sample-rate="44100"
     >
-      <header>
-        <span>{source.label}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Stop sound"
-          onClick={onStop}
-        >
-          <VolumeX size={15} />
-        </Button>
-      </header>
-      <div className="room-youtube-mount" ref={mount} />
-      <footer>
-        <span
-          role="status"
-          title={status}
-          className={failed ? "recording-unavailable" : ""}
-        >
-          {status}
-        </span>
-        <a
-          href={`https://www.youtube.com/watch?v=${source.videoId}`}
-          target="_blank"
-          rel="noopener"
-          aria-label={`Open ${source.label} on YouTube`}
-        >
-          YouTube <ExternalLink size={11} />
-        </a>
-      </footer>
-    </section>
+      {SOUND_RECORDINGS[recording].label}: {paused ? "paused" : status}
+    </span>
   );
 }

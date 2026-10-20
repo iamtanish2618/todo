@@ -416,3 +416,5 @@
 /* Small labels use the stronger ink over glass; muted ink stays on cream fields. */
 .cozy-room[data-dock="true"] .dock-panel :is(.room-helper,.room-field,.room-soft-notice,.room-empty,.room-setting,.room-eyebrow,.cinema-time-match,.dock-focus-row > strong,.dock-mix label) { color:#2a2622; }
 .cozy-room[data-dock="true"] .dock-panel .room-sound-choices button { color:#3b3029; }
+.room-audio-notice { position:absolute; z-index:28; left:50%; bottom:17%; translate:-50% 0; max-width:75%; padding:10px 16px; border-radius:999px; background:#f2e8daf2; color:#3d3029; font-size:12px; box-shadow:0 4px 20px #211c2426; }
+.room-audio-notice button { margin-left:10px; text-decoration:underline; text-underline-offset:3px; }

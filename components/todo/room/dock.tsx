@@ -15,8 +15,8 @@ import "./dock.css";
 export type DockItem = "notes" | "ambience" | "focus" | "friends" | "agent";
 export const DOCK_CONFIG = {
   enabled: true, // ?dock=0 restores the previous room UI without changing saved data.
-  wave: { maximum: 1.65, centerMaximum: 1.2, radius: 130, lerp: 0.18 },
-  bounce: { height: 18, delay: 0.07, follow: [1, 0.45, 0.2, 0.08, 0.04] },
+  wave: { maximum: 1.25, centerMaximum: 1.06, radius: 130, lerp: 0.18 },
+  bounce: { height: 7, delay: 0.07, follow: [1, 0.45, 0.2, 0.08, 0.04] },
 };
 const ITEMS = [
   { id: "notes", label: "Notes", Icon: BookOpen },
@@ -175,7 +175,7 @@ export function RoomDock({
           .to(node, { y: 0, duration: 0.2, ease: "power2.in" }, at + 0.19)
           .to(
             node,
-            { y: y * 0.6, duration: 0.17, ease: "power2.out" },
+            { y: y * 0.3, duration: 0.17, ease: "power2.out" },
             at + 0.39,
           )
           .to(node, { y: 0, duration: 0.23, ease: "power2.in" }, at + 0.56);

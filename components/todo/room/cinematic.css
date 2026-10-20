@@ -2002,3 +2002,6 @@
 .cinema-snow-sky { filter: saturate(.3) brightness(1.12); }
 .room-window-world[data-weather="snow"] :is(.room-morning-sky,.room-evening-sky) { opacity:0; }
 .room-window-world[data-weather="snow"] .cinema-window-frost { inset:7% 46% 56% 27%; background:radial-gradient(ellipse at 0 0,#eafaffcc,transparent 65%),radial-gradient(ellipse at 100% 100%,#eafaffaa,transparent 60%); }
+/* A small warm shooting star with a fading comet trail; keep its darker core legible. */
+.cinema-cursor-dot::after { content:"✦"; position:absolute; inset:-5px; display:grid; place-items:center; font-style:normal; font-size:15px; line-height:1; color:#b77424; text-shadow:0 0 1px #fff9db,0 0 5px #ffe7a9,0 0 12px #ffd171; }
+.cinema-cursor-trail { background:#d9a85e; box-shadow:0 0 5px #ffde9b99; }

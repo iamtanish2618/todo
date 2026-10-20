@@ -659,169 +659,25 @@ test("morning replaces the moon; lamp leaves no hand; real writing and coffee fl
   expect(errors).toEqual([]);
 });
 
-// Mock the official player boundary for deterministic lifecycle assertions.
-// Actual third-party playback is checked separately in the visible browser.
-async function mockRecordingPlayer(page: Page, mode = "play") {
-  await page.route("https://www.youtube.com/iframe_api", (route) =>
-    route.fulfill({
-      contentType: "application/javascript",
-      body: `
-      window.__recordingEvents = [];
-      window.YT = {Player: class {
-        constructor(node, options) {
-          this.options = options;
-          this.frame = document.createElement('iframe');
-          this.frame.title = options.videoId;
-          this.frame.src = '/recording-test-frame';
-          this.frame.style.width = '100%';
-          this.frame.style.height = '200px';
-          node.replaceWith(this.frame);
-          window.__recordingEvents.push(['create', options.videoId, options.playerVars]);
-          queueMicrotask(() => options.events.onReady({target: this}));
-        }
-        playVideo() {
-          window.__recordingEvents.push(['play', this.options.videoId]);
-          if (${JSON.stringify(mode)} === 'error') this.options.events.onError({target: this, data: 101});
-          else if (${JSON.stringify(mode)} === 'blocked') this.options.events.onAutoplayBlocked();
-          else this.options.events.onStateChange({target: this, data: 1});
-        }
-        pauseVideo() { window.__recordingEvents.push(['pause', this.options.videoId]); this.options.events.onStateChange({target: this, data: 2}); }
-        setVolume(value) { window.__recordingEvents.push(['volume', value]); }
-        destroy() { window.__recordingEvents.push(['destroy', this.options.videoId]); this.frame.remove(); }
-      }};
-      window.onYouTubeIframeAPIReady();
-    `,
-    }),
-  );
-  await page.route("**/recording-test-frame", (route) =>
-    route.fulfill({
-      body: "<html><body>Test player boundary only</body></html>",
-      contentType: "text/html",
-    }),
-  );
-}
-
-test("Rain is a silent evening; exact recording choices survive weather changes and clean up on stop/exit (mock player boundary)", async ({
+test("local recording playback failure is honest and can be stopped", async ({
   page,
 }) => {
-  await mockRecordingPlayer(page);
-  const requests: string[] = [],
-    errors: string[] = [];
-  page.on("request", (request) => requests.push(request.url()));
-  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/audio/brown-noise-loop.wav", (route) =>
+    route.fulfill({ status: 500, body: "Unavailable" }),
+  );
   await enter(page);
   await page.getByRole("button", { name: "Ambience", exact: true }).click();
-  await page.getByRole("button", { name: "Rain", exact: true }).click();
-  await expect(page.locator(".room-window-world")).toHaveAttribute(
-    "data-sky",
-    "evening",
-  );
-  await expect(
-    page.getByRole("img", { name: "A rainy evening outside", exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".room-evening-sky")).toHaveCSS("opacity", "1");
-  await expect(
-    page.getByRole("button", { name: "Sound off", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".room-recording-player")).toHaveCount(0);
-  expect(requests.filter((url) => /youtube|quiet-rain/.test(url))).toEqual([]);
-  await page.screenshot({ path: "outputs/todo-silent-evening.png" });
-  await page.getByRole("button", { name: "White noise", exact: true }).click();
-  await expect(page.locator(".room-youtube-mount iframe")).toHaveAttribute(
-    "title",
-    "ooyuJ-01TS0",
-  );
-  await expect(
-    page.getByRole("link", { name: "Open White noise on YouTube" }),
-  ).toHaveAttribute("href", "https://www.youtube.com/watch?v=ooyuJ-01TS0");
-  await expect(
-    page.locator('.room-recording-player [role="status"]'),
-  ).toHaveText("Playing on YouTube");
-  await page.getByRole("button", { name: "Day", exact: true }).click();
-  await page.getByRole("button", { name: "Night", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "White noise", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  const events = () =>
-    page.evaluate(
-      () =>
-        (window as unknown as { __recordingEvents: unknown[][] })
-          .__recordingEvents,
-    );
-  expect((await events()).filter((e) => e[0] === "create")).toHaveLength(1);
-  await page.getByRole("button", { name: "Close panel", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Start table timer", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Focus", exact: true }).click();
-  await expect(page.locator(".cozy-room")).toHaveAttribute(
-    "data-working",
-    "true",
-  );
-  await expect(page.locator(".room-youtube-mount iframe")).toBeVisible();
-  for (const size of [
-    { width: 1440, height: 900 },
-    { width: 1024, height: 768 },
-  ]) {
-    await page.setViewportSize(size);
-    const box = (await page
-      .locator(".room-youtube-mount iframe")
-      .boundingBox())!;
-    expect(box.width).toBeGreaterThanOrEqual(200);
-    expect(box.height).toBeGreaterThanOrEqual(200);
-    expect(box.x).toBeGreaterThanOrEqual(0);
-    expect(box.y + box.height).toBeLessThanOrEqual(size.height);
-  }
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Ambience", exact: true }).click();
   await page.getByRole("button", { name: "Brown noise", exact: true }).click();
-  await expect(page.locator(".room-youtube-mount iframe")).toHaveAttribute(
-    "title",
-    "InlECJg9FFw",
-  );
-  await page.getByRole("button", { name: "Rainy noise", exact: true }).click();
-  await expect(page.locator(".room-youtube-mount iframe")).toHaveAttribute(
-    "title",
-    "CpS5Ex1Wx-4",
-  );
-  await expect(page.locator(".room-youtube-mount iframe")).toHaveCount(1);
-  await page.getByRole("button", { name: "Stop sound", exact: true }).click();
-  await expect(page.locator(".room-recording-player")).toHaveCount(0);
-  expect((await events()).filter((e) => e[0] === "destroy")).toHaveLength(3);
-  await page.getByRole("button", { name: "White noise", exact: true }).click();
-  await expect(page.locator(".room-youtube-mount iframe")).toBeVisible();
+  await expect(
+    page.getByText("That recording could not load.", { exact: false }),
+  ).toBeVisible();
   await page
-    .getByRole("button", { name: "Choose companion", exact: true })
+    .locator(".room-audio-notice")
+    .getByRole("button", { name: "Sound off", exact: true })
     .click();
-  await expect(page.locator(".room-recording-player")).toHaveCount(0);
-  expect((await events()).filter((e) => e[0] === "destroy")).toHaveLength(4);
-  expect(errors).toEqual([]);
+  await expect(page.locator(".room-audio-notice")).toHaveCount(0);
+  await expect(page.locator("iframe")).toHaveCount(0);
 });
-
-for (const mode of ["error", "blocked"]) {
-  test(`recording ${mode} gives an honest playback message and exact YouTube link (mock player boundary)`, async ({
-    page,
-  }) => {
-    await mockRecordingPlayer(page, mode);
-    await enter(page);
-    await page.getByRole("button", { name: "Ambience", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Brown noise", exact: true })
-      .click();
-    await expect(
-      page.locator('.room-recording-player [role="status"]'),
-    ).toHaveText(
-      mode === "error"
-        ? "This recording can't play here. Open it on YouTube."
-        : "Press play in the video to listen.",
-    );
-    await expect(
-      page.getByRole("link", { name: "Open Brown noise on YouTube" }),
-    ).toHaveAttribute("href", "https://www.youtube.com/watch?v=InlECJg9FFw");
-    await page.getByRole("button", { name: "Sound off", exact: true }).click();
-    await expect(page.locator(".room-youtube-mount")).toHaveCount(0);
-  });
-}
 
 test("custom focus setup darkens selected tasks, hides controls, prepares Todo and pauses accessibly", async ({
   page,

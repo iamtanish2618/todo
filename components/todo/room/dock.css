@@ -84,7 +84,7 @@
   opacity: 0.45;
 }
 .todo-dock-button:active {
-  scale: 0.94;
+  scale: 0.98;
   transition: scale 90ms;
 }
 .todo-dock-button:focus-visible,

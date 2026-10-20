@@ -77,7 +77,7 @@ test("bokeh entry wakes Todo and interactive props stay usable without changing 
   expect(errors).toEqual([]);
 });
 
-test("five scenes crossfade only inside the window, keep audio independent, and remember sound comfort", async ({
+test("five scenes crossfade only inside the window, keep audio independent, and keep Ambience minimal", async ({
   page,
 }) => {
   await enter(page);
@@ -99,34 +99,12 @@ test("five scenes crossfade only inside the window, keep audio independent, and 
     ).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("iframe")).toHaveCount(0);
   }
-  await page.getByText("Room sounds & comfort", { exact: true }).click();
-  await page.getByRole("slider", { name: "Master volume" }).fill("0.3");
-  await page.getByRole("slider", { name: "Warm pad" }).fill("0.2");
-  await page.getByRole("switch", { name: "Mute all room sounds" }).click();
-  await page.getByRole("switch", { name: "Match my time of day" }).click();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => JSON.parse(localStorage.getItem("todo.room.polish.v1")!).mix.pad,
-      ),
-    )
-    .toBe(0.2);
-  await page.reload();
-  await page
-    .getByRole("button", { name: "Focus with Todo", exact: true })
-    .click();
-  await expect(page.locator(".cozy-room")).toHaveAttribute(
-    "data-arriving",
-    "false",
-  );
-  await page.getByRole("button", { name: "Ambience", exact: true }).click();
-  await page.getByText("Room sounds & comfort", { exact: true }).click();
-  await expect(page.getByRole("slider", { name: "Master volume" })).toHaveValue(
-    "0.3",
-  );
   await expect(
-    page.getByRole("switch", { name: "Mute all room sounds" }),
-  ).toBeChecked();
+    page.getByText("Room sounds & comfort", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Quiet mode", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("focus keeps props calm, has a smooth ring and usable pause and +5 controls", async ({
@@ -268,78 +246,19 @@ test("reduced motion and low-power devices simplify decoration without breaking 
   ).toBeVisible();
 });
 
-test("local weather is opt-in, sends coarse coordinates, and respects manual scene changes", async ({
+test("Ambience never asks for location or sends a weather request", async ({
   page,
-  context,
 }) => {
-  await context.grantPermissions(["geolocation"], {
-    origin: "http://localhost:3000",
-  });
-  await context.setGeolocation({ latitude: 28.634, longitude: 77.227 });
-  const calls: string[] = [];
-  await page.route("https://api.open-meteo.com/**", async (route) => {
-    calls.push(route.request().url());
-    await route.fulfill({ json: { current: { weather_code: 73, is_day: 1 } } });
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("open-meteo")) requests.push(request.url());
   });
   await enter(page);
   await page.getByRole("button", { name: "Ambience", exact: true }).click();
-  expect(calls).toEqual([]);
-  await page.getByText("Weather nearby", { exact: true }).click();
-  await page
-    .getByRole("button", { name: "Use local weather", exact: true })
-    .click();
-  await expect(page.locator(".round-room-art")).toHaveAttribute(
-    "data-weather",
-    "snow",
-  );
-  expect(calls).toHaveLength(1);
-  const url = new URL(calls[0]);
-  expect(url.searchParams.get("latitude")).toBe("28.6");
-  expect(url.searchParams.get("longitude")).toBe("77.2");
-  await page.getByRole("button", { name: "Night", exact: true }).click();
-  await expect(page.locator(".round-room-art")).toHaveAttribute(
-    "data-weather",
-    "night",
-  );
-  expect(
-    await page.evaluate(() => localStorage.getItem("todo.room.polish.v1")),
-  ).not.toContain("28.6");
-});
-
-test("denied weather permission keeps the room usable and makes no weather request", async ({
-  page,
-}) => {
-  let calls = 0;
-  await page.route("https://api.open-meteo.com/**", (route) => {
-    calls++;
-    return route.abort();
-  });
-  await page.addInitScript(() =>
-    Object.defineProperty(navigator, "geolocation", {
-      configurable: true,
-      value: {
-        getCurrentPosition: (
-          _success: unknown,
-          error: (e: { code: number }) => void,
-        ) => error({ code: 1 }),
-      },
-    }),
-  );
-  await enter(page);
-  await page.getByRole("button", { name: "Ambience", exact: true }).click();
-  await page.getByText("Weather nearby", { exact: true }).click();
-  await page
-    .getByRole("button", { name: "Use local weather", exact: true })
-    .click();
   await expect(
-    page.getByText("No problem. Choose any scene you like.", { exact: true }),
-  ).toBeVisible();
-  expect(calls).toBe(0);
-  await page.getByRole("button", { name: "Day", exact: true }).click();
-  await expect(page.locator(".round-room-art")).toHaveAttribute(
-    "data-weather",
-    "morning",
-  );
+    page.getByRole("button", { name: "Weather nearby", exact: true }),
+  ).toHaveCount(0);
+  expect(requests).toEqual([]);
 });
 
 test("dragging reorders saved tasks without completing or selecting them", async ({

@@ -45,25 +45,25 @@ export function useDockPanelMotion(
     const context = gsap.context(() => {
       gsap.fromTo(
         panel,
-        { opacity: 0, scale: calm ? 1 : 0.6, y: calm ? 0 : 16 },
+        { opacity: 0, scale: calm ? 1 : 0.96, y: calm ? 0 : 7 },
         {
           opacity: 1,
           scale: 1,
           y: 0,
-          duration: calm ? 0.15 : 0.32,
-          ease: calm ? "none" : "back.out(1.15)",
+          duration: calm ? 0.15 : 0.36,
+          ease: calm ? "none" : "power3.out",
           clearProps: "transform,opacity",
         },
       );
       if (!calm)
         gsap.fromTo(
           panel.querySelectorAll(".room-panel-body > *"),
-          { opacity: 0, y: 8 },
+          { opacity: 0, y: 4 },
           {
             opacity: 1,
             y: 0,
             duration: 0.24,
-            stagger: 0.04,
+            stagger: 0.025,
             delay: 0.08,
             clearProps: "transform,opacity",
           },

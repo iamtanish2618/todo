@@ -1,12 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import {
   EMPTY_MIX,
   timeWeather,
   type EndCue,
-  type RoomMix,
   type RoomWeather,
 } from "./cinema-config";
 export const POLISH_DEFAULTS = {
@@ -29,27 +26,17 @@ export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
       const p = JSON.parse(localStorage.getItem("todo.room.polish.v1") || "{}");
       setSettings((v) => ({
         ...v,
-        volume:
-          typeof p.volume === "number"
-            ? Math.max(0, Math.min(1, p.volume))
-            : v.volume,
+        volume: 0.5,
         glass:
           typeof p.glass === "number" ? Math.max(0, Math.min(1, p.glass)) : 0,
-        muted: p.muted === true,
+        muted: false,
         matchTime: p.matchTime === true,
-        thunder: p.thunder === true,
+        thunder: false,
         cue: ["chime", "voice", "silent"].includes(p.cue) ? p.cue : v.cue,
         outfit: ["original", "glasses", "star"].includes(p.outfit)
           ? p.outfit
           : v.outfit,
-        mix: Object.fromEntries(
-          Object.keys(EMPTY_MIX).map((k) => [
-            k,
-            typeof p.mix?.[k] === "number"
-              ? Math.max(0, Math.min(1, p.mix[k]))
-              : 0,
-          ]),
-        ) as RoomMix,
+        mix: EMPTY_MIX,
       }));
     } catch {}
     setReady(true);
@@ -72,94 +59,6 @@ export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
     update: (patch: Partial<typeof POLISH_DEFAULTS>) =>
       setSettings((v) => ({ ...v, ...patch })),
   };
-}
-export function SoundMixControls({
-  settings,
-  update,
-  onQuiet,
-}: {
-  settings: typeof POLISH_DEFAULTS;
-  update: (patch: Partial<typeof POLISH_DEFAULTS>) => void;
-  onQuiet: () => void;
-}) {
-  return (
-    <details className="cinema-mixer">
-      <summary>Room sounds &amp; comfort</summary>
-      <label>
-        <span>Mute all room sounds</span>
-        <Switch
-          aria-label="Mute all room sounds"
-          checked={settings.muted}
-          onCheckedChange={(muted) => update({ muted })}
-        />
-      </label>
-      <label>
-        <span>Master volume</span>
-        <input
-          aria-label="Master volume"
-          type="range"
-          min="0"
-          max="1"
-          step=".01"
-          value={settings.volume}
-          onChange={(e) => update({ volume: Number(e.target.value) })}
-        />
-      </label>
-      {(
-        [
-          ["rain", "Soft rain"],
-          ["fire", "Warm crackle"],
-          ["cafe", "Café hush"],
-          ["waves", "Shoreline"],
-          ["pad", "Warm pad"],
-        ] as const
-      ).map(([key, label]) => (
-        <label key={key}>
-          <span>{label}</span>
-          <input
-            aria-label={label}
-            type="range"
-            min="0"
-            max="1"
-            step=".01"
-            value={settings.mix[key]}
-            onChange={(e) =>
-              update({
-                mix: { ...settings.mix, [key]: Number(e.target.value) },
-              })
-            }
-          />
-        </label>
-      ))}
-      <label>
-        <span>Distant lightning</span>
-        <Switch
-          aria-label="Distant lightning"
-          checked={settings.thunder}
-          onCheckedChange={(thunder) => update({ thunder })}
-        />
-      </label>
-      <label>
-        <span>Session ending</span>
-        <select
-          aria-label="Session ending sound"
-          value={settings.cue}
-          onChange={(e) => update({ cue: e.target.value as EndCue })}
-        >
-          <option value="chime">Soft chime</option>
-          <option value="voice">Todo’s voice</option>
-          <option value="silent">Silent</option>
-        </select>
-      </label>
-      <Button className="cinema-room-quiet" variant="outline" onClick={onQuiet}>
-        Quiet mode
-      </Button>
-      <p className="room-helper" style={{ fontSize: 11 }}>
-        Room textures are softly synthesized. Recordings above keep their
-        original players.
-      </p>
-    </details>
-  );
 }
 export function CountUp({
   value,
