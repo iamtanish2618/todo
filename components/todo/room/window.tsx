@@ -2,7 +2,7 @@ import { useId } from "react";
 import { ROOM_CONFIG as C } from "./config";
 
 /** Clip only the four glass panes. Woodwork stays registered to the original artwork. */
-export function RoomWindow({ day }: { day: boolean }) {
+export function RoomWindow({ sky }: { sky: "day" | "night" | "evening" }) {
   const id = `glass-${useId().replace(/:/g, "")}`;
   return (
     <>
@@ -18,14 +18,28 @@ export function RoomWindow({ day }: { day: boolean }) {
       </svg>
       <div
         className="room-window-world"
-        data-sky={day ? "day" : "night"}
+        data-sky={sky}
         style={{ clipPath: `url(#${id})` }}
         role="img"
-        aria-label={day ? "A sunny morning outside" : "A moonlit night outside"}
+        aria-label={
+          sky === "day"
+            ? "A sunny morning outside"
+            : sky === "evening"
+              ? "A rainy evening outside"
+              : "A moonlit night outside"
+        }
       >
         <img
           className="room-morning-sky"
           src={C.dayImage}
+          width={1536}
+          height={1024}
+          alt=""
+          aria-hidden="true"
+        />
+        <img
+          className="room-evening-sky"
+          src={C.eveningImage}
           width={1536}
           height={1024}
           alt=""
@@ -61,7 +75,7 @@ export function RoomWindow({ day }: { day: boolean }) {
       </div>
       <div
         className="room-morning-light"
-        data-morning={day}
+        data-morning={sky === "day"}
         aria-hidden="true"
       />
     </>

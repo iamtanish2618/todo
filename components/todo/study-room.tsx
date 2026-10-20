@@ -53,7 +53,9 @@ import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./room/config";
 import { CompletionCelebration } from "./room/celebration";
 import { RoomScene } from "./room/scene";
 import { RoomChat } from "./room/chat";
-import { startSoundscape, type Soundscape } from "./room/ambience";
+import { SOUND_RECORDINGS, type Soundscape } from "./room/ambience";
+import { RoomSoundPlayer } from "./room/sound-player";
+import "./room/sound-player.css";
 import { makeRoomPDF } from "./room/pdf";
 import "./room/room.css";
 import "./room/scene.css";
@@ -174,47 +176,9 @@ export function StudyRoom(p: Props) {
     [resting, setResting] = useState(false),
     [speechAvailable, setSpeechAvailable] = useState(false),
     [listening, setListening] = useState(false);
-  const ambienceAudio =
-    useRef<Awaited<ReturnType<typeof startSoundscape>>>(null);
-  const audioGeneration = useRef(0);
-  const soundLoad = useRef<AbortController | null>(null);
   useEffect(() => {
-    if (!p.active) {
-      soundLoad.current?.abort();
-      audioGeneration.current++;
-      ambienceAudio.current?.stop();
-      ambienceAudio.current = null;
-      setSoundscape("off");
-    }
-    return () => {
-      soundLoad.current?.abort();
-      audioGeneration.current++;
-      ambienceAudio.current?.stop();
-      ambienceAudio.current = null;
-    };
+    if (!p.active) setSoundscape("off");
   }, [p.active]);
-  const changeSoundscape = async (kind: Soundscape) => {
-    soundLoad.current?.abort();
-    const controller = new AbortController();
-    soundLoad.current = controller;
-    const generation = ++audioGeneration.current;
-    ambienceAudio.current?.stop();
-    ambienceAudio.current = null;
-    setSoundscape(kind);
-    try {
-      const audio = await startSoundscape(kind, 0.25, controller.signal);
-      if (generation !== audioGeneration.current) {
-        audio?.stop();
-        return;
-      }
-      ambienceAudio.current = audio;
-      soundLoad.current = null;
-    } catch {
-      if (controller.signal.aborted) return;
-      setSoundscape("off");
-      setError("Sound could not start. Please try again.");
-    }
-  };
   const recognizer = useRef<Recognition | null>(null),
     baseline = useRef(0),
     roomRoot = useRef<HTMLElement>(null),
@@ -242,16 +206,24 @@ export function StudyRoom(p: Props) {
     const room = new Image(),
       idle = new Image(),
       day = new Image(),
+      evening = new Image(),
       focused = new Image();
     room.src = C.image;
     day.src = C.dayImage;
+    evening.src = C.eveningImage;
     idle.src = p.female
       ? C.poses.idle.replace(".png", "-pink.png")
       : C.poses.idle;
     focused.src = p.female
       ? C.focusedPose.replace(".png", "-pink.png")
       : C.focusedPose;
-    Promise.all([room.decode(), idle.decode(), day.decode(), focused.decode()])
+    Promise.all([
+      room.decode(),
+      idle.decode(),
+      day.decode(),
+      evening.decode(),
+      focused.decode(),
+    ])
       .then(() => {
         if (!stopped) setLoaded(true);
       })
@@ -462,8 +434,6 @@ export function StudyRoom(p: Props) {
   };
   const chooseWeather = (next: "morning" | "night" | "rain") => {
     setTone(next);
-    if (next === "rain") void changeSoundscape("rain");
-    else if (soundscape === "rain") void changeSoundscape("off");
   };
   // Duration is queued before the start updater, so the deadline uses the new time.
   const launchFocus = (event: FormEvent) => {
@@ -696,15 +666,16 @@ export function StudyRoom(p: Props) {
               {(
                 [
                   ["off", "Sound off", VolumeX],
-                  ["day", "Morning", Sun],
-                  ["night", "Soft ambient · warm hush", AudioLines],
+                  ["white", SOUND_RECORDINGS.white.label, AudioLines],
+                  ["brown", SOUND_RECORDINGS.brown.label, AudioLines],
+                  ["rain", SOUND_RECORDINGS.rain.label, CloudRain],
                 ] as const
               ).map(([value, label, Icon]) => (
                 <Button
                   key={value}
                   variant="ghost"
                   aria-pressed={soundscape === value}
-                  onClick={() => void changeSoundscape(value)}
+                  onClick={() => setSoundscape(value)}
                 >
                   <Icon size={18} />
                   <span>{label}</span>
@@ -1356,7 +1327,9 @@ export function StudyRoom(p: Props) {
             female={p.female}
             reduced={p.reduced}
             active={p.active && loaded}
-            day={tone === "morning"}
+            sky={
+              tone === "morning" ? "day" : tone === "rain" ? "evening" : "night"
+            }
             focusing={quietFocus}
             clock={p.started ? p.clock : null}
           />
@@ -1571,6 +1544,14 @@ export function StudyRoom(p: Props) {
             </div>
           )}
         </div>
+        {p.active && soundscape !== "off" ? (
+          <RoomSoundPlayer
+            key={soundscape}
+            recording={soundscape}
+            paused={celebrating}
+            onStop={() => setSoundscape("off")}
+          />
+        ) : null}
         {quietBreak ? (
           <div
             className="room-break-actions"

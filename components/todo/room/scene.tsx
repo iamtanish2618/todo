@@ -13,7 +13,7 @@ export function RoomScene({
   female,
   reduced,
   active,
-  day,
+  sky,
   focusing,
   clock,
 }: {
@@ -21,7 +21,7 @@ export function RoomScene({
   female: boolean;
   reduced: boolean;
   active: boolean;
-  day: boolean;
+  sky: "day" | "night" | "evening";
   focusing: boolean;
   clock: string | null;
 }) {
@@ -64,9 +64,9 @@ export function RoomScene({
         src={C.image}
         width={1536}
         height={1024}
-        alt={`A miniature cozy room with an arched ${day ? "sunlit" : "moonlit"} window, plants, a chair and a complete round oak study table.`}
+        alt={`A miniature cozy room with an arched ${sky === "day" ? "sunlit" : sky === "evening" ? "rainy evening" : "moonlit"} window, plants, a chair and a complete round oak study table.`}
       />
-      <RoomWindow day={day} />
+      <RoomWindow sky={sky} />
       {clock ? (
         <div className="room-back-countdown" aria-hidden="true">
           {clock}
