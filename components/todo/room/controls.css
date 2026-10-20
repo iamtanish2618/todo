@@ -1,0 +1,198 @@
+/* The same glass treatment belongs to every tool, including focus and finished tasks. */
+.cozy-room .room-tool-panel {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-color: #ffffffb3;
+}
+.room-weather-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.room-weather-choices button {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 90px;
+  height: auto;
+  border: 1px solid #ffffff80;
+  background: #ffffff28;
+  border-radius: 16px;
+  color: #776551;
+}
+.room-weather-choices button[aria-pressed="true"] {
+  background: #ead8b9a6;
+  border-color: #bda27d66;
+  color: #5f4932;
+}
+.room-sound-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.room-sound-choices button {
+  justify-content: flex-start;
+  gap: 12px;
+  height: 55px;
+  border: 1px solid #ffffff75;
+  border-radius: 14px;
+  background: #fff6;
+  white-space: normal;
+  text-align: left;
+  font-size: 12px;
+  color: #74614d;
+}
+.room-sound-choices button[aria-pressed="true"] {
+  background: #dbc5a394;
+  border-color: #b89d7766;
+  color: #58412c;
+}
+.room-sound-choices svg {
+  flex-shrink: 0;
+}
+.room-time-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.room-time-presets button {
+  min-height: 42px;
+  background: #fff4;
+  border: 1px solid #ffffff60;
+}
+.room-minute-field {
+  padding: 3px 0;
+}
+.room-focus-panel .room-panel-heading {
+  align-items: center;
+}
+.room-focus-panel .room-panel-heading h2 {
+  margin: 0;
+}
+.room-focus-panel .room-panel-body {
+  gap: 12px;
+}
+.room-finished-link {
+  justify-content: space-between;
+  font-size: 12px;
+  color: #755c43;
+  background: #ffffff38;
+  border: 1px solid #ffffff70;
+}
+.room-finished-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.room-finished-task {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 10px;
+  background: #ffffff45;
+  border: 1px solid #ffffff75;
+  border-radius: 13px;
+}
+.room-finished-task > svg {
+  color: #718173;
+  flex-shrink: 0;
+}
+.room-finished-task > div {
+  flex: 1;
+  min-width: 0;
+}
+.room-finished-task h3 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+.room-finished-task p {
+  margin: 5px 0 0;
+  color: #7e705f;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.room-finished-task button {
+  padding: 0 6px;
+  font-size: 10px;
+  color: #8a7560;
+}
+.cozy-room .room-home-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 75px;
+}
+.room-home-card form {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cozy-room .room-home-card h1 {
+  margin: 0;
+  font-size: clamp(17px, 1.7cqw, 24px);
+}
+.room-home-card .room-intention-form {
+  flex: 0 0 auto;
+}
+.room-back-countdown {
+  position: absolute;
+  z-index: 2;
+  left: 19%;
+  top: 16.5%;
+  width: 62%;
+  text-align: center;
+  color: #fff5df;
+  opacity: 0.15;
+  font-size: 10cqw;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.065em;
+  line-height: 1.2;
+  pointer-events: none;
+  user-select: none;
+  text-shadow: 0 2px 12px #fff5df20;
+}
+/* A glazed stoneware cup replaces the flat CSS teacup, both on the table and in Todo's flippers. */
+.round-room-art .room-table-coffee {
+  left: 34.2%;
+  top: 56.6%;
+  width: 6.2%;
+  height: 9.3%;
+  transform: rotate(-3deg);
+  filter: none;
+}
+.room-table-coffee .room-ceramic-mug {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.room-table-coffee .ceramic-vessel {
+  transition: opacity 0.65s;
+}
+.round-room-art[data-pose="tea"] .room-table-coffee .ceramic-vessel {
+  opacity: 0;
+}
+.room-table-coffee .steam {
+  left: 40%;
+  top: -12%;
+  height: 31%;
+  width: 7%;
+  opacity: 0.18;
+}
+.room-table-coffee .steam-two {
+  left: 55%;
+}
+
+.cozy-room .room-sit-status button {
+  font-size: 12px;
+}
+.cozy-room .room-sit-status h2 {
+  font-size: clamp(15px, 1.5cqw, 21px);
+}

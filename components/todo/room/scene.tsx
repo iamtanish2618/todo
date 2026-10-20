@@ -4,6 +4,7 @@ import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./config";
 import { RoomPenguin } from "./penguin";
 import { RoomWindow } from "./window";
 import { DeskNotebook } from "./notebook";
+import { CeramicMug } from "./mug";
 import { WorkingFlippers } from "./flippers";
 
 /** A fixed camera and separate object layers give the table genuine occlusion. */
@@ -14,6 +15,7 @@ export function RoomScene({
   active,
   day,
   focusing,
+  clock,
 }: {
   pose: RoomPose;
   female: boolean;
@@ -21,6 +23,7 @@ export function RoomScene({
   active: boolean;
   day: boolean;
   focusing: boolean;
+  clock: string | null;
 }) {
   const [ready, setReady] = useState(reduced);
   const [lamp, setLamp] = useState(false);
@@ -64,6 +67,11 @@ export function RoomScene({
         alt={`A miniature cozy room with an arched ${day ? "sunlit" : "moonlit"} window, plants, a chair and a complete round oak study table.`}
       />
       <RoomWindow day={day} />
+      {clock ? (
+        <div className="room-back-countdown" aria-hidden="true">
+          {clock}
+        </div>
+      ) : null}
       <div
         className="room-contact-shadow"
         style={zoneStyle(C.shadow)}
@@ -122,10 +130,7 @@ export function RoomScene({
       <div className="coffee-cup room-table-coffee" aria-hidden="true">
         <i className="steam steam-one" />
         <i className="steam steam-two" />
-        <span className="cup-top" />
-        <span className="cup-body" />
-        <span className="cup-handle" />
-        <span className="cup-saucer" />
+        <CeramicMug />
       </div>
     </div>
   );

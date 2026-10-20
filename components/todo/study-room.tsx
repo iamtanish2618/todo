@@ -16,6 +16,8 @@ import {
   CheckCheck,
   Coffee,
   CloudRain,
+  AudioLines,
+  VolumeX,
   Sun,
   FileDown,
   LampDesk,
@@ -56,9 +58,11 @@ import { makeRoomPDF } from "./room/pdf";
 import "./room/room.css";
 import "./room/scene.css";
 import "./room/calm.css";
+import "./room/controls.css";
 
 type Pane =
   | "focus"
+  | "finished"
   | "ambience"
   | "tasks"
   | "notes"
@@ -85,6 +89,7 @@ type Props = {
   running: boolean;
   started: boolean;
   task: string;
+  taskId?: string | null;
   phase: "focus" | "break";
   agentBusy: boolean;
   agentMode: boolean;
@@ -107,7 +112,7 @@ type Props = {
   onSound: (value: boolean) => void;
   onBusy: (value: boolean) => void;
   onAgentMode: (mode: boolean) => void;
-  onTask: (task: string, begin?: boolean) => void;
+  onTask: (task: string, begin?: boolean, taskId?: string) => void;
   onStart: () => void;
   onFinish: () => Promise<boolean>;
   onExit: () => void;
@@ -138,7 +143,6 @@ export function StudyRoom(p: Props) {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [draft, setDraft] = useState(""),
-    [filter, setFilter] = useState("all"),
     [chosen, setChosen] = useState<string[]>([]);
   const [noteTitle, setNoteTitle] = useState(""),
     [noteText, setNoteText] = useState(""),
@@ -154,10 +158,10 @@ export function StudyRoom(p: Props) {
         ? "night"
         : "morning",
     ),
-    [rain, setRain] = useState(false),
     [soundscape, setSoundscape] = useState<Soundscape>("off"),
-    [volume, setVolume] = useState(0.25),
     [sleeping, setSleeping] = useState(false);
+  const rain = tone === "rain";
+  const [finishedAfterFocus, setFinishedAfterFocus] = useState(false);
   const [joining, setJoining] = useState("todo"),
     [friendCode, setFriendCode] = useState(""),
     [friendNotice, setFriendNotice] = useState("");
@@ -193,7 +197,7 @@ export function StudyRoom(p: Props) {
     ambienceAudio.current = null;
     setSoundscape(kind);
     try {
-      const audio = await startSoundscape(kind, volume, controller.signal);
+      const audio = await startSoundscape(kind, 0.25, controller.signal);
       if (generation !== audioGeneration.current) {
         audio?.stop();
         return;
@@ -375,34 +379,27 @@ export function StudyRoom(p: Props) {
     void work(async () => {
       const task = await api<Task>("/api/tasks", "POST", { title: draft });
       p.onTasks([task, ...p.tasks]);
-      if (!p.started && !p.task) p.onTask(task.title);
+      if (!p.started && !p.task) p.onTask(task.title, false, task.id);
       setDraft("");
     });
   };
   const toggle = async (task: Task) => {
     await work(async () => {
+      // Save the active sit before completing its task, so the finished record includes it.
+      const finishSit =
+        !task.done && p.started && p.phase === "focus" && p.taskId === task.id;
+      if (finishSit && !(await p.onFinish())) return;
       const next = await api<Task>("/api/tasks", "PATCH", {
         id: task.id,
         done: !task.done,
       });
       p.onTasks(p.tasks.map((t) => (t.id === next.id ? next : t)));
-      if (next.done) setChosen((v) => v.filter((id) => id !== next.id));
-      void refresh();
-      if (
-        next.done &&
-        chosen.includes(next.id) &&
-        p.started &&
-        p.phase === "focus"
-      ) {
-        const minutes = Math.max(
-          0,
-          Math.round((p.duration - p.remaining) / 60),
-        );
-        if (await p.onFinish()) {
-          setRecap({ minutes, tasks: 1 });
-          setPane("recap");
-        }
+      if (next.done) {
+        setChosen((v) => v.filter((id) => id !== next.id));
+        setFinishedAfterFocus(finishSit);
+        setPane("finished");
       }
+      void refresh();
     });
   };
   const focusTask = (task: Task) => {
@@ -410,7 +407,7 @@ export function StudyRoom(p: Props) {
       setChosen((v) => v.filter((id) => id !== task.id));
     else if (chosen.length < 3) {
       setChosen((v) => [...v, task.id]);
-      if (!p.started && !p.task) p.onTask(task.title);
+      if (!p.started && !p.task) p.onTask(task.title, false, task.id);
     } else
       setError(
         "Three is a good little handful. Put one back to choose another.",
@@ -461,17 +458,14 @@ export function StudyRoom(p: Props) {
   const exportNote = () =>
     void work(() => makeRoomPDF(noteTitle || "A little note", noteText));
   const beginFocus = () => {
-    const tasks = chosen
-      .map((id) => p.tasks.find((t) => t.id === id && !t.done))
-      .filter((t): t is Task => Boolean(t));
-    if (!tasks.length) {
-      setError("Add your tasks and choose up to three before starting.");
-      setPane("tasks");
-      return;
-    }
     setFocusTime(String(p.duration / 60));
     setError("");
     setPane("focus");
+  };
+  const chooseWeather = (next: "morning" | "night" | "rain") => {
+    setTone(next);
+    if (next === "rain") void changeSoundscape("rain");
+    else if (soundscape === "rain") void changeSoundscape("off");
   };
   // Duration is queued before the start updater, so the deadline uses the new time.
   const launchFocus = (event: FormEvent) => {
@@ -484,13 +478,9 @@ export function StudyRoom(p: Props) {
     const task = chosen
       .map((id) => p.tasks.find((t) => t.id === id && !t.done))
       .find(Boolean);
-    if (!task) {
-      setError("Choose at least one task first.");
-      setPane("tasks");
-      return;
-    }
+    setFinishedAfterFocus(false);
     p.onDuration(minutes);
-    p.onTask(task.title, true);
+    p.onTask(task?.title || "Quiet focus", true, task?.id);
     baseline.current = p.tasks.filter((t) => t.done).length;
   };
   const sit = (e: FormEvent) => {
@@ -545,9 +535,14 @@ export function StudyRoom(p: Props) {
         : sleeping
           ? "sleeping"
           : "idle";
-  const visibleTasks = p.tasks.filter(
-    (t) => filter === "all" || (filter === "done" ? t.done : !t.done),
-  );
+  const visibleTasks = p.tasks.filter((task) => !task.done);
+  const finishedTasks = p.tasks
+    .filter((task) => task.done)
+    .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+  const focusTimeLabel = (seconds = 0) =>
+    seconds > 0
+      ? `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s of focus`
+      : "Not timed";
   const selected = chosen
     .map((id) => p.tasks.find((t) => t.id === id && !t.done))
     .filter((t): t is Task => Boolean(t));
@@ -592,9 +587,10 @@ export function StudyRoom(p: Props) {
     setError("");
   };
   const panelTitle: Record<Pane, string> = {
-    focus: "A little time for you.",
+    focus: "Todo.",
+    finished: "Finished tasks.",
     ambience: "Set the mood.",
-    tasks: "Things waiting",
+    tasks: "Your tasks.",
     notes: "Your little notebook.",
     agent: "A little help.",
     settings: "Make yourself comfortable.",
@@ -610,12 +606,9 @@ export function StudyRoom(p: Props) {
       case "focus":
         return (
           <form className="room-focus-form" onSubmit={launchFocus}>
-            <p className="room-helper">
-              {selected.length} {selected.length === 1 ? "task" : "tasks"}{" "}
-              chosen. Todo will work beside you.
-            </p>
-            <label className="room-field" htmlFor="focus-minutes">
-              How long shall we focus?
+            <p className="room-helper">Todo will work beside you.</p>
+            <label className="sr-only" htmlFor="focus-minutes">
+              Focus minutes
             </label>
             <div className="room-minute-field">
               <Input
@@ -639,7 +632,7 @@ export function StudyRoom(p: Props) {
               role="group"
               aria-label="Suggested focus times"
             >
-              {[15, 25, 45].map((minutes) => (
+              {[15, 25, 30, 45, 60, 90].map((minutes) => (
                 <Button
                   key={minutes}
                   type="button"
@@ -651,13 +644,6 @@ export function StudyRoom(p: Props) {
                 </Button>
               ))}
             </div>
-            <p className="room-focus-intention">
-              {selected.map((task) => task.title).join(" · ")}
-            </p>
-            <p className="room-helper">
-              The room will settle into quiet. Click the clock or press Escape
-              to pause.
-            </p>
             <Button
               type="submit"
               className="room-dark-button room-focus-launch"
@@ -669,87 +655,107 @@ export function StudyRoom(p: Props) {
       case "ambience":
         return (
           <>
-            <p className="room-helper">A little atmosphere, at your pace.</p>
             <div
-              className="room-mini-tabs"
+              className="room-weather-choices"
               role="group"
-              aria-label="Time of day"
+              aria-label="Ambience"
             >
-              <Button
-                variant="ghost"
-                aria-pressed={tone === "morning"}
-                onClick={() => setTone("morning")}
-              >
-                <Sun size={16} />
-                Day
-              </Button>
-              <Button
-                variant="ghost"
-                aria-pressed={tone === "night"}
-                onClick={() => setTone("night")}
-              >
-                <Moon size={16} />
-                Night
-              </Button>
+              {(
+                [
+                  ["morning", "Day", Sun],
+                  ["night", "Night", Moon],
+                  ["rain", "Rain", CloudRain],
+                ] as const
+              ).map(([value, label, Icon]) => (
+                <Button
+                  key={value}
+                  variant="ghost"
+                  aria-pressed={tone === value}
+                  onClick={() => chooseWeather(value)}
+                >
+                  <Icon size={21} />
+                  <span>{label}</span>
+                </Button>
+              ))}
             </div>
-            <label className="room-setting">
-              <span>Rain outside</span>
-              <Switch checked={rain} onCheckedChange={setRain} />
-            </label>
-            <label className="room-field">
-              Soft sounds
-              <select
-                aria-label="Soft sounds"
-                value={soundscape}
-                onChange={(e) =>
-                  void changeSoundscape(e.target.value as Soundscape)
-                }
-              >
-                <option value="off">Quiet · sound off</option>
-                <option value="day">Morning · soft ambient</option>
-                <option value="night">Night · warm hush</option>
-                <option value="rain">Soft rain</option>
-              </select>
-            </label>
-            <label className="room-field">
-              Volume
-              <input
-                aria-label="Ambience volume"
-                type="range"
-                min="0"
-                max="1"
-                step=".01"
-                value={volume}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  setVolume(value);
-                  ambienceAudio.current?.setVolume(value);
-                }}
-              />
-            </label>
-            <p className="room-helper">
-              Sounds play only when you choose them. You can keep the room
-              completely quiet.
-            </p>
+            <div
+              className="room-sound-choices"
+              role="group"
+              aria-label="Sound effects"
+            >
+              {(
+                [
+                  ["off", "Sound off", VolumeX],
+                  ["day", "Morning", Sun],
+                  ["night", "Soft ambient · warm hush", AudioLines],
+                ] as const
+              ).map(([value, label, Icon]) => (
+                <Button
+                  key={value}
+                  variant="ghost"
+                  aria-pressed={soundscape === value}
+                  onClick={() => void changeSoundscape(value)}
+                >
+                  <Icon size={18} />
+                  <span>{label}</span>
+                </Button>
+              ))}
+            </div>
           </>
         );
-
+      case "finished":
+        return (
+          <>
+            <div className="room-finished-list">
+              {finishedTasks.length ? (
+                finishedTasks.map((task) => (
+                  <article className="room-finished-task" key={task.id}>
+                    <CheckCheck size={16} />
+                    <div>
+                      <h3>{task.title}</h3>
+                      <p>{focusTimeLabel(task.focusedSeconds)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Reopen ${task.title}`}
+                      disabled={busy}
+                      onClick={() => void toggle(task)}
+                    >
+                      Reopen
+                    </Button>
+                  </article>
+                ))
+              ) : (
+                <p className="room-empty">No finished tasks yet.</p>
+              )}
+            </div>
+            <Button variant="ghost" onClick={() => setPane("tasks")}>
+              Back to tasks <ArrowLeft size={14} />
+            </Button>
+            {finishedAfterFocus ? (
+              <Button
+                className="room-dark-button"
+                onClick={() => {
+                  p.onBreak();
+                  setPane("break");
+                }}
+              >
+                Todo, take a break <Coffee size={15} />
+              </Button>
+            ) : null}
+          </>
+        );
       case "tasks":
         return (
           <>
-            <label className="room-field">
-              <span className="sr-only">Task filter</span>
-              <select
-                aria-label="Task filter"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-              >
-                <option value="all">All tasks</option>
-                <option value="waiting">Waiting</option>
-                <option value="done">Finished</option>
-              </select>
-            </label>
-            <p className="room-helper">Pick up to three to keep you company.</p>
+            <Button
+              variant="ghost"
+              className="room-finished-link"
+              onClick={() => setPane("finished")}
+            >
+              Finished tasks <CheckCheck size={15} />
+            </Button>
             <div className="room-task-list">
               {visibleTasks.length ? (
                 visibleTasks.map((task) => (
@@ -815,11 +821,6 @@ export function StudyRoom(p: Props) {
                 </p>
               )}
             </div>
-            {p.tasks.filter((t) => !t.done).length > 3 ? (
-              <p className="room-helper">
-                +{p.tasks.filter((t) => !t.done).length - 3} more in your list
-              </p>
-            ) : null}
             <form className="room-task-input" onSubmit={addTask}>
               <Input
                 aria-label="New task"
@@ -1106,8 +1107,13 @@ export function StudyRoom(p: Props) {
             </label>
             <label className="room-field">
               Room light
-              <select value={tone} onChange={(e) => setTone(e.target.value)}>
-                <option value="evening">Warm evening</option>
+              <select
+                value={tone}
+                onChange={(e) =>
+                  chooseWeather(e.target.value as "morning" | "night" | "rain")
+                }
+              >
+                <option value="rain">Rain</option>
                 <option value="night">Quiet night</option>
                 <option value="morning">Soft morning</option>
               </select>
@@ -1119,7 +1125,7 @@ export function StudyRoom(p: Props) {
             <div className="room-settings-links">
               {[
                 ["home", Users, "Who is joining?"],
-                ["month,", TimerIcon, "This month"],
+                ["month", TimerIcon, "This month"],
                 ["corner", LampDesk, "Your corner"],
                 ["friends", Users, "Bring friends"],
               ].map(([id, Icon, label]) => {
@@ -1359,6 +1365,7 @@ export function StudyRoom(p: Props) {
             active={p.active && loaded}
             day={tone === "morning"}
             focusing={quietFocus}
+            clock={p.started && p.phase === "focus" ? p.clock : null}
           />
           <div
             className="room-table-clock round-timer"
@@ -1516,28 +1523,12 @@ export function StudyRoom(p: Props) {
         >
           {!p.started && p.phase === "focus" ? (
             <form onSubmit={sit}>
-              <span className="room-eyebrow">TODAY</span>
-              <h1>What are we working on?</h1>
+              <h1>What are we doing?</h1>
               <div className="room-intention-form">
-                <p className="room-helper">
-                  {selected.length
-                    ? `${selected.length} ${selected.length === 1 ? "task" : "tasks"} chosen. Your table is ready.`
-                    : "Write your tasks. Choose up to three."}
-                </p>
                 <Button className="room-dark-button">
                   {selected.length ? "Edit your tasks" : "Sit with Todo"}
                   <ArrowRight size={15} />
                 </Button>
-                {selected.length && !pane ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="room-choose-time"
-                    onClick={beginFocus}
-                  >
-                    Choose timer <TimerIcon size={15} />
-                  </Button>
-                ) : null}
               </div>
             </form>
           ) : (
@@ -1552,11 +1543,28 @@ export function StudyRoom(p: Props) {
               </div>
               <Button
                 variant="ghost"
-                onClick={done}
+                onClick={() => {
+                  const activeTask = p.tasks.find(
+                    (task) => task.id === p.taskId && !task.done,
+                  );
+                  if (p.phase === "focus" && activeTask)
+                    void toggle(activeTask);
+                  else done();
+                }}
                 disabled={busy}
-                aria-label={p.phase === "break" ? "End break" : "Done for now"}
+                aria-label={
+                  p.phase === "break"
+                    ? "End break"
+                    : p.taskId
+                      ? "Finish task"
+                      : "Done for now"
+                }
               >
-                {p.phase === "break" ? "End break" : "Done for now"}
+                {p.phase === "break"
+                  ? "End break"
+                  : p.taskId
+                    ? "Finish task"
+                    : "Done for now"}
                 <Check size={16} />
               </Button>
             </div>
@@ -1628,7 +1636,12 @@ export function StudyRoom(p: Props) {
               style={
                 pane === "focus"
                   ? undefined
-                  : zoneStyle(pane === "agent" ? C.chat : C.panel)
+                  : {
+                      ...zoneStyle(pane === "agent" ? C.chat : C.panel),
+                      ...(pane === "ambience"
+                        ? { height: "auto", maxHeight: "64%" }
+                        : {}),
+                    }
               }
               aria-labelledby="room-panel-title"
               aria-describedby="room-panel-description"
@@ -1660,7 +1673,6 @@ export function StudyRoom(p: Props) {
                 <>
                   <header className="room-panel-heading">
                     <div>
-                      <span className="room-eyebrow">YOUR LITTLE CORNER</span>
                       <DialogPrimitive.Title id="room-panel-title" asChild>
                         <h2>{panelTitle[pane]}</h2>
                       </DialogPrimitive.Title>

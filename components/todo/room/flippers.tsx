@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { CeramicMug } from "./mug";
 import { ROOM_CONFIG as C } from "./config";
 /** Attached shoulder pivots keep the rounded flippers connected during each stroke or sip. */
 export function WorkingFlippers({
@@ -67,12 +68,7 @@ export function WorkingFlippers({
           <stop offset=".5" stopColor="#413d39" />
           <stop offset="1" stopColor="#2e2d2a" />
         </linearGradient>
-        <linearGradient id={`${id}-cup`}>
-          <stop stopColor="#c8c8b5" />
-          <stop offset=".4" stopColor="#fff8dd" />
-          <stop offset=".8" stopColor="#e9e3cc" />
-          <stop offset="1" stopColor="#bebda9" />
-        </linearGradient>
+
         <pattern
           id={`${id}-fur-lines`}
           width="64"
@@ -174,18 +170,9 @@ export function WorkingFlippers({
           />
         </g>
         <g className="todo-sip-cup">
-          <path
-            d="M788 521Q820 516 820 539Q820 557 791 553"
-            fill="none"
-            stroke="#d9d5bd"
-            strokeWidth="9"
-          />
-          <path
-            d="M729 512L735 561Q761 580 789 560L796 512Z"
-            fill={`url(#${id}-cup)`}
-          />
-          <ellipse cx="762" cy="513" rx="34" ry="11" fill="#fff9e5" />
-          <ellipse cx="762" cy="513" rx="28" ry="7" fill="#5d4733" />
+          <svg x="718" y="484" width="84" height="90" overflow="visible">
+            <CeramicMug held />
+          </svg>
           <path
             className="todo-cup-steam steam-a"
             d="M753 491Q745 480 753 467"

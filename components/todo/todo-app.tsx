@@ -66,6 +66,7 @@ type Message = {
   imageName?: string;
 };
 type Timer = {
+  taskId?: string | null;
   remaining: number;
   duration: number;
   deadline: number | null;
@@ -76,6 +77,7 @@ type Timer = {
   startedAt?: number;
 };
 const freshTimer: Timer = {
+  taskId: null,
   remaining: 25 * 60,
   duration: 25 * 60,
   deadline: null,
@@ -227,6 +229,18 @@ export default function TodoApp({
           localStorage.setItem(timerStorageKey, JSON.stringify(timer));
       } catch {}
   }, [timer, timerReady, timerStorageKey, identity]);
+  useEffect(() => {
+    // Upgrade an in-progress legacy timer only when its task title is unambiguous.
+    if (!timer.started || timer.phase !== "focus" || timer.taskId !== undefined)
+      return;
+    const matches = tasks.filter(
+      (task) => !task.done && task.title === timer.task,
+    );
+    if (matches.length === 1)
+      setTimer((current) =>
+        current.taskId ? current : { ...current, taskId: matches[0].id },
+      );
+  }, [tasks, timer.started, timer.phase, timer.taskId, timer.task]);
   const chime = useCallback(() => {
     if (!sound) return;
     try {
@@ -258,6 +272,7 @@ export default function TodoApp({
     try {
       const result = await api<FocusSession>("/api/sessions", "POST", {
         task: value.task,
+        ...(value.taskId ? { taskId: value.taskId } : {}),
         seconds,
         character: localStorage.getItem("todo.character.v1") || "male",
       });
@@ -526,6 +541,7 @@ export default function TodoApp({
         running={Boolean(timer.deadline)}
         started={timer.started}
         task={timer.task}
+        taskId={timer.taskId}
         phase={timer.phase}
         agentBusy={agentBusy}
         agentMode={agentMode}
@@ -533,10 +549,11 @@ export default function TodoApp({
           setAgentMode(mode);
           if (!mode) setPanel(null);
         }}
-        onTask={(task, begin) => {
+        onTask={(task, begin, taskId) => {
           setTimer((t) => ({
             ...t,
             task,
+            taskId: taskId ?? null,
             ...(begin
               ? {
                   deadline: Date.now() + t.remaining * 1000,

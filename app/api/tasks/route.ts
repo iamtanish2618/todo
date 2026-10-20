@@ -1,6 +1,6 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, sql, sum } from "drizzle-orm";
 import { getDb } from "@/db";
-import { tasks } from "@/db/schema";
+import { tasks, sessions } from "@/db/schema";
 import { ApiError, body, fail, owner } from "@/lib/todo/server";
 import { z } from "zod";
 export async function GET(request: Request) {
@@ -8,7 +8,10 @@ export async function GET(request: Request) {
     const userId = await owner(request);
     return Response.json(
       await getDb()
-        .select()
+        .select({
+          ...getTableColumns(tasks),
+          focusedSeconds: sql<number>`coalesce((select sum(s.seconds) from sessions as s where s.task_id = tasks.id and s.user_id = ${userId}), 0)`,
+        })
         .from(tasks)
         .where(eq(tasks.userId, userId))
         .orderBy(desc(tasks.createdAt)),
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
       createdAt: Date.now(),
     };
     await getDb().insert(tasks).values(task);
-    return Response.json(task, { status: 201 });
+    return Response.json({ ...task, focusedSeconds: 0 }, { status: 201 });
   } catch (e) {
     return fail(e);
   }
@@ -54,7 +57,16 @@ export async function PATCH(request: Request) {
       .where(and(eq(tasks.id, parsed.data.id), eq(tasks.userId, userId)))
       .returning();
     if (!result[0]) throw new ApiError("That task was not found.", 404);
-    return Response.json(result[0]);
+    const [time] = await getDb()
+      .select({ seconds: sum(sessions.seconds) })
+      .from(sessions)
+      .where(
+        and(eq(sessions.userId, userId), eq(sessions.taskId, parsed.data.id)),
+      );
+    return Response.json({
+      ...result[0],
+      focusedSeconds: Number(time?.seconds || 0),
+    });
   } catch (e) {
     return fail(e);
   }

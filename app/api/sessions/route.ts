@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { sessions } from "@/db/schema";
+import { sessions, tasks } from "@/db/schema";
 import { ApiError, body, fail, owner } from "@/lib/todo/server";
 import { z } from "zod";
 export async function GET(request: Request) {
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
     const userId = await owner(request),
       parsed = z
         .object({
+          taskId: z.string().uuid().optional(),
           task: z.string().trim().min(1).max(180),
           seconds: z.number().int().min(1).max(86400),
           character: z.enum(["male", "female"]),
@@ -32,8 +33,22 @@ export async function POST(request: Request) {
       throw new ApiError(
         "This session could not be saved. Check its task and duration.",
       );
+    const linkedTask = parsed.data.taskId
+      ? (
+          await getDb()
+            .select()
+            .from(tasks)
+            .where(
+              and(eq(tasks.id, parsed.data.taskId), eq(tasks.userId, userId)),
+            )
+            .limit(1)
+        )[0]
+      : undefined;
+    if (parsed.data.taskId && !linkedTask)
+      throw new ApiError("That task was not found.", 404);
     const session = {
       ...parsed.data,
+      task: linkedTask?.title || parsed.data.task,
       id: crypto.randomUUID(),
       userId,
       createdAt: Date.now(),

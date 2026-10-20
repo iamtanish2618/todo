@@ -3,6 +3,7 @@ import {
   text,
   integer,
   primaryKey,
+  index,
 } from "drizzle-orm/sqlite-core";
 
 export const profiles = sqliteTable("profiles", {
@@ -20,14 +21,19 @@ export const tasks = sqliteTable("tasks", {
   completedAt: integer("completed_at"),
   createdAt: integer("created_at").notNull(),
 });
-export const sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey(),
-  userId: text("user_id").notNull(),
-  task: text("task").notNull(),
-  seconds: integer("seconds").notNull(),
-  character: text("character").notNull(),
-  createdAt: integer("created_at").notNull(),
-});
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    task: text("task").notNull(),
+    taskId: text("task_id"),
+    seconds: integer("seconds").notNull(),
+    character: text("character").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("sessions_owner_task_idx").on(t.userId, t.taskId)],
+);
 export const notes = sqliteTable("notes", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),

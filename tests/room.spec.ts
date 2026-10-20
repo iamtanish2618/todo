@@ -122,12 +122,15 @@ test("tasks persist, three can be selected, completion is saved and privately ow
     .click();
   await expect(
     page.getByRole("button", { name: `Reopen ${names[0]}`, exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  ).toBeVisible();
   await page.reload();
   await page
     .getByRole("button", { name: "Focus with Todo", exact: true })
     .click();
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Finished tasks", exact: true })
+    .click();
   await expect(
     page.getByRole("button", { name: `Reopen ${names[0]}`, exact: true }),
   ).toBeVisible();
@@ -136,10 +139,10 @@ test("tasks persist, three can be selected, completion is saved and privately ow
     stored.find((t: { title: string }) => t.title === names[0]).completedAt,
   ).toBeGreaterThan(0);
   for (const title of names) {
-    await page
-      .getByRole("button", { name: `Delete ${title}`, exact: true })
-      .click();
-    await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+    const task = stored.find((t: { title: string }) => t.title === title);
+    expect(
+      (await page.request.delete("/api/tasks", { data: { id: task.id } })).ok(),
+    ).toBe(true);
   }
 });
 
@@ -477,7 +480,10 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
   await page
     .getByRole("button", { name: "Start table timer", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText("choose up to three");
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo.");
+  await expect(page.getByLabel("New task", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
   const title = `Desk flow ${Date.now()}`;
   await page.getByLabel("New task", { exact: true }).fill(title);
   await page.getByRole("button", { name: "Add task", exact: true }).click();
@@ -501,7 +507,7 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
     .getByRole("button", { name: `Complete ${title}`, exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Session complete", exact: true }),
+    page.getByRole("heading", { name: "Finished tasks.", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Todo, take a break", exact: true })
@@ -514,11 +520,9 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
     "data-tone",
     "night",
   );
-  await page.getByRole("switch", { name: "Rain outside", exact: true }).check();
+  await page.getByRole("button", { name: "Rain", exact: true }).click();
   await expect(page.locator(".cozy-room")).toHaveAttribute("data-rain", "true");
-  await page.getByLabel("Soft sounds", { exact: true }).selectOption("rain");
-  await page.getByLabel("Ambience volume", { exact: true }).fill("0.15");
-  await page.getByLabel("Soft sounds", { exact: true }).selectOption("off");
+  await page.getByRole("button", { name: "Sound off", exact: true }).click();
   await page.getByRole("button", { name: "Notes", exact: true }).click();
   await page.getByLabel("Upload study notes", { exact: true }).setInputFiles({
     name: "chapter.md",
@@ -528,10 +532,11 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
   await expect(page.getByLabel("Your notes", { exact: true })).toHaveValue(
     "The water cycle includes evaporation.",
   );
-  await page.getByRole("button", { name: "Tasks", exact: true }).click();
-  await page
-    .getByRole("button", { name: `Delete ${title}`, exact: true })
-    .click();
+  const stored = await (await page.request.get("/api/tasks")).json();
+  const completedTask = stored.find(
+    (task: { title: string }) => task.title === title,
+  );
+  await page.request.delete("/api/tasks", { data: { id: completedTask.id } });
   expect(errors).toEqual([]);
 });
 
@@ -598,7 +603,7 @@ test("morning replaces the moon; lamp leaves no hand; real writing and coffee fl
     "naturalWidth",
     1536,
   );
-  await page.getByRole("switch", { name: "Rain outside", exact: true }).check();
+  await page.getByRole("button", { name: "Rain", exact: true }).click();
   const duration = await page
     .locator(".window-rain-drops i")
     .first()
@@ -680,7 +685,7 @@ test("calmer audio plays an actual rain recording at a controlled level, crossfa
   const recording = page.waitForResponse((r) =>
     r.url().endsWith("/audio/quiet-rain.mp3"),
   );
-  await page.getByLabel("Soft sounds", { exact: true }).selectOption("rain");
+  await page.getByRole("button", { name: "Rain", exact: true }).click();
   expect((await recording).status()).toBe(200);
   await page.waitForTimeout(2300);
   const rms = await page.evaluate(() => {
@@ -700,7 +705,7 @@ test("calmer audio plays an actual rain recording at a controlled level, crossfa
   expect(rms.state).toBe("running");
   expect(rms.value).toBeGreaterThan(0.00001);
   expect(rms.value).toBeLessThan(0.16);
-  await page.getByLabel("Soft sounds", { exact: true }).selectOption("off");
+  await page.getByRole("button", { name: "Sound off", exact: true }).click();
   await page.waitForTimeout(1200);
   expect(
     await page.evaluate(() =>
@@ -709,7 +714,10 @@ test("calmer audio plays an actual rain recording at a controlled level, crossfa
       ).__todoAudio.every((a) => a.ctx.state === "closed"),
     ),
   ).toBe(true);
-  await page.getByLabel("Soft sounds", { exact: true }).selectOption("day");
+  await page
+    .getByRole("group", { name: "Sound effects", exact: true })
+    .getByRole("button", { name: "Morning", exact: true })
+    .click();
   await page
     .getByRole("button", { name: "Choose companion", exact: true })
     .click();
@@ -753,9 +761,7 @@ test("custom focus setup darkens selected tasks, hides controls, prepares Todo a
     false,
   );
   await page.getByRole("button", { name: "Choose timer", exact: true }).click();
-  await expect(page.getByRole("dialog")).toHaveAccessibleName(
-    "A little time for you.",
-  );
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo.");
   await page.getByLabel("Focus minutes", { exact: true }).fill("121");
   await page.getByRole("button", { name: "Focus", exact: true }).click();
   await expect(page.locator(".cozy-room")).toHaveAttribute(
@@ -930,3 +936,206 @@ for (const variant of [
     expect(errors).toEqual([]);
   });
 }
+
+test("ambience uses three weather cards and three sound cards; timer opens directly and all tools share glass", async ({
+  page,
+}) => {
+  await enter(page);
+  await expect(page.locator(".room-home-card")).toContainText(
+    "What are we doing?",
+  );
+  await expect(
+    page.locator(".room-home-card .room-helper,.room-choose-time"),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Start table timer", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo.");
+  await expect(page.getByLabel("New task", { exact: true })).toHaveCount(0);
+  for (const m of [15, 25, 30, 45, 60, 90])
+    await expect(
+      page.getByRole("button", { name: `${m} min`, exact: true }),
+    ).toBeVisible();
+  const glass = await page
+    .getByRole("dialog")
+    .evaluate((e) => getComputedStyle(e).backgroundColor);
+  await page.getByRole("button", { name: "90 min", exact: true }).click();
+  await expect(page.getByLabel("Focus minutes", { exact: true })).toHaveValue(
+    "90",
+  );
+  await page.screenshot({ path: "outputs/todo-simple-timer.png" });
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page.getByRole("button", { name: "Ambience", exact: true }).click();
+  const panel = page.getByRole("dialog");
+  await expect(panel.getByRole("combobox")).toHaveCount(0);
+  await expect(panel.getByRole("slider")).toHaveCount(0);
+  await expect(panel.getByRole("switch")).toHaveCount(0);
+  await expect(
+    panel
+      .getByRole("group", { name: "Ambience", exact: true })
+      .getByRole("button"),
+  ).toHaveCount(3);
+  await expect(
+    panel
+      .getByRole("group", { name: "Sound effects", exact: true })
+      .getByRole("button"),
+  ).toHaveCount(3);
+  expect(await panel.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(
+    glass,
+  );
+  await page.getByRole("button", { name: "Rain", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute("data-rain", "true");
+  await page.getByRole("button", { name: "Sound off", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute("data-rain", "true");
+  await page.getByRole("button", { name: "Day", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-rain",
+    "false",
+  );
+  await page.screenshot({ path: "outputs/todo-simple-ambience.png" });
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  expect(await panel.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(
+    glass,
+  );
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Start table timer", exact: true })
+    .click();
+  await page.getByRole("button", { name: "15 min", exact: true }).click();
+  await page.getByRole("button", { name: "Focus", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-working",
+    "true",
+  );
+  await expect(page).toHaveTitle(/14:5\d - Todo/);
+  await page.keyboard.press("Escape");
+});
+
+test("Finish task saves only its linked focus time, opens finished history, and persists across reload", async ({
+  page,
+}) => {
+  await enter(page);
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  const titles = [`Timed task ${Date.now()}`, `Next task ${Date.now()}`];
+  for (const title of titles) {
+    await page.getByLabel("New task", { exact: true }).fill(title);
+    await page.getByRole("button", { name: "Add task", exact: true }).click();
+    await page
+      .getByRole("button", { name: `Focus on ${title}`, exact: true })
+      .click();
+  }
+  await expect(page.getByLabel("Task filter", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Close panel", exact: true }).click();
+  await expect(page.locator(".room-home-card")).not.toContainText("chosen");
+  await expect(page.locator(".room-home-card")).not.toContainText(
+    "Choose timer",
+  );
+  await page
+    .getByRole("button", { name: "Start table timer", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Focus", exact: true }).click();
+  await expect(page.locator(".room-pet")).toHaveAttribute(
+    "data-attention",
+    "notebook",
+  );
+  await expect(page.locator(".room-back-countdown")).toHaveText(/\d{2}:\d{2}/);
+  expect(
+    await page
+      .locator(".room-back-countdown")
+      .evaluate((e) => +getComputedStyle(e).opacity),
+  ).toBeLessThan(0.2);
+  await expect(
+    page.locator(".room-table-coffee .ceramic-vessel"),
+  ).toBeVisible();
+  await page.screenshot({ path: "outputs/todo-refined-focus.png" });
+  await page.waitForTimeout(1800);
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Finish task", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Finished tasks.", exact: true }),
+  ).toBeVisible();
+  const record = page
+    .locator(".room-finished-task")
+    .filter({ hasText: titles[0] });
+  await expect(record).toContainText(/\dm \d{2}s of focus/);
+  const tasks = await (await page.request.get("/api/tasks")).json();
+  const first = tasks.find((t: { title: string }) => t.title === titles[0]);
+  const next = tasks.find((t: { title: string }) => t.title === titles[1]);
+  expect(first.done).toBe(true);
+  expect(first.focusedSeconds).toBeGreaterThan(0);
+  expect(next.done).toBe(false);
+  expect(next.focusedSeconds).toBe(0);
+  await page.screenshot({ path: "outputs/todo-finished-tasks.png" });
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: `Focus on ${titles[1]}`, exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Finished tasks", exact: true })
+    .click();
+  await expect(
+    page.locator(".room-finished-task").filter({ hasText: titles[0] }),
+  ).toContainText(
+    `${String(first.focusedSeconds % 60).padStart(2, "0")}s of focus`,
+  );
+  for (const task of [first, next])
+    expect(
+      (await page.request.delete("/api/tasks", { data: { id: task.id } })).ok(),
+    ).toBe(true);
+});
+
+test("task duration aggregation uses owned task IDs across all sits, including duplicate titles", async ({
+  page,
+}) => {
+  await enter(page);
+  const title = `Same title ${Date.now()}`;
+  const first = await (
+    await page.request.post("/api/tasks", { data: { title } })
+  ).json();
+  const second = await (
+    await page.request.post("/api/tasks", { data: { title } })
+  ).json();
+  for (const seconds of [34, 65]) {
+    const saved = await page.request.post("/api/sessions", {
+      data: {
+        task: "wrong supplied title",
+        taskId: first.id,
+        seconds,
+        character: "male",
+      },
+    });
+    expect(saved.status()).toBe(201);
+    expect((await saved.json()).task).toBe(title);
+  }
+  expect(
+    (
+      await page.request.post("/api/sessions", {
+        data: {
+          task: title,
+          taskId: crypto.randomUUID(),
+          seconds: 20,
+          character: "male",
+        },
+      })
+    ).status(),
+  ).toBe(404);
+  const tasks = await (await page.request.get("/api/tasks")).json();
+  expect(
+    tasks.find((t: { id: string }) => t.id === first.id).focusedSeconds,
+  ).toBe(99);
+  expect(
+    tasks.find((t: { id: string }) => t.id === second.id).focusedSeconds,
+  ).toBe(0);
+  const completed = await (
+    await page.request.patch("/api/tasks", {
+      data: { id: first.id, done: true },
+    })
+  ).json();
+  expect(completed.focusedSeconds).toBe(99);
+  for (const task of [first, second])
+    await page.request.delete("/api/tasks", { data: { id: task.id } });
+});

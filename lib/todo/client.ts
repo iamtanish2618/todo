@@ -3,11 +3,13 @@ export type Task = {
   title: string;
   done: boolean;
   completedAt?: number | null;
+  focusedSeconds?: number;
   createdAt: number;
 };
 export type FocusSession = {
   id: string;
   task: string;
+  taskId?: string | null;
   seconds: number;
   character: string;
   createdAt: number;
