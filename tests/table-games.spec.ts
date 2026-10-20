@@ -11,6 +11,7 @@ test("breathing cycle, late phase and stroke validation", () => {
   expect(breathPhase(7000, 0).label).toBe("Breathe out");
   expect(breathPhase(19000, 12000)).toEqual(breathPhase(7000, 0));
   expect(breathPhase(60000, 0).finished).toBe(true);
+  expect(breathPhase(64000, 0).progress).toBe(0);
   expect(
     readStroke({ sid: "abc", color: "blue", pts: [[-1, 2]] })?.pts,
   ).toEqual([[0, 1]]);

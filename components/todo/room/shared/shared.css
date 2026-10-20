@@ -629,3 +629,43 @@
   width: 7%;
   height: 10.5%;
 }
+/* Each teammate's work/break animation follows their own presence, not your timer. */
+.round-room-art[data-shared="true"]
+  .table-member-tools
+  :is(.todo-writing-rig, .todo-coffee-rig) {
+  opacity: 0;
+}
+.round-room-art[data-shared="true"]
+  .table-member-tools[data-pose="writing"]
+  .todo-writing-rig,
+.round-room-art[data-shared="true"]
+  .table-member-tools[data-pose="tea"]
+  .todo-coffee-rig {
+  opacity: 1;
+}
+.round-room-art[data-shared="true"]
+  .table-member-tools
+  :is(
+    .todo-write-left,
+    .todo-write-right,
+    .todo-writing-wrist,
+    .todo-sip-left,
+    .todo-sip-right,
+    .todo-sip-cup,
+    .desk-ink-line
+  ) {
+  animation-play-state: paused;
+}
+.round-room-art[data-shared="true"]
+  .table-member-tools[data-pose="writing"]
+  :is(.todo-write-left, .todo-write-right, .todo-writing-wrist, .desk-ink-line),
+.round-room-art[data-shared="true"]
+  .table-member-tools[data-pose="tea"]
+  :is(.todo-sip-left, .todo-sip-right, .todo-sip-cup) {
+  animation-play-state: running;
+}
+@media (prefers-reduced-motion: reduce) {
+  .round-room-art[data-shared="true"] .table-member-tools * {
+    animation: none !important;
+  }
+}

@@ -218,14 +218,22 @@ export async function firebaseTransport(
       pending.forEach(clearTimeout);
       pending.clear();
       cleanups.forEach((fn) => fn());
-      if (code && id) {
-        const paths: Record<string, null> = cleanupPaths();
-        outgoing.forEach((p) => {
-          paths[p] = null;
-        });
-        await sdk.update(sdk.ref(db), paths).catch(() => {});
+      if (!code || !id) return;
+      // Keep the ownership claim until every protected node has been removed.
+      // A failed client write must never cancel the server-side disconnect fallback.
+      const remove = (path: string) => sdk.remove(sdk.ref(db, path));
+      const results = await Promise.allSettled([
+        remove(`tables/${code}/members/${id}`),
+        remove(`tables/${code}/inbox/${id}`),
+        ...[...outgoing].map(remove),
+      ]);
+      if (results.some((result) => result.status === "rejected")) return;
+      try {
+        await remove(`tableClaims/${code}/${id}`);
+        await disconnect?.cancel();
+      } catch {
+        /* Leave the registered server cleanup intact. */
       }
-      await disconnect?.cancel().catch(() => {});
     },
   };
 }

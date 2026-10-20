@@ -38,11 +38,13 @@ export function breathPhase(now: number, startAt: number) {
             ? "Hold"
             : "Breathe out",
     progress:
-      phase < 4000
-        ? phase / 4000
-        : phase < 6000
-          ? 1
-          : 1 - (phase - 6000) / 6000,
+      elapsed >= 60000
+        ? 0
+        : phase < 4000
+          ? phase / 4000
+          : phase < 6000
+            ? 1
+            : 1 - (phase - 6000) / 6000,
   };
 }
 export type GameSnapshot = {

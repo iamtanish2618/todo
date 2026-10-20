@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
+const logins = new WeakMap<Page, { email: string; password: string }>();
 const contexts: Awaited<ReturnType<Browser["newContext"]>>[] = [];
 test.afterEach(async () => {
   await Promise.all(contexts.splice(0).map((c) => c.close()));
@@ -8,29 +9,32 @@ async function peer(
   index: number,
   mount = true,
   invite = "",
+  login?: { email: string; password: string },
 ) {
-  const email = `table-${index}-${Date.now()}@example.test`,
-    password = "OnlyEmulatorTest123!";
-  const r = await fetch(
-    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, returnSecureToken: true }),
-    },
-  );
-  const user = (await r.json()) as { localId: string };
-  await fetch(
-    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:update?key=fake-api-key",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer owner",
+  const email = login?.email || `table-${index}-${Date.now()}@example.test`,
+    password = login?.password || "OnlyEmulatorTest123!";
+  if (!login) {
+    const r = await fetch(
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, returnSecureToken: true }),
       },
-      body: JSON.stringify({ localId: user.localId, emailVerified: true }),
-    },
-  );
+    );
+    const user = (await r.json()) as { localId: string };
+    await fetch(
+      "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:update?key=fake-api-key",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer owner",
+        },
+        body: JSON.stringify({ localId: user.localId, emailVerified: true }),
+      },
+    );
+  }
   const context = await browser.newContext({ permissions: ["microphone"] });
   contexts.push(context);
   const page = await context.newPage();
@@ -66,6 +70,7 @@ async function peer(
     },
     { email, password, mount },
   );
+  logins.set(page, { email, password });
   return page;
 }
 async function state(page: Page) {
@@ -186,6 +191,26 @@ test("four original penguins seat gently, nicknames appear and Friends stays cle
     [...geometry.map((g) => g.x)].sort((a, b) => a - b),
   );
   await a.screenshot({ path: "outputs/todo-four-real-teammates.png" });
+  await act(pages[0], "qa.session.setStatus('focusing')");
+  await act(pages[1], "qa.session.setStatus('break')");
+  await expect(
+    a.locator('.table-member-tools[data-pose="writing"]'),
+  ).toHaveCount(1);
+  await expect(a.locator('.table-member-tools[data-pose="tea"]')).toHaveCount(
+    1,
+  );
+  await expect
+    .poll(() =>
+      a
+        .locator('.table-member-tools[data-pose="writing"] .todo-writing-rig')
+        .evaluate((el) => Number(getComputedStyle(el).opacity)),
+    )
+    .toBe(1);
+  expect(
+    await a
+      .locator('.table-member-tools[data-pose="tea"] .todo-writing-rig')
+      .evaluate((el) => Number(getComputedStyle(el).opacity)),
+  ).toBe(0);
   await act(pages[2], "qa.session.leave()");
   await expect(a.locator(".table-name-tag")).toHaveCount(3);
   await a.waitForTimeout(700);
@@ -494,6 +519,32 @@ test("host moderation uses authenticated senders and clears the temporary room",
   await expect
     .poll(async () => (await state(b)).table.message)
     .toContain("host closed");
+  await Promise.all(
+    [a, b].map((p) => act(p, "qa.games.dispose();qa.voice.leave()")),
+  );
+});
+
+test("two tabs using one account leave no room or ownership residue", async ({
+  browser,
+}) => {
+  const a = await peer(browser, 90),
+    b = await peer(browser, 91, true, "", logins.get(a));
+  await act(a, "qa.session.join(true,'','One','blue')");
+  const code = (await state(a)).table.code;
+  await act(b, `qa.session.join(false,${JSON.stringify(code)},'Two','pink')`);
+  await expect.poll(async () => (await state(a)).table.members.length).toBe(2);
+  await act(b, "qa.session.leave()");
+  await expect.poll(async () => (await state(a)).table.members.length).toBe(1);
+  await act(a, "qa.session.leave()");
+  const get = async (path: string) => {
+    const r = await fetch(
+      `http://127.0.0.1:9000/${path}.json?ns=demo-todo-default-rtdb`,
+      { headers: { Authorization: "Bearer owner" } },
+    );
+    return r.json();
+  };
+  await expect.poll(() => get(`tables/${code}`)).toBeNull();
+  await expect.poll(() => get(`tableClaims/${code}`)).toBeNull();
   await Promise.all(
     [a, b].map((p) => act(p, "qa.games.dispose();qa.voice.leave()")),
   );

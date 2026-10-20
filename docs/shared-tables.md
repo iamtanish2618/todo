@@ -103,7 +103,7 @@ No automated test is a substitute for listening on two real devices with headpho
 
 ## Completed verification for this update
 
-- 14 shared-table checks passed in Chrome, using the real Firebase emulators/rules and real WebRTC with a synthetic microphone. Includes wrong/missing rooms, capacity, duplicate names, host migration/moderation, listening without capture, denied capture, incoming volume, reconnect recovery, real Todo invite entry, matching timer deadlines, shared doodles, late breathing joins, solo breaks and reduced motion.
+- 15 shared-table checks passed in Chrome, using the real Firebase emulators/rules and real WebRTC with a synthetic microphone. Includes wrong/missing rooms, capacity, duplicate names, host migration/moderation, listening without capture, denied capture, incoming volume, reconnect recovery, real Todo invite entry, matching timer deadlines, shared doodles, late breathing joins, solo breaks and reduced motion.
 - All 21 existing dock/room regression checks passed, including tasks, timer pause/extend, notes/PDF/flashcards, AI request/quota UI, scene changes, the three supplied seamless recordings, open eyes, cursor, keyboard, resizing, break return and desktop frame budget.
 - TypeScript passed. New module lint has zero errors and one existing image-policy style warning on the original avatar layer. Full-repository lint still has the original 39 errors; no rule was disabled.
 - Database rules passed Firebase's syntax check and were deployed to the existing project. Billing remains disabled.
@@ -118,3 +118,5 @@ Stage file map:
 | Teammates | `shared/seating.tsx`, `shared/shared.css`, small plugs in `scene.tsx`, `penguin.tsx`, `study-room.tsx` |
 | Games | `lib/todo/table/games.ts`, `shared/break-games.tsx`, `shared/games.css` |
 | Hardening | `database.rules.json`, `firebase.emulators.json`, `tests/table-*.spec.ts`, `tests/fixtures/table-harness.tsx`, config/status routes, shared timer bridge in `todo-app.tsx`, this guide |
+
+The final cleanup regression also covers two tabs signed in to the same account. Leave removes protected nodes before releasing their private ownership claim, and only cancels its server disconnect fallback after successful cleanup. Each teammate’s writing/coffee animation follows their own presence status.
