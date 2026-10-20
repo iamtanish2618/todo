@@ -65,6 +65,7 @@ import "./room/celebration.css";
 import "./room/agent.css";
 import "./room/polish.css";
 import { RoomArrival } from "./room/arrival";
+import { BreakReturn } from "./room/break-return";
 
 type Pane =
   | "focus"
@@ -102,6 +103,7 @@ type Props = {
   duration: number;
   focusMinutes: number;
   startedAt?: number;
+  timerId: string;
   focusCompletions: number;
   onBreak: (minutes: number) => void;
   userId: string;
@@ -143,6 +145,8 @@ export function StudyRoom(p: Props) {
   const [breakTime, setBreakTime] = useState("5");
   const [celebrating, setCelebrating] = useState(false);
   const handledCompletions = useRef(0);
+  const [breakReturn, setBreakReturn] = useState<string | null>(null);
+  const handledBreak = useRef<string | null>(null);
   const celebrationOpen = useRef(celebrating);
   celebrationOpen.current = celebrating;
   const quietFocus = p.running && p.phase === "focus";
@@ -197,6 +201,46 @@ export function StudyRoom(p: Props) {
   useEffect(() => {
     if (!p.active) setArrived(false);
   }, [p.active]);
+  useEffect(() => {
+    if (!p.active) {
+      setBreakReturn(null);
+      return;
+    }
+    if (
+      arrived &&
+      p.started &&
+      p.phase === "break" &&
+      p.remaining === 0 &&
+      handledBreak.current !== p.timerId
+    ) {
+      handledBreak.current = p.timerId;
+      setPane(null);
+      setBreakReturn(p.timerId);
+    }
+  }, [p.active, p.started, p.phase, p.remaining, p.timerId, arrived]);
+  const restoreAfterBreak = useCallback(async () => {
+    const current = latest.current;
+    if (
+      current.phase === "break" &&
+      current.started &&
+      !(await current.onFinish())
+    )
+      return false;
+    setPane(null);
+    setSleeping(false);
+    setCelebrating(false);
+    current.onAgentMode(false);
+    current.onRestoreRoom();
+    return true;
+  }, []);
+  const finishBreakReturn = useCallback(() => {
+    setBreakReturn(null);
+    requestAnimationFrame(() =>
+      roomRoot.current
+        ?.querySelector<HTMLButtonElement>(".room-home-card button")
+        ?.focus({ preventScroll: true }),
+    );
+  }, []);
   const storageKey = `todo.room.focus.${p.userId}`;
   useEffect(() => {
     setDebug(new URLSearchParams(location.search).get("debug") === "1");
@@ -1345,7 +1389,11 @@ export function StudyRoom(p: Props) {
         style={{ backgroundImage: `url(${C.image})` }}
         aria-hidden="true"
       />
-      <div className="cozy-room-stage" inert={!arrived} aria-hidden={!arrived}>
+      <div
+        className="cozy-room-stage"
+        inert={!arrived || Boolean(breakReturn)}
+        aria-hidden={!arrived || Boolean(breakReturn)}
+      >
         <div className="room-scene-world">
           <RoomScene
             pose={pose}
@@ -1576,7 +1624,7 @@ export function StudyRoom(p: Props) {
           <RoomSoundPlayer
             key={soundscape}
             recording={soundscape}
-            paused={celebrating}
+            paused={celebrating || Boolean(breakReturn)}
             onStop={() => setSoundscape("off")}
           />
         ) : null}
@@ -1746,6 +1794,15 @@ export function StudyRoom(p: Props) {
           ) : null}
         </DialogPrimitive.Root>
       </div>
+      {p.active && breakReturn ? (
+        <BreakReturn
+          key={breakReturn}
+          female={p.female}
+          reduced={p.reduced}
+          onCovered={restoreAfterBreak}
+          onComplete={finishBreakReturn}
+        />
+      ) : null}
       <CompletionCelebration
         open={celebrating}
         female={p.female}

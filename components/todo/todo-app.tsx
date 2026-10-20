@@ -305,9 +305,8 @@ export default function TodoApp({
           setFocusCompletions((v) => v + 1);
           setTimer({ ...freshTimer, task: current.task });
         } else {
-          // Keep a completed break calm until the user chooses their next step.
+          // The room announces expiry and restores its tools under Todo’s wipe.
           setTimer({ ...current, remaining: 0, deadline: null });
-          chime();
         }
         setInRoom(true);
         setPanel(null);
@@ -501,6 +500,7 @@ export default function TodoApp({
         remaining={timer.remaining}
         duration={timer.duration}
         focusMinutes={minutes}
+        timerId={timer.id}
         startedAt={timer.startedAt}
         focusCompletions={focusCompletions}
         onBreak={(breakMinutes) => {

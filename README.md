@@ -93,3 +93,9 @@ Tests cover pointer tracking, glass hover, scroll selection and reload persisten
 - `tests/`: repeatable browser, API, and mocked model tests.
 
 Artwork was generated using the built-in ImageGen tool. The clean background is at `public/art/todo-face.png`; the eyes and interface are separate working elements. Noto Sans is bundled with its license in `public/fonts/`.
+
+## Break-over reminder
+
+Natural break expiry speaks “The break is over. We need to focus once again.” using the browser’s English voice at a gently raised pitch. The same message stays visible if speech is unavailable or blocked. Todo sweeps diagonally across a warm full-screen wipe, then reveals the normal room controls without starting another timer or recording a focus session. Ambient playback pauses during the reminder. “Back to focus” skips the announcement; reduced motion uses a short dissolve instead. Voice availability and pronunciation depend on the device.
+
+`components/todo/room/break-return.tsx` owns the announcement, cancellation and covered scene swap. Its CSS controls the greeting and oversized penguin. `tests/break-return.spec.ts` checks natural expiry, voice failure fallback, cancellation, and preservation of focus history using disposable local timer fixtures.

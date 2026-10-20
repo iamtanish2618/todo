@@ -1337,7 +1337,7 @@ test("completion has exactly two choices; custom breaks hide tools, survive refr
   await page.request.delete("/api/tasks", { data: { id: task.id } });
 });
 
-test("a completed break stays calm at zero; End break restores the room without saving focus", async ({
+test("End break restores the room early without saving focus", async ({
   page,
 }) => {
   await page.goto("/signin-with-chatgpt?return_to=/");
@@ -1350,21 +1350,25 @@ test("a completed break stays calm at zero; End break restores the room without 
     localStorage.setItem(
       "todo.timer.v1",
       JSON.stringify({
-        remaining: 1,
-        duration: 60,
-        deadline: Date.now() + 800,
+        remaining: 120,
+        duration: 120,
+        deadline: Date.now() + 120000,
         phase: "break",
         started: true,
         task: "A little rest",
         id: crypto.randomUUID(),
-        startedAt: Date.now() - 59000,
+        startedAt: Date.now(),
       }),
     ),
   );
   await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Break complete", exact: true }),
-  ).toBeDisabled({ timeout: 10000 });
+  await page
+    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-arriving",
+    "false",
+  );
   await expect(
     page.getByRole("group", { name: "Break controls", exact: true }),
   ).toBeVisible();
