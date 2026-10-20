@@ -328,7 +328,7 @@ test("Agent pending animation follows a real pending browser request, saves note
     "typing",
   );
   await expect(
-    page.getByText("Todo is working", { exact: false }),
+    page.getByText("Thinking it through…", { exact: false }),
   ).toBeVisible();
   await expect(page.locator(".room-chat-message.assistant")).toContainText(
     "Evaporation turns water",
@@ -1454,3 +1454,205 @@ for (const sound of [true, false]) {
     await page.request.delete("/api/tasks", { data: { id: task.id } });
   });
 }
+
+test("Agent is a single bottom composer, hides tools, frames Todo on laptops, and restores the room", async ({
+  page,
+}) => {
+  await page.route("**/api/status", (route) => route.fulfill({ json: ready }));
+  await enter(page);
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-agent",
+    "true",
+  );
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Talk with Todo");
+  await expect(page.getByLabel("Message Todo")).toBeFocused();
+  for (const name of [
+    "Ambience",
+    "Tasks",
+    "Notes",
+    "Open room settings",
+    "Choose companion",
+    "Start table timer",
+  ])
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await expect(
+    page.getByRole("button", { name: "Attach notes or a photo" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Speak to Todo" }),
+  ).toBeVisible();
+  for (const size of [
+    { width: 1440, height: 900 },
+    { width: 1920, height: 1080 },
+    { width: 1024, height: 768 },
+  ]) {
+    await page.setViewportSize(size);
+    const panel = (await page.getByRole("dialog").boundingBox())!;
+    const pet = (await page.locator(".room-seated-anchor").boundingBox())!;
+    expect(panel.y).toBeGreaterThan(pet.y + pet.height * 0.5);
+    expect(panel.x).toBeGreaterThanOrEqual(0);
+    expect(panel.x + panel.width).toBeLessThanOrEqual(size.width);
+    expect(panel.y + panel.height).toBeLessThanOrEqual(size.height);
+    await expect(
+      page.getByRole("button", { name: "Send to Todo" }),
+    ).toBeVisible();
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "outputs/todo-agent-chat.png" });
+  await expect
+    .poll(() =>
+      page
+        .locator(".room-scene-world")
+        .evaluate(
+          (element) => new DOMMatrix(getComputedStyle(element).transform).a,
+        ),
+    )
+    .toBeCloseTo(1.035, 3);
+  await page.getByRole("button", { name: "Back to room", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-agent",
+    "false",
+  );
+  await expect(
+    page.getByRole("button", { name: "Tasks", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Companion", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Agent image attachment, Shift+Enter, Enter, and cancellation use the real chat request boundary", async ({
+  page,
+}) => {
+  await page.route("**/api/status", (route) => route.fulfill({ json: ready }));
+  const requests: Array<{ messages: { content: string }[]; image?: string }> =
+    [];
+  let hold = false;
+  await page.route("**/api/chat", async (route) => {
+    requests.push(route.request().postDataJSON());
+    if (hold) await new Promise((resolve) => setTimeout(resolve, 1600));
+    await route
+      .fulfill({
+        json: { text: "A simple explanation from the mocked test model." },
+      })
+      .catch(() => {});
+  });
+  await enter(page);
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
+  await page
+    .getByLabel("Attach text or image")
+    .setInputFiles({
+      name: "pixel.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jq3cAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+  await expect(page.getByText("pixel.png", { exact: true })).toBeVisible();
+  const draft = page.getByLabel("Message Todo");
+  await draft.fill("Explain this photo.");
+  await draft.press("Shift+Enter");
+  await expect(draft).toHaveValue("Explain this photo.\n");
+  expect(requests).toHaveLength(0);
+  await draft.press("Enter");
+  await expect(page.locator(".room-chat-message.assistant")).toContainText(
+    "simple explanation",
+  );
+  expect(requests[0].image).toMatch(/^data:image\/png;base64,/);
+  await expect(
+    page.getByRole("button", { name: "Remove attached image" }),
+  ).toHaveCount(0);
+  hold = true;
+  const failed = page.waitForEvent("requestfailed", {
+    predicate: (request) => request.url().endsWith("/api/chat"),
+  });
+  await draft.fill("A request that I will leave.");
+  await draft.press("Enter");
+  await expect(page.locator(".room-pet")).toHaveAttribute(
+    "data-pose",
+    "typing",
+  );
+  await page.getByRole("button", { name: "Back to room" }).click();
+  await failed;
+  await expect(
+    page.getByRole("button", { name: "Tasks", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "idle");
+});
+
+test("Agent browser dictation is reviewed before sending, handles denial and releases the microphone on close (mock recognition)", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    class Speech {
+      lang = "en-US";
+      interimResults = false;
+      onresult: ((event: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: { error: string }) => void) | null = null;
+      start() {
+        (window as unknown as { __speech: Speech }).__speech = this;
+      }
+      stop() {
+        this.onresult?.({
+          results: [[{ transcript: "Explain the water cycle." }]],
+        });
+        this.onend?.();
+      }
+      abort() {
+        (window as unknown as { __speechAborted: boolean }).__speechAborted =
+          true;
+      }
+    }
+    (
+      window as unknown as { SpeechRecognition: typeof Speech }
+    ).SpeechRecognition = Speech;
+  });
+  await page.route("**/api/status", (route) => route.fulfill({ json: ready }));
+  let sent = 0;
+  await page.route("**/api/chat", (route) => {
+    sent++;
+    return route.fulfill({ json: { text: "Water evaporates and condenses." } });
+  });
+  await enter(page);
+  await page.getByRole("button", { name: "Agent", exact: true }).click();
+  await page.getByRole("button", { name: "Speak to Todo" }).click();
+  await expect(page.getByText("Listening…", { exact: false })).toBeVisible();
+  expect(sent).toBe(0);
+  await page.getByRole("button", { name: "Stop voice input" }).click();
+  await expect(page.getByLabel("Message Todo")).toHaveValue(
+    "Explain the water cycle.",
+  );
+  expect(sent).toBe(0);
+  await page.getByRole("button", { name: "Send to Todo" }).click();
+  await expect(page.locator(".room-chat-message.assistant")).toContainText(
+    "evaporates",
+  );
+  expect(sent).toBe(1);
+  await page.getByRole("button", { name: "Speak to Todo" }).click();
+  await page.evaluate(() =>
+    (
+      window as unknown as {
+        __speech: { onerror: (e: { error: string }) => void };
+      }
+    ).__speech.onerror({ error: "not-allowed" }),
+  );
+  await expect(
+    page.getByText("Microphone access wasn't allowed.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Speak to Todo" }).click();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __speechAborted: boolean }).__speechAborted,
+    ),
+  ).toBe(true);
+  await expect(
+    page.getByRole("button", { name: "Tasks", exact: true }),
+  ).toBeVisible();
+});

@@ -1,12 +1,37 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, FileDown, Loader2, Plus, Square, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  FileDown,
+  Loader2,
+  Mic,
+  MicOff,
+  Plus,
+  Square,
+  X,
+} from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Connection, type Note } from "@/lib/todo/client";
 import { makeRoomPDF } from "./pdf";
 
+type Recognition = {
+  lang: string;
+  interimResults: boolean;
+  onresult:
+    ((event: { results: { 0: { 0: { transcript: string } } } }) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => Recognition;
+  webkitSpeechRecognition?: new () => Recognition;
+};
 type Message = { role: "user" | "assistant"; content: string };
 export function RoomChat({
   connection,
@@ -26,6 +51,10 @@ export function RoomChat({
     [messages, setMessages] = useState<Message[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [canSpeak, setCanSpeak] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognition = useRef<Recognition | null>(null);
+  const live = useRef(true);
   const [attachment, setAttachment] = useState<{
     data: string;
     name: string;
@@ -33,13 +62,65 @@ export function RoomChat({
   const inputFile = useRef<HTMLInputElement>(null);
   const controller = useRef<AbortController | null>(null),
     transcript = useRef<HTMLDivElement>(null);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    live.current = true;
+    const browser = window as SpeechWindow;
+    setCanSpeak(
+      Boolean(browser.SpeechRecognition || browser.webkitSpeechRecognition),
+    );
+    return () => {
+      live.current = false;
       controller.current?.abort();
+      const speech = recognition.current;
+      if (speech) {
+        speech.onresult = speech.onerror = speech.onend = null;
+        speech.abort();
+      }
       onBusy(false);
-    },
-    [onBusy],
-  );
+    };
+  }, [onBusy]);
+  const dictate = () => {
+    if (listening) {
+      recognition.current?.stop();
+      return;
+    }
+    const browser = window as SpeechWindow;
+    const Constructor =
+      browser.SpeechRecognition || browser.webkitSpeechRecognition;
+    if (!Constructor || busy) return;
+    setError("");
+    const speech = new Constructor();
+    recognition.current = speech;
+    speech.lang = navigator.language || "en-US";
+    speech.interimResults = false;
+    speech.onresult = (event) => {
+      if (!live.current) return;
+      setDraft((text) =>
+        `${text}${text.trim() ? " " : ""}${event.results[0][0].transcript}`.slice(
+          0,
+          20000,
+        ),
+      );
+    };
+    speech.onend = () => {
+      if (live.current) setListening(false);
+    };
+    speech.onerror = (event) => {
+      if (!live.current) return;
+      setListening(false);
+      setError(
+        event.error === "not-allowed"
+          ? "Microphone access wasn't allowed. You can still type."
+          : "Voice input couldn't finish. You can still type your message.",
+      );
+    };
+    try {
+      speech.start();
+      setListening(true);
+    } catch {
+      setError("Voice input isn't available here. You can still type.");
+    }
+  };
   useEffect(() => {
     if (transcript.current)
       transcript.current.scrollTop = transcript.current.scrollHeight;
@@ -51,6 +132,8 @@ export function RoomChat({
       if (["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
         if (file.size > 3 * 1024 * 1024)
           throw new Error("Choose an image smaller than 3 MB.");
+        if (connection?.ai && !connection.vision)
+          throw new Error("Image reading isn't enabled for this model yet.");
         const data = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
@@ -66,7 +149,12 @@ export function RoomChat({
         const text = await file.text();
         if (text.length > 18000)
           throw new Error("Try a shorter section of these notes.");
-        setDraft(`Here is ${file.name}:\n\n${text}`);
+        setDraft((previous) =>
+          `${previous.trim() ? previous + "\n\n" : ""}Here is ${file.name}:\n\n${text}`.slice(
+            0,
+            20000,
+          ),
+        );
       } else throw new Error("Choose a TXT, Markdown, PNG, JPEG or WebP file.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read that file.");
@@ -76,7 +164,7 @@ export function RoomChat({
   };
   const send = async (e: FormEvent) => {
     e.preventDefault();
-    if (!draft.trim() || busy || !connection?.ai) return;
+    if (!draft.trim() || busy || listening || !connection?.ai) return;
     const user: Message = { role: "user", content: draft.trim() },
       next = [...messages, user];
     setError("");
@@ -97,9 +185,11 @@ export function RoomChat({
         },
         request.signal,
       );
+      if (!live.current) return;
       setMessages([...next, { role: "assistant", content: result.text }]);
       setAttachment(null);
     } catch (error) {
+      if (!live.current) return;
       if ((error as { status?: number }).status === 429) {
         onRest();
         return;
@@ -114,8 +204,10 @@ export function RoomChat({
             : "Could not reach Todo. Please try again.",
       );
     } finally {
-      setBusy(false);
-      onBusy(false);
+      if (live.current) {
+        setBusy(false);
+        onBusy(false);
+      }
     }
   };
   const save = async (content: string) => {
@@ -137,54 +229,35 @@ export function RoomChat({
   };
   return (
     <>
-      <header className="room-panel-heading">
-        <div>
-          <span className="room-eyebrow">A SECOND PAIR OF FLIPPERS</span>
-          <DialogPrimitive.Title id="room-panel-title" asChild>
-            <h2>A little help.</h2>
-          </DialogPrimitive.Title>
-        </div>
+      <header className="room-agent-heading">
+        <DialogPrimitive.Title id="room-panel-title">
+          Talk with Todo
+        </DialogPrimitive.Title>
         <Button
           variant="ghost"
-          size="icon"
-          aria-label="Close panel"
+          size="sm"
+          aria-label="Back to room"
           onClick={onClose}
         >
-          <X size={18} />
+          <ArrowLeft size={14} /> Back to room
         </Button>
       </header>
-      <label className="room-field">
-        What would help?
-        <select
-          value={mode}
-          disabled={busy}
-          onChange={(e) => setMode(e.target.value)}
-        >
-          {[
-            ["chat", "Chat"],
-            ["summarize", "Summarize text"],
-            ["notes", "Make study notes"],
-            ["quiz", "Quiz questions"],
-            ["flashcards", "Flashcards from notes"],
-          ].map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
       {!connection?.ai ? (
         <p className="room-soft-notice">
-          Todo’s AI connection isn’t ready yet. Your timer, tasks, notes and PDF
-          tools are here whenever you need them.
+          Todo’s AI connection isn’t ready yet. You can prepare a message while
+          it is being connected.
         </p>
       ) : null}
-      <div className="room-chat-transcript" ref={transcript} aria-live="polite">
+      <div
+        className="room-chat-transcript"
+        ref={transcript}
+        role="log"
+        aria-label="Conversation with Todo"
+        aria-live="polite"
+        aria-relevant="additions text"
+      >
         {!messages.length ? (
-          <p className="room-chat-welcome">
-            Bring a question, a page of notes, or a thought you’d like to
-            untangle.
-          </p>
+          <p className="room-chat-welcome">What’s on your mind?</p>
         ) : (
           messages.map((m, i) => (
             <article key={i} className={`room-chat-message ${m.role}`}>
@@ -256,20 +329,72 @@ export function RoomChat({
           value={draft}
           disabled={busy}
           maxLength={20000}
+          onKeyDown={(event) => {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              !event.nativeEvent.isComposing
+            ) {
+              event.preventDefault();
+              if (!listening) event.currentTarget.form?.requestSubmit();
+            }
+          }}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <div>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={busy}
-            aria-label="Attach notes or a photo"
-            onClick={() => inputFile.current?.click()}
-          >
-            <Plus size={15} />
-            Attach
-          </Button>
+        <div className="room-agent-compose-tools">
+          <div className="room-agent-input-tools">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy}
+              aria-label="Attach notes or a photo"
+              onClick={() => inputFile.current?.click()}
+            >
+              <Plus size={15} />
+              Attach
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={busy || !canSpeak}
+              aria-label={listening ? "Stop voice input" : "Speak to Todo"}
+              aria-pressed={listening}
+              title={
+                canSpeak
+                  ? "Dictate with your browser, then review before sending"
+                  : "Voice input isn't supported by this browser"
+              }
+              onClick={dictate}
+            >
+              {listening ? <MicOff size={16} /> : <Mic size={16} />}
+              {listening ? "Stop" : "Speak"}
+            </Button>
+            <label className="sr-only" htmlFor="todo-chat-help">
+              What would help?
+            </label>
+            <select
+              id="todo-chat-help"
+              value={mode}
+              disabled={busy}
+              aria-label="What would help?"
+              onChange={(event) => setMode(event.target.value)}
+            >
+              {[
+                ["chat", "Chat"],
+                ["summarize", "Summarize"],
+                ["notes", "Study notes"],
+                ["explain", "Explain"],
+                ["quiz", "Quiz"],
+                ["flashcards", "Flashcards"],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
           {busy ? (
             <Button
               type="button"
@@ -283,12 +408,18 @@ export function RoomChat({
             <Button
               size="icon"
               aria-label="Send to Todo"
-              disabled={!draft.trim() || !connection?.ai}
+              disabled={!draft.trim() || listening || !connection?.ai}
             >
               <ArrowUp size={18} />
             </Button>
           )}
         </div>
+        {listening ? (
+          <p className="room-voice-status" role="status">
+            Listening… Your browser may use its speech service. Review the text
+            before sending.
+          </p>
+        ) : null}
       </form>
     </>
   );

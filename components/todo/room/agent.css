@@ -1,0 +1,187 @@
+/* Agent is the lower invitation transformed into a single conversation surface. */
+.cozy-room .room-agent-panel {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: 3%;
+  width: min(720px, 70%);
+  max-height: 48%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid #ffffffb3;
+  border-radius: 26px;
+  background: #ffffff99;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  color: #665440;
+  box-shadow: 0 16px 60px #382a251c;
+  outline: none;
+  animation: room-agent-arrive 0.7s cubic-bezier(0.22, 0.65, 0.24, 1) both;
+}
+@keyframes room-agent-arrive {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 20px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+.cozy-room[data-agent="true"] .room-scene-world {
+  transform: translate3d(0, 0.5%, 0) scale(1.035);
+}
+.cozy-room[data-agent="true"] .round-timer {
+  opacity: 0;
+  pointer-events: none;
+}
+.round-timer {
+  transition: opacity 0.65s ease;
+}
+.room-agent-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.room-agent-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+.room-agent-heading button {
+  height: 30px;
+  padding: 0 8px;
+  gap: 6px;
+  border-radius: 10px;
+  color: #7d6a56;
+  font-size: 11px;
+}
+.room-agent-panel .room-soft-notice {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #fff7e580;
+}
+.room-agent-panel .room-chat-transcript {
+  min-height: 0;
+  max-height: 190px;
+  padding: 0 4px;
+  flex: 1 1 auto;
+}
+.room-agent-panel .room-chat-welcome {
+  margin: 0;
+  padding: 2px 0 6px;
+  font-size: 13px;
+}
+.room-agent-panel .room-chat-message {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.room-agent-panel .room-chat-message > span {
+  font-size: 10px;
+}
+.room-agent-panel .room-chat-message > p {
+  font-size: 13px;
+  line-height: 1.65;
+}
+.room-agent-panel .room-message-actions button {
+  font-size: 10px;
+  height: 26px;
+  border-radius: 8px;
+}
+.room-agent-panel .room-chat-compose {
+  flex: 0 0 auto;
+  padding: 12px;
+  background: #fff9ed85;
+  border-color: #ffffffa6;
+  border-radius: 18px;
+}
+.room-agent-panel .room-chat-compose textarea {
+  min-height: 52px;
+  height: 52px;
+  max-height: 100px;
+  resize: none;
+  font-size: 14px;
+}
+.room-agent-panel .room-chat-compose textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.room-agent-panel .room-chat-compose:focus-within {
+  outline: 2px solid #baa17e88;
+  outline-offset: 2px;
+}
+.room-agent-panel .room-agent-compose-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.room-agent-input-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.room-agent-panel .room-chat-compose button {
+  flex-shrink: 0;
+}
+.room-agent-panel .room-agent-input-tools button {
+  width: auto;
+  height: 30px;
+  border-radius: 10px;
+  padding: 0 8px;
+  gap: 5px;
+  color: #806c55;
+  background: transparent;
+  font-size: 11px;
+}
+.room-agent-panel .room-agent-input-tools button:hover {
+  background: #dcc9aa66;
+}
+.room-agent-input-tools select {
+  font: inherit;
+  font-size: 11px;
+  color: #806c55;
+  height: 30px;
+  max-width: 120px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  padding: 0 5px;
+}
+.room-agent-input-tools button[aria-pressed="true"] {
+  color: #9c5348;
+  background: #eab8a94d;
+}
+.room-agent-panel button:focus-visible,
+.room-agent-panel select:focus-visible {
+  outline: 2px solid #977550;
+  outline-offset: 3px;
+}
+.room-agent-panel .room-error,
+.room-agent-panel .room-voice-status {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.room-agent-panel .room-voice-status {
+  margin-top: 8px;
+  color: #8d6d56;
+}
+.cozy-room-reduced .room-agent-panel {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-agent-panel {
+    animation: none !important;
+  }
+}

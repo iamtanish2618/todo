@@ -87,11 +87,11 @@ Continue focusing stays in the room. It resumes a paused focus sit if another ta
 
 ## Agent mode
 
-The UI calls authenticated `/api/chat`; `/api/assistant` remains an alias for earlier clients. Both use the same server validation, token verification, private provider settings, atomic daily usage reservation and timeout. API keys never enter client code. Available study modes are chat, notes, summary, explanation/photo analysis, quiz questions and flashcards. Text/image uploads remain supported. Output can be saved as notes or exported. The assistant has no coding/execution tool.
+Agent mode now replaces the lower invitation with one frosted chat surface, fades ordinary controls away and zooms the table gently. Back to room/Escape restore the workspace. Typed messages, text/image attachments and browser dictation feed a reviewable composer; Enter sends and Shift+Enter adds a line. Dictation is browser-dependent and is not real-time audio chat. See [Gemini setup](AI.md). The UI calls authenticated `/api/chat`; `/api/assistant` remains an alias for earlier clients. Both use the same server validation, token verification, private provider settings, atomic daily usage reservation and timeout. API keys never enter client code. Available study modes are chat, notes, summary, explanation/photo analysis, quiz questions and flashcards. Text/image uploads remain supported. Output can be saved as notes or exported. The assistant has no coding/execution tool.
 
 A real pending fetch switches Todo to typing and shows the working pill. Closing chat or switching back aborts the request. No fake pending animation is shown without a request. A local daily limit or upstream HTTP 429 closes Agent, selects Companion, disables Agent until the server day resets, and shows the gentle resting message. Server days and monthly aggregates use UTC; the client refreshes allowance at each UTC midnight and on window focus. Default daily allowance is 25 in the config, overridden by the private `TODO_AI_DAILY_LIMIT` setting (clamped to 1–100). Failed requests can consume a reserved use.
 
-No live AI provider key is configured in this project yet. Browser AI tests use clearly identified mock responses; they establish request/pending/fallback behaviour, not live model quality. Companion tools work without AI.
+Gemini 3.6 Flash is configured privately for the adult-audience version. Browser regression tests use clearly identified mock responses; a separate real adapter request verified live inference. Companion tools work without AI. End break explicitly restores the workspace; Focus again retains its existing route to the landing page.
 
 ## Verification
 

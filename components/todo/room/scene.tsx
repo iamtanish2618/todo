@@ -15,6 +15,7 @@ export function RoomScene({
   active,
   sky,
   focusing,
+  interactive = true,
   clock,
 }: {
   pose: RoomPose;
@@ -23,6 +24,7 @@ export function RoomScene({
   active: boolean;
   sky: "day" | "night" | "evening";
   focusing: boolean;
+  interactive?: boolean;
   clock: string | null;
 }) {
   const [ready, setReady] = useState(reduced);
@@ -105,8 +107,8 @@ export function RoomScene({
         aria-label={lamp ? "Turn table lamp off" : "Turn table lamp on"}
         aria-pressed={lamp}
         onClick={() => setLamp((v) => !v)}
-        disabled={focusing}
-        tabIndex={focusing ? -1 : 0}
+        disabled={focusing || !interactive}
+        tabIndex={focusing || !interactive ? -1 : 0}
       >
         <span className="round-lamp-base" />
         <span className="round-lamp-stem" />

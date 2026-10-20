@@ -564,7 +564,13 @@ export default function TodoApp({
         onFinish={finish}
         onExit={() => {
           setPanel(null);
+          setAgentMode(false);
           setInRoom(false);
+        }}
+        onRestoreRoom={() => {
+          setPanel(null);
+          setAgentMode(false);
+          setInRoom(true);
         }}
         onPanel={(id) => {
           if (id === "agent") setAgentMode(true);

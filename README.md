@@ -8,7 +8,7 @@ A penguin companion for focus, notes, and a little help. This is the first worki
 - **One shared workspace:** the single **Focus with Todo** invitation enters the room, with your selected penguin sitting across a complete round wooden table, a notebook and pen, coffee with rising steam, and a raised circular timer with depth, feet and a contact shadow. The notebook has curved pages and real page thickness. Todo’s attached flippers write during focus and lift a mug during breaks; the lamp starts off and warms up automatically for focus, without a reaching hand. Companion and Agent are modes in this room; closing a tool leaves the room in place.
 - **Focus solo:** write your tasks, select up to three, then start using the physical desk clock. Todo writes while you focus and has coffee during breaks. The physical clock handles pause, resume and finishing. Clicking the clock opens a compact setup with custom 1–120 minute durations and a Focus button. Selecting tasks darkens them without crossing them out. Focus hides the tools, warms the lamp and gently zooms toward Todo preparing his notebook and writing. Click the clock or press Escape to pause and restore controls. The old adjustment crown and duplicate timer display are removed. The timer continues when you close a tool or refresh.
 - **A little celebration:** completing a task or focus sit brings up Todo cheering, with only **Take a break** and **Continue focusing**. The soft two-note chime follows the room sound-effects setting. Breaks accept a custom 1–120 minutes, hide the tools, and show Todo sipping coffee. **Focus again** returns to the front page; **End break** restores the room. Break time never counts as focused time.
-- **Ask Todo:** chat, make notes, summarize text, or ask about an image once an AI provider is connected. Attach `.txt`, `.md`, PNG, JPEG, or WebP files. Image input needs a vision-capable model.
+- **Ask Todo:** Agent mode fades ordinary tools away, gently zooms in, and replaces the lower invitation with one chat composer. Type, attach text/images, or use browser dictation and review before sending. Enter sends; Shift+Enter adds a line. Back to room or Escape restores the workspace. Live replies require a privately configured model; notes/PDF export remain available for answers.
 - **Tasks:** active tasks stay saved until explicitly deleted. Finished tasks have their own panel with accumulated recorded focus time, linked by task ID so equal names cannot mix. Earlier untimed tasks say Not timed. A quiet focus sit can also start directly from the clock without a task.
 - **Your notes:** write and save notes and download real multi-page PDFs. This works without AI.
 - **Choose your companion:** scroll between the penguins or click the switch hint. Each character has its own invitation and greeting. They fade away as he closes his eyes and snow fills the screen, then return as she opens hers. The original playful avatar wears separate blue/pink knitted cap and muffler layers. The story now takes one long scroll, with him moving up and her arriving from below. Clicking anywhere on them triggers gentle wiggles, bounces, warmer blush, and occasional little hearts. Clicks do not blink. Your choice is remembered.
@@ -46,17 +46,17 @@ Open the printed local URL. Firebase is the default locally and in production. T
 
 ## Connect AI privately
 
-The initial build does **not** have live AI credentials. It clearly displays that state. Focus, notes, and PDF export already work.
+Gemini is configured privately for the adult-audience version. The owner supplies the key through ignored local/server configuration; no key is included in source or the browser bundle. Focus, notes and PDF export also work independently of AI.
 
-Choose an OpenAI-compatible API provider with terms allowing the account owner, intended age group, and this app's use. Free tiers have quotas and may have different data rules. Gemini API is not suitable here because its current terms exclude API clients likely to be accessed by under-18s. A parent's account does not remove that app restriction. Do not paste API keys into chats or commit them.
+Todo's intended audience is adults aged 18+ (confirmed by the owner). Gemini can be connected through its OpenAI-compatible endpoint using an eligible adult-owned account. Free tiers have quotas and different data rules; unpaid Gemini inputs/outputs can be used by Google to improve its products. Do not paste API keys into chats or commit them. See [the Gemini setup guide](docs/AI.md).
 
 For local development copy `.env.example` to `.env.local`, fill these private values, and restart the dev server:
 
 ```text
 TODO_AI_API_KEY=<your private key>
-TODO_AI_BASE_URL=<provider's HTTPS API base URL ending in /v1>
-TODO_AI_MODEL=<provider's exact current model ID>
-TODO_AI_LABEL=<friendly provider name>
+TODO_AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+TODO_AI_MODEL=gemini-3.6-flash
+TODO_AI_LABEL=Gemini
 TODO_AI_VISION=true
 TODO_AI_DAILY_LIMIT=25
 ```

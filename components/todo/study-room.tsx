@@ -62,6 +62,7 @@ import "./room/scene.css";
 import "./room/calm.css";
 import "./room/controls.css";
 import "./room/celebration.css";
+import "./room/agent.css";
 
 type Pane =
   | "focus"
@@ -118,6 +119,7 @@ type Props = {
   onStart: () => void;
   onFinish: () => Promise<boolean>;
   onExit: () => void;
+  onRestoreRoom: () => void;
   onPanel: (panel: Panel) => void;
 };
 
@@ -143,12 +145,13 @@ export function StudyRoom(p: Props) {
   celebrationOpen.current = celebrating;
   const quietFocus = p.running && p.phase === "focus";
   const quietBreak = p.started && p.phase === "break";
-  const quietRoom = quietFocus || quietBreak || celebrating;
   const [pane, setPane] = useState<Pane | null>(null),
     [loaded, setLoaded] = useState(false),
     [loadError, setLoadError] = useState(""),
     [retry, setRetry] = useState(0),
     [debug, setDebug] = useState(false);
+  const agentView = p.active && p.agentMode && pane === "agent";
+  const quietRoom = quietFocus || quietBreak || celebrating || agentView;
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [draft, setDraft] = useState(""),
@@ -177,8 +180,8 @@ export function StudyRoom(p: Props) {
     [speechAvailable, setSpeechAvailable] = useState(false),
     [listening, setListening] = useState(false);
   useEffect(() => {
-    if (!p.active) setSoundscape("off");
-  }, [p.active]);
+    if (!p.active || p.agentMode) setSoundscape("off");
+  }, [p.active, p.agentMode]);
   const recognizer = useRef<Recognition | null>(null),
     baseline = useRef(0),
     roomRoot = useRef<HTMLElement>(null),
@@ -307,6 +310,7 @@ export function StudyRoom(p: Props) {
           latest.current.onStart();
         }
         setPane(null);
+        latest.current.onAgentMode(false);
         setError("");
       }
     };
@@ -503,6 +507,10 @@ export function StudyRoom(p: Props) {
       if (!(await p.onFinish())) return;
       setPane(null);
       if (goHome) p.onExit();
+      else {
+        p.onAgentMode(false);
+        p.onRestoreRoom();
+      }
     });
   const mode = (agent: boolean) => {
     if (agent && resting) return;
@@ -564,6 +572,7 @@ export function StudyRoom(p: Props) {
     },
   ].filter((k) => totalSits >= k.at);
   const close = () => {
+    if (pane === "agent") p.onAgentMode(false);
     setPane(null);
     setError("");
   };
@@ -573,7 +582,7 @@ export function StudyRoom(p: Props) {
     ambience: "Set the mood.",
     tasks: "Your tasks.",
     notes: "Your little notebook.",
-    agent: "A little help.",
+    agent: "Talk with Todo",
     settings: "Make yourself comfortable.",
     month: "This month",
     corner: "Your corner",
@@ -1307,6 +1316,7 @@ export function StudyRoom(p: Props) {
       inert={!p.active}
       data-character={p.female ? "female" : "male"}
       data-mode={p.agentMode ? "agent" : "companion"}
+      data-agent={agentView}
       data-loaded={loaded}
       data-tone={tone}
       data-rain={rain}
@@ -1331,11 +1341,14 @@ export function StudyRoom(p: Props) {
               tone === "morning" ? "day" : tone === "rain" ? "evening" : "night"
             }
             focusing={quietFocus}
+            interactive={!agentView}
             clock={p.started ? p.clock : null}
           />
           <div
             className="room-table-clock round-timer"
             aria-label={`Table timer ${p.clock}`}
+            inert={agentView}
+            aria-hidden={agentView}
           >
             <span className="round-timer-shadow" aria-hidden="true" />
             <span className="round-timer-feet" aria-hidden="true" />
@@ -1544,7 +1557,7 @@ export function StudyRoom(p: Props) {
             </div>
           )}
         </div>
-        {p.active && soundscape !== "off" ? (
+        {p.active && !agentView && soundscape !== "off" ? (
           <RoomSoundPlayer
             key={soundscape}
             recording={soundscape}
@@ -1633,12 +1646,16 @@ export function StudyRoom(p: Props) {
         >
           {pane ? (
             <DialogPrimitive.Content
-              className={`room-tool-panel ${pane === "agent" ? "room-chat-panel" : ""} ${pane === "focus" || pane === "break" ? "room-focus-panel" : ""}`}
+              className={
+                pane === "agent"
+                  ? "room-agent-panel"
+                  : `room-tool-panel ${pane === "focus" || pane === "break" ? "room-focus-panel" : ""}`
+              }
               style={
-                pane === "focus" || pane === "break"
+                pane === "focus" || pane === "break" || pane === "agent"
                   ? undefined
                   : {
-                      ...zoneStyle(pane === "agent" ? C.chat : C.panel),
+                      ...zoneStyle(C.panel),
                       ...(pane === "ambience"
                         ? { height: "auto", maxHeight: "64%" }
                         : {}),
@@ -1647,6 +1664,15 @@ export function StudyRoom(p: Props) {
               aria-labelledby="room-panel-title"
               aria-describedby="room-panel-description"
               onInteractOutside={(e) => e.preventDefault()}
+              onOpenAutoFocus={(event) => {
+                if (pane !== "agent") return;
+                event.preventDefault();
+                roomRoot.current
+                  ?.querySelector<HTMLTextAreaElement>(
+                    ".room-agent-panel textarea",
+                  )
+                  ?.focus({ preventScroll: true });
+              }}
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
                 if (celebrationOpen.current) return;
@@ -1654,8 +1680,8 @@ export function StudyRoom(p: Props) {
                   ?.querySelector<HTMLButtonElement>(".round-timer-face")
                   ?.focus({ preventScroll: true });
               }}
-              inert={quietRoom}
-              aria-hidden={quietRoom}
+              inert={pane !== "agent" && quietRoom}
+              aria-hidden={pane !== "agent" && quietRoom}
               data-lenis-prevent
             >
               <DialogPrimitive.Description
