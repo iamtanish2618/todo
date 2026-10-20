@@ -61,3 +61,5 @@ next-env.d.ts
 *.tsbuildinfo
 /firebase-debug*.log
 /ui-debug.log
+
+/database-debug.log

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
+import type { Color } from "@/lib/todo/table/protocol";
 import { ROOM_CONFIG as C, type RoomPose } from "./config";
 
 export function RoomPenguin({
@@ -10,6 +11,7 @@ export function RoomPenguin({
   active,
   calm = false,
   intro = "awake",
+  beanie,
 }: {
   pose: RoomPose;
   female: boolean;
@@ -17,6 +19,7 @@ export function RoomPenguin({
   active: boolean;
   calm?: boolean;
   intro?: string;
+  beanie?: Color;
 }) {
   const root = useRef<HTMLButtonElement>(null);
   const [reaction, setReaction] = useState("");
@@ -175,6 +178,24 @@ export function RoomPenguin({
             }}
           />
         ))}
+        {beanie && beanie !== "blue" && beanie !== "pink" && (
+          <>
+            <img
+              className="table-knit-tint table-knit-cap"
+              data-color={beanie}
+              src={source(pose)}
+              alt=""
+              aria-hidden="true"
+            />
+            <img
+              className="table-knit-tint table-knit-scarf"
+              data-color={beanie}
+              src={source(pose)}
+              alt=""
+              aria-hidden="true"
+            />
+          </>
+        )}
         <span
           className="room-gaze"
           style={{

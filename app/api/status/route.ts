@@ -1,3 +1,4 @@
+import { tableConfig } from "@/lib/todo/table/config.server";
 import { env } from "cloudflare:workers";
 import { ApiError, aiConfig, fail, owner, setting } from "@/lib/todo/server";
 import { dailyLimit, quotaReset, usageDay } from "@/lib/todo/quota";
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
         ai: Boolean(aiConfig()),
         vision: setting("TODO_AI_VISION") === "true",
         provider: setting("TODO_AI_LABEL") || "AI connection",
-        friends: false,
+        friends: tableConfig().enabled && tableConfig().configured,
         quota: { used, limit, resting: used >= limit, resetsAt: quotaReset() },
       },
       { headers: { "Cache-Control": "private, no-store" } },

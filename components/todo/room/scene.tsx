@@ -21,6 +21,7 @@ export function RoomScene({
   clock,
   weather,
   arrived,
+  teammates,
 }: {
   pose: RoomPose;
   female: boolean;
@@ -32,6 +33,7 @@ export function RoomScene({
   clock: string | null;
   weather: RoomWeather;
   arrived: boolean;
+  teammates?: React.ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [intro, setIntro] = useState("sleep");
@@ -102,6 +104,7 @@ export function RoomScene({
     <div
       ref={root}
       className="cozy-room-art round-room-art"
+      data-shared={!!teammates}
       data-weather={weather}
       data-intro={intro}
       data-prop-action={propAction}
@@ -190,16 +193,20 @@ export function RoomScene({
         style={zoneStyle(C.shadow)}
         aria-hidden="true"
       />
-      <div className="room-seated-anchor" style={zoneStyle(C.penguin)}>
-        <RoomPenguin
-          pose={scenePose}
-          female={female}
-          reduced={reduced}
-          active={active}
-          calm={focusing || !interactive || pose !== "idle"}
-          intro={intro}
-        />
-      </div>
+      {teammates || (
+        <>
+          <div className="room-seated-anchor" style={zoneStyle(C.penguin)}>
+            <RoomPenguin
+              pose={scenePose}
+              female={female}
+              reduced={reduced}
+              active={active}
+              calm={focusing || !interactive || pose !== "idle"}
+              intro={intro}
+            />
+          </div>
+        </>
+      )}
       <img
         className="round-table-front"
         src={C.image}

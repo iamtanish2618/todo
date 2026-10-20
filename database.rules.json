@@ -1,0 +1,77 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "tableClaims": {
+      "$code": {
+        "$id": {
+          ".write": "auth != null && auth.token.email_verified == true && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && (!newData.exists() || newData.val() == auth.uid)))",
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        }
+      }
+    },
+    "tables": {
+      "$code": {
+        "members": {
+          ".read": "auth != null && auth.token.email_verified == true",
+          "$id": {
+            ".write": "auth != null && auth.token.email_verified == true && root.child('tableClaims').child($code).child($id).val() == auth.uid",
+            ".validate": "newData.hasChildren(['id','name','color','joinedAt','status','mic','hasMicPermission'])",
+            "id": {
+              ".validate": "newData.isString() && newData.val() == $id"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 16"
+            },
+            "color": {
+              ".validate": "newData.val() == 'blue' || newData.val() == 'pink' || newData.val() == 'sage' || newData.val() == 'honey' || newData.val() == 'lavender' || newData.val() == 'rust'"
+            },
+            "joinedAt": {
+              ".validate": "newData.isNumber() && ((!data.exists() && newData.val() == now) || (data.exists() && newData.val() == data.val()))"
+            },
+            "status": {
+              ".validate": "newData.val() == 'arriving' || newData.val() == 'idle' || newData.val() == 'focusing' || newData.val() == 'break'"
+            },
+            "mic": {
+              ".validate": "newData.val() == 'muted' || newData.val() == 'live'"
+            },
+            "hasMicPermission": {
+              ".validate": "newData.isBoolean()"
+            },
+            "playing": {
+              ".validate": "newData.val() == 'doodle' || newData.val() == 'breathe'"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "inbox": {
+          "$to": {
+            ".read": "auth != null && auth.token.email_verified == true && root.child('tableClaims').child($code).child($to).val() == auth.uid",
+            ".write": "auth != null && auth.token.email_verified == true && root.child('tableClaims').child($code).child($to).val() == auth.uid && !newData.exists()",
+            "$from": {
+              ".write": "auth != null && auth.token.email_verified == true && root.child('tableClaims').child($code).child($from).val() == auth.uid && !newData.exists()",
+              "$message": {
+                ".write": "auth != null && auth.token.email_verified == true && ((root.child('tableClaims').child($code).child($from).val() == auth.uid && root.child('tables').child($code).child('members').child($from).exists() && root.child('tables').child($code).child('members').child($to).exists()) || (!newData.exists() && (root.child('tableClaims').child($code).child($from).val() == auth.uid || root.child('tableClaims').child($code).child($to).val() == auth.uid)))",
+                ".validate": "newData.hasChildren(['from','body','sentAt'])",
+                "from": {
+                  ".validate": "newData.val() == $from"
+                },
+                "body": {
+                  ".validate": "newData.isString() && newData.val().length <= 65000"
+                },
+                "sentAt": {
+                  ".validate": "newData.isNumber() && newData.val() == now"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

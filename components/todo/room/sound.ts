@@ -137,6 +137,28 @@ export function useRoomSound(
       if (!e) return;
       const { context, master } = e,
         now = context.currentTime;
+      if (kind === "table_join" || kind === "table_leave") {
+        const notes = kind === "table_join" ? [392, 494] : [440, 349];
+        notes.forEach((frequency, i) => {
+          const osc = context.createOscillator(),
+            gain = context.createGain(),
+            at = now + i * 0.09;
+          osc.type = "sine";
+          osc.frequency.value = frequency;
+          gain.gain.setValueAtTime(0, at);
+          gain.gain.linearRampToValueAtTime(0.035, at + 0.025);
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.3);
+          osc.connect(gain);
+          gain.connect(master);
+          osc.start(at);
+          osc.stop(at + 0.32);
+          osc.onended = () => {
+            osc.disconnect();
+            gain.disconnect();
+          };
+        });
+        return;
+      }
       if (["pour", "page", "print", "lamp", "thunder"].includes(kind)) {
         const source = context.createBufferSource(),
           filter = context.createBiquadFilter(),

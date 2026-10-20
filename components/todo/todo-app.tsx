@@ -362,6 +362,19 @@ export default function TodoApp({
     } else setPanel(id);
     chime();
   };
+  useEffect(() => {
+    if (
+      !identity ||
+      !timerReady ||
+      !new URLSearchParams(location.search).has("room")
+    )
+      return;
+    const open = setTimeout(() => {
+      setInRoom(true);
+      setPanel("friends");
+    }, 0);
+    return () => clearTimeout(open);
+  }, [identity, timerReady]);
   const switchCharacter = () =>
     introRef.current?.selectCharacter(female ? "male" : "female");
   const addTask = async (e: FormEvent) => {
@@ -514,6 +527,7 @@ export default function TodoApp({
       ) : null}
       <StudyRoom
         active={inRoom}
+        entryPanel={panel}
         userId={identity?.id || "guest"}
         tasks={tasks}
         notes={notes}
@@ -583,6 +597,25 @@ export default function TodoApp({
               : {}),
           }));
           if (begin) chime();
+        }}
+        onSharedStart={(durationMinutes, startAt) => {
+          if (timer.started) return;
+          const duration = durationMinutes * 60,
+            deadline = startAt + duration * 1000;
+          if (deadline <= Date.now()) return;
+          setMinutes(durationMinutes);
+          setTimer({
+            ...freshTimer,
+            task: timer.task || "Sit together",
+            taskId: timer.taskId,
+            duration,
+            remaining: Math.ceil((deadline - Date.now()) / 1000),
+            deadline,
+            started: true,
+            startedAt: startAt,
+            id: crypto.randomUUID(),
+          });
+          chime();
         }}
         onStart={start}
         onExtend={() =>
@@ -818,7 +851,7 @@ export default function TodoApp({
         onBusyChange={setAgentBusy}
       />
       <Dialog
-        open={panel === "friends"}
+        open={panel === "friends" && !inRoom}
         onOpenChange={(open) => {
           if (!open) setPanel(null);
         }}

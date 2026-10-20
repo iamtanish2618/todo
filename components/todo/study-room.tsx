@@ -86,6 +86,13 @@ import {
 } from "./room/polish-controls";
 import { EMPTY_MIX, roomEffect, type RoomWeather } from "./room/cinema-config";
 import "./room/cinematic.css";
+import { useTable } from "./room/shared/use-table";
+import { useTableVoice } from "./room/shared/use-voice";
+import { VoiceControls, PersistentMic } from "./room/shared/voice-controls";
+import { useBreakGames, BreakGames } from "./room/shared/break-games";
+import { TableSeats } from "./room/shared/seating";
+import { FriendsPanel } from "./room/shared/friends";
+import "./room/shared/shared.css";
 
 type Pane =
   | "focus"
@@ -108,6 +115,7 @@ type Summary = {
   totalSits: number;
 };
 type Props = {
+  entryPanel?: Panel;
   active: boolean;
   female: boolean;
   reduced: boolean;
@@ -141,6 +149,7 @@ type Props = {
   onAgentMode: (mode: boolean) => void;
   onTask: (task: string, begin?: boolean, taskId?: string) => void;
   onStart: () => void;
+  onSharedStart: (minutes: number, startAt: number) => void;
   onExtend: () => void;
   onFinish: () => Promise<boolean>;
   onExit: () => void;
@@ -162,6 +171,45 @@ type Recognition = {
 };
 
 export function StudyRoom(p: Props) {
+  const { session: tableSession, table } = useTable(
+    p.active,
+    p.started ? (p.phase === "break" ? "break" : "focusing") : "idle",
+  );
+  const { voice: tableVoice, state: voiceState } = useTableVoice(
+    tableSession,
+    p.active && table.config.voice,
+    p.started && p.phase === "focus",
+  );
+  const { games: breakGames, state: breakGameState } = useBreakGames(
+    tableSession,
+    p.active &&
+      table.config.games &&
+      p.started &&
+      p.phase === "break" &&
+      p.remaining > 0,
+  );
+  const [inviteCode, setInviteCode] = useState("");
+  const [acceptedSit, setAcceptedSit] = useState<number | null>(null);
+  useEffect(() => {
+    if (!table.sit || acceptedSit !== table.sit.startAt || p.started) return;
+    const sit = table.sit;
+    const begin = setTimeout(
+      () => {
+        p.onSharedStart(sit.minutes, sit.startAt - table.offset);
+        tableSession.dismissSit();
+        setAcceptedSit(null);
+      },
+      Math.max(0, sit.startAt - table.offset - Date.now()),
+    );
+    return () => clearTimeout(begin);
+  }, [
+    table.sit,
+    table.offset,
+    acceptedSit,
+    p.started,
+    p.onSharedStart,
+    tableSession,
+  ]);
   const [dockEnabled, setDockEnabled] = useState(DOCK_CONFIG.enabled);
   useEffect(() => {
     setDockEnabled(
@@ -186,6 +234,17 @@ export function StudyRoom(p: Props) {
     [loadError, setLoadError] = useState(""),
     [retry, setRetry] = useState(0),
     [debug, setDebug] = useState(false);
+  useEffect(() => {
+    if (!p.active || !arrived) return;
+    const code = new URLSearchParams(location.search).get("room");
+    const open = setTimeout(() => {
+      if (code || p.entryPanel === "friends") {
+        setInviteCode(code || "");
+        setPane("friends");
+      }
+    }, 0);
+    return () => clearTimeout(open);
+  }, [p.active, arrived, p.entryPanel]);
   const agentView = p.active && p.agentMode && pane === "agent";
   const quietRoom = quietFocus || quietBreak || celebrating || agentView;
   const [error, setError] = useState(""),
@@ -279,9 +338,7 @@ export function StudyRoom(p: Props) {
 
   const dragDepth = useRef(0);
   const printTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [joining, setJoining] = useState("todo"),
-    [friendCode, setFriendCode] = useState(""),
-    [friendNotice, setFriendNotice] = useState("");
+  const [joining, setJoining] = useState("todo");
   const [connection, setConnection] = useState(p.connection),
     [resting, setResting] = useState(false),
     [speechAvailable, setSpeechAvailable] = useState(false),
@@ -290,6 +347,17 @@ export function StudyRoom(p: Props) {
     baseline = useRef(0),
     roomRoot = useRef<HTMLElement>(null),
     latest = useRef(p);
+  useEffect(() => {
+    let previous = tableSession.getSnapshot().members.map((m) => m.id);
+    return tableSession.subscribe(() => {
+      const ids = tableSession.getSnapshot().members.map((m) => m.id);
+      if (ids.some((id) => !previous.includes(id)))
+        roomEffect(roomRoot.current, "table_join");
+      else if (previous.some((id) => !ids.includes(id)) && ids.length)
+        roomEffect(roomRoot.current, "table_leave");
+      previous = ids;
+    });
+  }, [tableSession]);
   const closePanel = useRef<() => void>(() => {});
   const closingTween = useRef<GSAPTween | null>(null);
   useEffect(
@@ -1659,55 +1727,19 @@ export function StudyRoom(p: Props) {
         );
       case "friends":
         return (
-          <>
-            <p className="room-helper">A place for good company.</p>
-            <div
-              className="room-friend-table"
-              aria-label="Preview of a table for you and your friends"
-            >
-              <span>
-                <img
-                  className="cinema-friend-preview"
-                  src={
-                    p.female
-                      ? C.poses.idle.replace(".png", "-pink.png")
-                      : C.poses.idle
-                  }
-                  alt="You"
-                />
-              </span>
-              <i />
-              <span aria-label="Empty chair">♡</span>
-              <span aria-label="Empty chair">♡</span>
-            </div>
-            <label className="room-field">
-              Join with a code
-              <Input
-                aria-label="Friend room code"
-                value={friendCode}
-                placeholder="Your room code"
-                onChange={(e) => setFriendCode(e.target.value)}
-              />
-            </label>
-            <Button
-              className="room-dark-button"
-              disabled={!friendCode.trim()}
-              onClick={() =>
-                setFriendNotice(
-                  "Shared rooms and microphones are still being built. This table is a preview; no room has been joined.",
-                )
-              }
-            >
-              Join room
-            </Button>
-            <p className="room-soft-notice">
-              {friendNotice ||
-                "A preview for now. Shared rooms and voice are coming later."}
-            </p>
-            <Button variant="ghost" onClick={() => setPane("home")}>
-              Sit with Todo for now <ArrowRight size={15} />
-            </Button>
-          </>
+          <FriendsPanel
+            session={tableSession}
+            table={table}
+            initialCode={inviteCode}
+            onSit={() =>
+              setAcceptedSit(tableSession.getSnapshot().sit?.startAt || null)
+            }
+            onGesture={() => void tableVoice.unlock()}
+          >
+            {table.config.voice && (
+              <VoiceControls voice={tableVoice} state={voiceState} />
+            )}
+          </FriendsPanel>
         );
       case "home":
         return (
@@ -1825,6 +1857,8 @@ export function StudyRoom(p: Props) {
       data-rain={rain}
       data-working={quietFocus}
       data-quiet={quietRoom}
+      data-break-game={quietBreak ? breakGameState.game || "" : ""}
+      data-shared-table={table.members.length > 0}
       data-resting={quietBreak}
       data-panel-open={Boolean(pane) && !quietRoom}
       data-season={
@@ -1847,8 +1881,47 @@ export function StudyRoom(p: Props) {
         inert={!arrived || Boolean(breakReturn)}
         aria-hidden={!arrived || Boolean(breakReturn)}
       >
+        {table.config.games && (
+          <BreakGames games={breakGames} reduced={p.reduced} sound={p.sound} />
+        )}
+        {table.members.length > 0 && table.config.voice && (
+          <PersistentMic
+            voice={tableVoice}
+            state={voiceState}
+            focusing={quietFocus}
+          />
+        )}
+        {table.state === "reconnecting" && (
+          <p className="table-reconnect" role="status">
+            Reconnecting…
+          </p>
+        )}
+        {table.sit && acceptedSit !== table.sit.startAt && !p.started && (
+          <div
+            className="table-sit-invite"
+            role="group"
+            aria-label="Shared focus invitation"
+          >
+            <span>Sit together for {table.sit.minutes} minutes?</span>
+            <button onClick={() => setAcceptedSit(table.sit!.startAt)}>
+              Join focus
+            </button>
+            <button onClick={() => tableSession.dismissSit()}>Not now</button>
+          </div>
+        )}
         <div className="room-scene-world">
           <RoomScene
+            teammates={
+              table.members.length ? (
+                <TableSeats
+                  table={table}
+                  voice={tableVoice}
+                  voiceState={voiceState}
+                  session={tableSession}
+                  reduced={p.reduced}
+                />
+              ) : undefined
+            }
             pose={pose}
             female={p.female}
             reduced={p.reduced}
@@ -2168,6 +2241,15 @@ export function StudyRoom(p: Props) {
             role="group"
             aria-label="Break controls"
           >
+            {table.config.games && p.remaining > 0 && (
+              <Button
+                className="table-game-play"
+                onClick={() => breakGames.showMenu()}
+              >
+                <Sparkles size={15} />
+                Play
+              </Button>
+            )}
             <Button onClick={() => endBreak(true)} disabled={busy}>
               Focus again <ArrowRight size={15} />
             </Button>

@@ -1,0 +1,222 @@
+.table-game-panel {
+  position: absolute;
+  right: 2%;
+  top: 17%;
+  width: 23%;
+  z-index: 38;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 25px;
+  background: linear-gradient(135deg, #fff8e9c9, #e7d5c5a8);
+  border: 1px solid #fffc;
+  backdrop-filter: blur(25px);
+  box-shadow: 0 10px 35px #32251d25;
+  color: #3b302a;
+  animation: table-game-enter 0.3s ease both;
+}
+.table-game-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.table-game-panel h2 {
+  font-size: 16px;
+  font-weight: 750;
+  margin: 0;
+}
+.table-game-choice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff8;
+  border: 1px solid #fffa;
+  transition: transform 0.2s;
+}
+.table-game-choice:hover {
+  transform: translateY(-2px);
+}
+.table-game-choice > span {
+  font-size: 13px;
+  font-weight: 650;
+}
+.table-game-choice small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.75;
+  margin-top: 3px;
+}
+.table-doodle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  touch-action: none;
+  cursor: crosshair;
+  pointer-events: auto;
+}
+.table-game-toolbar {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 38;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 22px;
+  background: #f8eee0d9;
+  border: 1px solid #fff9;
+  backdrop-filter: blur(20px);
+  color: #42372e;
+  font-size: 12px;
+}
+.table-game-toolbar > span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.table-game-toolbar button {
+  font-size: 12px;
+}
+.table-game-invite {
+  position: absolute;
+  left: 3%;
+  top: 8%;
+  z-index: 42;
+  max-width: 35%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 22px;
+  background: #fff8ebe6;
+  border: 1px solid #fff9;
+  backdrop-filter: blur(18px);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #3f352c;
+}
+.table-breath-panel {
+  align-items: center;
+  text-align: center;
+}
+.table-breath-space {
+  height: 150px;
+  display: grid;
+  place-items: center;
+}
+.table-breath-orb {
+  height: 128px;
+  width: 128px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    circle at 30% 25%,
+    #ffffffd9,
+    #d3e5e694 35%,
+    #b6cad666 68%,
+    #fff8
+  );
+  box-shadow:
+    inset 0 0 24px #fff8,
+    0 8px 24px #748d9a25;
+  color: #fff;
+  transform: scale(0.65);
+}
+.table-breath-label {
+  font-size: 16px;
+  min-height: 24px;
+  color: #40382f;
+}
+.table-game-end {
+  position: absolute;
+  z-index: 40;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 20px;
+  background: #fff8ece6;
+  padding: 8px 14px;
+  color: #514337;
+  font-size: 12px;
+  pointer-events: none;
+  animation: table-end-notice 4s both;
+}
+.table-game-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.table-game-panel :focus-visible,
+.table-game-toolbar :focus-visible {
+  outline: 2px solid #79533b;
+  outline-offset: 3px;
+}
+@keyframes table-game-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes table-end-notice {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-game-panel {
+    animation: table-game-fade 0.2s linear;
+  }
+  .table-game-choice:hover {
+    transform: none;
+  }
+}
+@keyframes table-game-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.cozy-room[data-break-game="breathe"] .room-pet-breathe {
+  animation: none;
+  transform-origin: 50% 90%;
+  transform: scale(
+    calc(1 + var(--table-breath, 0) * 0.012),
+    calc(1 + var(--table-breath, 0) * 0.025)
+  );
+}
+.cozy-room[data-break-game="doodle"] .room-seated-anchor .room-pet {
+  transform: rotate(-3deg);
+  transform-origin: 50% 90%;
+  transition: transform 0.5s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cozy-room[data-break-game="breathe"] .room-pet-breathe,
+  .cozy-room[data-break-game="doodle"] .room-seated-anchor .room-pet {
+    transform: none;
+  }
+}
+/* Above the window's decorative hotspot; clipping keeps the rest of the room interactive. */
+.table-doodle {
+  z-index: 17;
+}

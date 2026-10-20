@@ -117,3 +117,7 @@ Tune `components/todo/room/cinema-config.ts`; the motion/canvas controller is `c
 Relevant checks: `npx playwright test --config work/qa.config.ts tests/cinema.spec.ts tests/cinema-performance.spec.ts tests/break-return.spec.ts`. Additional regression coverage lives in `tests/room.spec.ts`.
 
 The weather boundary is covered with mocked geolocation and provider responses; no real visitor location is used during testing. Performance checks require installed Google Chrome. A forced SwiftShader diagnostic remains useful for fallback behavior, but cannot represent hardware-composited laptop performance.
+
+## Shared tables
+
+Firebase rooms, voice, teammate seating, break games, configuration, privacy limits and the complete manual test plan are documented in [docs/shared-tables.md](docs/shared-tables.md). Solo focus remains independent of shared tables.
