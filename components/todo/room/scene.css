@@ -330,24 +330,6 @@
   transform: rotate(-90deg);
   transform-origin: center;
 }
-.cozy-room .round-timer .round-timer-adjust {
-  padding: 0;
-  position: absolute;
-  right: 22%;
-  top: -6%;
-  width: 22%;
-  height: 14%;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(#f5efd9, #bac5af);
-  border: 1px solid #e6e9d6;
-  border-radius: 5px 5px 2px 2px;
-  color: #7d8d7d;
-  transform: rotate(-8deg);
-  z-index: -1;
-  cursor: pointer;
-  box-shadow: 1px 1px 2px #42533b33;
-}
 .cozy-room .room-home-card {
   padding: 12px 20px;
 }

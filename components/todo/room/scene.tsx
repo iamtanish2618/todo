@@ -13,15 +13,30 @@ export function RoomScene({
   reduced,
   active,
   day,
+  focusing,
 }: {
   pose: RoomPose;
   female: boolean;
   reduced: boolean;
   active: boolean;
   day: boolean;
+  focusing: boolean;
 }) {
   const [ready, setReady] = useState(reduced);
-  const [lamp, setLamp] = useState(true);
+  const [lamp, setLamp] = useState(false);
+  const [working, setWorking] = useState(false);
+  useEffect(() => {
+    setWorking(false);
+    if (!focusing || !active) return;
+    setLamp(false);
+    const light = setTimeout(() => setLamp(true), reduced ? 0 : 250);
+    const prepare = setTimeout(() => setWorking(true), reduced ? 0 : 1200);
+    return () => {
+      clearTimeout(light);
+      clearTimeout(prepare);
+    };
+  }, [focusing, active, reduced]);
+  const scenePose = pose === "writing" && !working ? "idle" : pose;
   useEffect(() => {
     if (!active) return;
     if (reduced) {
@@ -36,7 +51,8 @@ export function RoomScene({
     <div
       className="cozy-room-art round-room-art"
       data-entry={ready ? "ready" : "settling"}
-      data-pose={pose}
+      data-pose={scenePose}
+      data-work-phase={focusing ? (working ? "writing" : "preparing") : "idle"}
       data-lamp-on={lamp}
       data-active={active}
     >
@@ -55,7 +71,7 @@ export function RoomScene({
       />
       <div className="room-seated-anchor" style={zoneStyle(C.penguin)}>
         <RoomPenguin
-          pose={pose}
+          pose={scenePose}
           female={female}
           reduced={reduced}
           active={active}
@@ -81,6 +97,8 @@ export function RoomScene({
         aria-label={lamp ? "Turn table lamp off" : "Turn table lamp on"}
         aria-pressed={lamp}
         onClick={() => setLamp((v) => !v)}
+        disabled={focusing}
+        tabIndex={focusing ? -1 : 0}
       >
         <span className="round-lamp-base" />
         <span className="round-lamp-stem" />
@@ -90,7 +108,7 @@ export function RoomScene({
         <span className="round-lamp-button" />
       </button>
       <DeskNotebook />
-      <WorkingFlippers pose={pose} />
+      <WorkingFlippers pose={scenePose} />
       <div className="round-tea-set" aria-hidden="true">
         <span className="round-tea-pot">
           <i />

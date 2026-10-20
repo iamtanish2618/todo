@@ -171,6 +171,14 @@ export default function TodoApp({
       cancelled = true;
     };
   }, [load, identity, auth.ready, auth.newAccount]);
+  const [systemReduced, setSystemReduced] = useState(false);
+  useEffect(() => {
+    const media = matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setSystemReduced(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   useEffect(() => {
     const preference = matchMedia("(prefers-reduced-motion: reduce)");
     try {
@@ -421,11 +429,11 @@ export default function TodoApp({
   return (
     <main
       data-ready={timerReady}
-      className={`todo-root ${reduced ? "reduce-motion" : ""} ${inRoom ? "room-active" : ""}`}
+      className={`todo-root ${(inRoom ? reduced || systemReduced : systemReduced) ? "reduce-motion" : ""} ${inRoom ? "room-active" : ""}`}
     >
       <Welcome
         ref={introRef}
-        reduced={reduced}
+        reduced={systemReduced}
         ready={timerReady && auth.ready}
         active={!inRoom}
         blocked={Boolean(panel) || accountOpen}
@@ -457,7 +465,7 @@ export default function TodoApp({
           female={female}
           signInPath={signInPath}
           signOutPath={signOutPath}
-          reduced={reduced}
+          reduced={systemReduced}
           auth={auth}
           onSaved={(next) => {
             setProfile(next);

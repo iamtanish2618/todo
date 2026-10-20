@@ -3,6 +3,12 @@ import { test, expect } from "@playwright/test";
 test("minimal anonymous home connects to real hosted sign-in, not a fake password form", async ({
   page,
 }) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "todo.settings.v1",
+      JSON.stringify({ reduced: true, sound: false }),
+    ),
+  );
   await page.goto("/");
   await expect(page.locator(".intro-experience")).toHaveAttribute(
     "data-loaded",
@@ -17,7 +23,16 @@ test("minimal anonymous home connects to real hosted sign-in, not a fake passwor
   await expect(
     page.getByRole("button", { name: /Ask Todo|Join friends/ }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Open settings", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".intro-playmate .pocket-todo")).toBeVisible();
+  await expect(page.locator(".todo-root")).not.toHaveClass(/reduce-motion/);
   await page.getByRole("button", { name: "Sign up", exact: true }).click();
+  await expect(page.getByText("Gentle motion", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Little sound effects", { exact: true }),
+  ).toHaveCount(0);
   const link = page.getByRole("link", { name: /Continue with ChatGPT/ });
   await expect(link).toHaveAttribute("target", "_top");
   await expect(link).toHaveAttribute(
@@ -49,7 +64,9 @@ test("profile saves to the database, greeting returns by name, mascot follows fi
   await expect(
     page.getByRole("heading", { name: "Lovely to meet you, Avery." }),
   ).toBeVisible();
-  await expect(page.locator(".pocket-todo")).toHaveClass(/pocket-happy/);
+  await expect(page.locator(".account-panel .pocket-todo")).toHaveClass(
+    /pocket-happy/,
+  );
   await page.getByRole("button", { name: "Back to Todo", exact: true }).click();
   await expect(page.locator(".intro-cards-male .intro-greeting")).toHaveText(
     "Hey, Avery.",

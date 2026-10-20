@@ -58,6 +58,7 @@ import "./room/scene.css";
 import "./room/calm.css";
 
 type Pane =
+  | "focus"
   | "ambience"
   | "tasks"
   | "notes"
@@ -127,6 +128,8 @@ type Recognition = {
 };
 
 export function StudyRoom(p: Props) {
+  const [focusTime, setFocusTime] = useState("25");
+  const quietFocus = p.running && p.phase === "focus";
   const [pane, setPane] = useState<Pane | null>(null),
     [loaded, setLoaded] = useState(false),
     [loadError, setLoadError] = useState(""),
@@ -323,6 +326,9 @@ export function StudyRoom(p: Props) {
     if (!p.active) return;
     const escape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (latest.current.running && latest.current.phase === "focus") {
+          latest.current.onStart();
+        }
         setPane(null);
         setError("");
       }
@@ -330,6 +336,15 @@ export function StudyRoom(p: Props) {
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, [p.active]);
+  useEffect(() => {
+    if (!quietFocus) return;
+    roomRoot.current
+      ?.querySelector<HTMLButtonElement>(".round-timer-face")
+      ?.focus({ preventScroll: true });
+    // Keep the setup mounted just long enough to dissolve with the other tools.
+    const dismiss = setTimeout(() => setPane(null), p.reduced ? 0 : 650);
+    return () => clearTimeout(dismiss);
+  }, [quietFocus, p.reduced]);
   const show = (next: Pane) => {
     setError("");
     setPane((current) => (current === next ? null : next));
@@ -450,9 +465,29 @@ export function StudyRoom(p: Props) {
       setPane("tasks");
       return;
     }
-    p.onTask(tasks[0].title, true);
+    setFocusTime(String(p.duration / 60));
+    setError("");
+    setPane("focus");
+  };
+  // Duration is queued before the start updater, so the deadline uses the new time.
+  const launchFocus = (event: FormEvent) => {
+    event.preventDefault();
+    const minutes = Number(focusTime);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 120) {
+      setError("Choose a whole number from 1 to 120 minutes.");
+      return;
+    }
+    const task = chosen
+      .map((id) => p.tasks.find((t) => t.id === id && !t.done))
+      .find(Boolean);
+    if (!task) {
+      setError("Choose at least one task first.");
+      setPane("tasks");
+      return;
+    }
+    p.onDuration(minutes);
+    p.onTask(task.title, true);
     baseline.current = p.tasks.filter((t) => t.done).length;
-    setPane(null);
   };
   const sit = (e: FormEvent) => {
     e.preventDefault();
@@ -553,6 +588,7 @@ export function StudyRoom(p: Props) {
     setError("");
   };
   const panelTitle: Record<Pane, string> = {
+    focus: "A little time for you.",
     ambience: "Set the mood.",
     tasks: "Things waiting",
     notes: "Your little notebook.",
@@ -567,6 +603,65 @@ export function StudyRoom(p: Props) {
   };
   const panelContent = () => {
     switch (pane) {
+      case "focus":
+        return (
+          <form className="room-focus-form" onSubmit={launchFocus}>
+            <p className="room-helper">
+              {selected.length} {selected.length === 1 ? "task" : "tasks"}{" "}
+              chosen. Todo will work beside you.
+            </p>
+            <label className="room-field" htmlFor="focus-minutes">
+              How long shall we focus?
+            </label>
+            <div className="room-minute-field">
+              <Input
+                id="focus-minutes"
+                aria-label="Focus minutes"
+                type="number"
+                min={1}
+                max={120}
+                step={1}
+                required
+                value={focusTime}
+                onChange={(e) => {
+                  setFocusTime(e.target.value);
+                  setError("");
+                }}
+              />
+              <span>minutes</span>
+            </div>
+            <div
+              className="room-time-presets"
+              role="group"
+              aria-label="Suggested focus times"
+            >
+              {[15, 25, 45].map((minutes) => (
+                <Button
+                  key={minutes}
+                  type="button"
+                  variant="ghost"
+                  aria-pressed={Number(focusTime) === minutes}
+                  onClick={() => setFocusTime(String(minutes))}
+                >
+                  {minutes} min
+                </Button>
+              ))}
+            </div>
+            <p className="room-focus-intention">
+              {selected.map((task) => task.title).join(" · ")}
+            </p>
+            <p className="room-helper">
+              The room will settle into quiet. Click the clock or press Escape
+              to pause.
+            </p>
+            <Button
+              type="submit"
+              className="room-dark-button room-focus-launch"
+            >
+              Focus <ArrowRight size={16} />
+            </Button>
+          </form>
+        );
       case "ambience":
         return (
           <>
@@ -655,35 +750,43 @@ export function StudyRoom(p: Props) {
               {visibleTasks.length ? (
                 visibleTasks.map((task) => (
                   <div
-                    className={`room-task-row ${task.done ? "task-finished" : ""}`}
+                    className={`room-task-row ${task.done ? "task-finished" : ""} ${chosen.includes(task.id) ? "task-selected" : ""}`}
                     key={task.id}
                   >
                     <button
-                      className="room-task-check"
+                      className="room-task-select"
                       aria-label={
                         task.done
                           ? `Reopen ${task.title}`
-                          : `Complete ${task.title}`
+                          : `Focus on ${task.title}`
                       }
-                      aria-pressed={task.done}
+                      aria-pressed={task.done || chosen.includes(task.id)}
                       disabled={busy}
-                      onClick={() => void toggle(task)}
+                      onClick={() =>
+                        task.done ? void toggle(task) : focusTask(task)
+                      }
                     >
-                      {task.done ? <Check size={14} /> : null}
-                    </button>
-                    <span>{task.title}</span>
-                    {!task.done ? (
-                      <button
-                        className="room-task-focus"
-                        aria-label={`Focus on ${task.title}`}
-                        aria-pressed={chosen.includes(task.id)}
-                        onClick={() => focusTask(task)}
-                      >
-                        {chosen.includes(task.id) ? (
+                      <span className="room-task-number">
+                        {task.done ? (
+                          <Check size={13} />
+                        ) : chosen.includes(task.id) ? (
                           chosen.indexOf(task.id) + 1
                         ) : (
-                          <Plus size={14} />
+                          "+"
                         )}
+                      </span>
+                      <span>{task.title}</span>
+                      {task.done ? <small>Finished</small> : null}
+                    </button>
+                    {!task.done ? (
+                      <button
+                        className="room-task-check"
+                        aria-label={`Complete ${task.title}`}
+                        title="Mark finished"
+                        disabled={busy}
+                        onClick={() => void toggle(task)}
+                      >
+                        <Check size={13} />
                       </button>
                     ) : null}
                     <button
@@ -752,9 +855,7 @@ export function StudyRoom(p: Props) {
                   : beginFocus
               }
             >
-              {p.started
-                ? "Back to the table"
-                : `Focus with ${selected.length || "your"} ${selected.length === 1 ? "task" : "tasks"}`}
+              {p.started ? "Back to the table" : "Choose timer"}
               <ArrowRight size={16} />
             </Button>
           </>
@@ -1236,7 +1337,8 @@ export function StudyRoom(p: Props) {
       data-loaded={loaded}
       data-tone={tone}
       data-rain={rain}
-      data-working={p.running && p.phase === "focus"}
+      data-working={quietFocus}
+      data-quiet={quietFocus}
     >
       <link rel="preload" href={C.image} as="image" />
       <div
@@ -1245,15 +1347,91 @@ export function StudyRoom(p: Props) {
         aria-hidden="true"
       />
       <div className="cozy-room-stage">
-        <RoomScene
-          pose={pose}
-          female={p.female}
-          reduced={p.reduced}
-          active={p.active && loaded}
-          day={tone === "morning"}
-        />
+        <div className="room-scene-world">
+          <RoomScene
+            pose={pose}
+            female={p.female}
+            reduced={p.reduced}
+            active={p.active && loaded}
+            day={tone === "morning"}
+            focusing={quietFocus}
+          />
+          <div
+            className="room-table-clock round-timer"
+            aria-label={`Table timer ${p.clock}`}
+          >
+            <span className="round-timer-shadow" aria-hidden="true" />
+            <span className="round-timer-feet" aria-hidden="true" />
+            <span className="round-timer-case" aria-hidden="true" />
+            <button
+              className="round-timer-face"
+              aria-label={
+                p.running
+                  ? "Pause table timer"
+                  : p.started
+                    ? "Resume table timer"
+                    : "Start table timer"
+              }
+              onClick={() => {
+                if (p.started || p.phase === "break") {
+                  close();
+                  p.onStart();
+                } else beginFocus();
+              }}
+            >
+              <svg
+                viewBox="0 0 120 120"
+                className="round-timer-dial"
+                aria-hidden="true"
+              >
+                <circle cx="60" cy="60" r="53" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="47"
+                  pathLength="60"
+                  strokeDasharray=".25 .75"
+                />
+                <circle
+                  className="round-timer-progress"
+                  cx="60"
+                  cy="60"
+                  r="53"
+                  pathLength="100"
+                  strokeDasharray="100"
+                  strokeDashoffset={100 * (1 - p.remaining / p.duration)}
+                />
+              </svg>
+              <span className="round-timer-label">
+                {p.phase === "break" ? "BREATHE" : "QUIET FOCUS"}
+              </span>
+              <strong>{p.clock}</strong>
+              <span className="round-timer-action">
+                {p.running ? <Pause size={12} /> : <Play size={12} />}
+              </span>
+            </button>
+            {p.started && !quietFocus ? (
+              <button
+                className="round-timer-done"
+                aria-label={
+                  p.phase === "break" ? "Finish break" : "Finish focus session"
+                }
+                onClick={done}
+                disabled={busy}
+              >
+                <Check size={14} />
+              </button>
+            ) : null}
+          </div>
+        </div>
+        <p className="sr-only" role="status">
+          {quietFocus
+            ? "Focus has started. Click the clock or press Escape to pause and show the room controls."
+            : ""}
+        </p>
         <Button
           data-room-ui="back"
+          inert={quietFocus}
           variant="ghost"
           size="icon"
           className="room-nav-back"
@@ -1268,6 +1446,7 @@ export function StudyRoom(p: Props) {
         <div
           className="room-mode-toggle"
           data-room-ui="mode"
+          inert={quietFocus}
           role="group"
           aria-label="Todo mode"
         >
@@ -1290,6 +1469,7 @@ export function StudyRoom(p: Props) {
         </div>
         <Button
           data-room-ui="settings"
+          inert={quietFocus}
           variant="ghost"
           size="icon"
           className="room-nav-settings"
@@ -1301,6 +1481,7 @@ export function StudyRoom(p: Props) {
         <nav
           className="room-edge-tabs"
           data-room-ui="tools"
+          inert={quietFocus}
           aria-label="Room tools"
         >
           {[
@@ -1324,87 +1505,9 @@ export function StudyRoom(p: Props) {
           })}
         </nav>
         <div
-          className="room-table-clock round-timer"
-          aria-label={`Table timer ${p.clock}`}
-        >
-          <span className="round-timer-shadow" aria-hidden="true" />
-          <span className="round-timer-feet" aria-hidden="true" />
-          <span className="round-timer-case" aria-hidden="true" />
-          <button
-            className="round-timer-face"
-            aria-label={
-              p.running
-                ? "Pause table timer"
-                : p.started
-                  ? "Resume table timer"
-                  : "Start table timer"
-            }
-            onClick={p.started || p.phase === "break" ? p.onStart : beginFocus}
-          >
-            <svg
-              viewBox="0 0 120 120"
-              className="round-timer-dial"
-              aria-hidden="true"
-            >
-              <circle cx="60" cy="60" r="53" />
-              <circle
-                cx="60"
-                cy="60"
-                r="47"
-                pathLength="60"
-                strokeDasharray=".25 .75"
-              />
-              <circle
-                className="round-timer-progress"
-                cx="60"
-                cy="60"
-                r="53"
-                pathLength="100"
-                strokeDasharray="100"
-                strokeDashoffset={100 * (1 - p.remaining / p.duration)}
-              />
-            </svg>
-            <span className="round-timer-label">
-              {p.phase === "break" ? "BREATHE" : "QUIET FOCUS"}
-            </span>
-            <strong>{p.clock}</strong>
-            <span className="round-timer-action">
-              {p.running ? <Pause size={12} /> : <Play size={12} />}
-            </span>
-          </button>
-          <label className="round-timer-adjust" title="Choose focus duration">
-            <Settings2 size={13} />
-            <select
-              aria-label="Focus duration"
-              disabled={p.started || p.phase === "break"}
-              value={p.duration / 60}
-              onChange={(e) => p.onDuration(Number(e.target.value))}
-            >
-              {[...new Set([15, 25, 45, 60, 90, 120, p.duration / 60])]
-                .sort((a, b) => a - b)
-                .map((m) => (
-                  <option key={m} value={m}>
-                    {m} minutes
-                  </option>
-                ))}
-            </select>
-          </label>
-          {p.started ? (
-            <button
-              className="round-timer-done"
-              aria-label={
-                p.phase === "break" ? "Finish break" : "Finish focus session"
-              }
-              onClick={done}
-              disabled={busy}
-            >
-              <Check size={14} />
-            </button>
-          ) : null}
-        </div>
-        <div
           className="room-home-card"
           data-room-ui="home"
+          inert={quietFocus}
           style={zoneStyle(C.home)}
         >
           {!p.started && p.phase === "focus" ? (
@@ -1421,6 +1524,16 @@ export function StudyRoom(p: Props) {
                   {selected.length ? "Edit your tasks" : "Sit with Todo"}
                   <ArrowRight size={15} />
                 </Button>
+                {selected.length && !pane ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="room-choose-time"
+                    onClick={beginFocus}
+                  >
+                    Choose timer <TimerIcon size={15} />
+                  </Button>
+                ) : null}
               </div>
             </form>
           ) : (
@@ -1468,6 +1581,7 @@ export function StudyRoom(p: Props) {
         {keepsakes.length ? (
           <div
             className="room-shelf-keepsakes"
+            inert={quietFocus}
             aria-label="Keepsakes on your shelf"
           >
             {keepsakes.map((k) => (
@@ -1506,11 +1620,22 @@ export function StudyRoom(p: Props) {
         >
           {pane ? (
             <DialogPrimitive.Content
-              className={`room-tool-panel ${pane === "agent" ? "room-chat-panel" : ""}`}
-              style={zoneStyle(pane === "agent" ? C.chat : C.panel)}
+              className={`room-tool-panel ${pane === "agent" ? "room-chat-panel" : ""} ${pane === "focus" ? "room-focus-panel" : ""}`}
+              style={
+                pane === "focus"
+                  ? undefined
+                  : zoneStyle(pane === "agent" ? C.chat : C.panel)
+              }
               aria-labelledby="room-panel-title"
               aria-describedby="room-panel-description"
               onInteractOutside={(e) => e.preventDefault()}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                roomRoot.current
+                  ?.querySelector<HTMLButtonElement>(".round-timer-face")
+                  ?.focus({ preventScroll: true });
+              }}
+              inert={quietFocus}
               data-lenis-prevent
             >
               <DialogPrimitive.Description

@@ -7,15 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  ArrowRight,
-  Headphones,
-  Heart,
-  Loader2,
-  Settings2,
-  X,
-} from "lucide-react";
+import { ArrowRight, Headphones, Heart, Loader2, X } from "lucide-react";
 import { createArtLens } from "@/lib/todo/art-lens";
+import { PocketTodo } from "./pocket-todo";
 import { Button } from "@/components/ui/button";
 import "lenis/dist/lenis.css";
 import "./welcome.css";
@@ -1435,16 +1429,9 @@ export const Welcome = forwardRef<WelcomeHandle, Props>(
                   </>
                 )}
               </nav>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="intro-settings"
-                aria-label="Open settings"
-                disabled={!props.ready || !loaded}
-                onClick={() => props.onChoose("settings")}
-              >
-                <Settings2 size={18} />
-              </Button>
+              <span className="intro-playmate" aria-hidden="true">
+                <PocketTodo female={selected === "female"} happy={false} />
+              </span>
             </header>
           </div>
           {(["male", "female"] as const).map((character) => (

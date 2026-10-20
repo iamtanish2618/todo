@@ -184,18 +184,7 @@
   opacity: 0.65;
   margin-top: 9px;
 }
-.intro-settings {
-  margin-left: auto;
-  border: 1px solid #ffffff25 !important;
-  background: #ffffff0b !important;
-  border-radius: 50% !important;
-  width: 39px !important;
-  height: 39px !important;
-  color: #f9f0e5 !important;
-}
-.intro-settings:hover {
-  background: #ffffff20 !important;
-}
+
 .intro-footer {
   position: absolute;
   bottom: 22px;
@@ -1012,14 +1001,7 @@
   border: 1px solid #fffefa;
   box-shadow: 0 3px 14px #72513908;
 }
-.intro-settings {
-  margin-left: 0;
-  color: #7f7467 !important;
-  border-color: #ffffff9e !important;
-  background: #fff9f385 !important;
-  width: 38px !important;
-  height: 38px !important;
-}
+
 .intro-cards {
   width: min(320px, calc(100vw - 48px));
   bottom: 9%;
@@ -1207,10 +1189,7 @@
     height: 35px;
     font-size: 11px;
   }
-  .intro-settings {
-    width: 33px !important;
-    height: 33px !important;
-  }
+
   .intro-footer {
     left: 22px;
     right: 22px;
@@ -1297,4 +1276,69 @@
     #000 75%,
     transparent
   );
+}
+/* A tiny playmate takes the place of landing-page preferences. */
+.intro-header > .intro-playmate {
+  opacity: 1;
+  margin-top: 0;
+  width: 40px;
+  height: 42px;
+  position: relative;
+  display: block;
+  flex: 0 0 40px;
+}
+.intro-playmate .pocket-todo {
+  position: absolute;
+  inset: 0;
+  width: 40px;
+  height: 44px;
+  transform: none;
+  animation: intro-play 5.8s ease-in-out infinite;
+}
+.intro-playmate .pocket-todo svg {
+  width: 100%;
+  height: 100%;
+  animation: none;
+}
+.intro-playmate svg > path:first-of-type {
+  transform-origin: 50px 70px;
+  animation: intro-flipper-play 5.8s ease-in-out infinite;
+}
+@keyframes intro-play {
+  0%,
+  25%,
+  72%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0);
+  }
+  38% {
+    transform: translate3d(-3px, -3px, 0) rotate(-9deg);
+  }
+  48% {
+    transform: translate3d(2px, -5px, 0) rotate(8deg);
+  }
+  58% {
+    transform: translate3d(0, -1px, 0) rotate(-3deg);
+  }
+}
+@keyframes intro-flipper-play {
+  0%,
+  25%,
+  72%,
+  100% {
+    transform: rotate(0);
+  }
+  38%,
+  58% {
+    transform: rotate(-12deg);
+  }
+  48% {
+    transform: rotate(12deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-playmate .pocket-todo,
+  .intro-playmate svg > path:first-of-type {
+    animation: none;
+  }
 }
