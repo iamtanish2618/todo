@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
-  ArrowUp,
+  ArrowRight,
   FileDown,
   Loader2,
   Mic,
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Connection, type Note } from "@/lib/todo/client";
 import { makeRoomPDF } from "./pdf";
+import { useMagneticSurface } from "../use-magnetic-surface";
 
 type Recognition = {
   lang: string;
@@ -47,8 +48,9 @@ export function RoomChat({
   onNote: (note: Note) => void;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState("chat"),
-    [draft, setDraft] = useState(""),
+  const composerMotion = useMagneticSurface(2.5, 0.7);
+  const arrowMotion = useMagneticSurface(4, 3);
+  const [draft, setDraft] = useState(""),
     [messages, setMessages] = useState<Message[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -186,7 +188,7 @@ export function RoomChat({
         "/api/chat",
         "POST",
         {
-          mode,
+          mode: "chat",
           messages: next.slice(-20),
           ...(attachment ? { image: attachment.data } : {}),
         },
@@ -318,7 +320,11 @@ export function RoomChat({
           {error}
         </p>
       ) : null}
-      <form className="room-chat-compose" onSubmit={send}>
+      <form
+        className="room-chat-compose magnetic-surface"
+        onSubmit={send}
+        {...composerMotion}
+      >
         <input
           type="file"
           ref={inputFile}
@@ -341,7 +347,7 @@ export function RoomChat({
         ) : null}
         <Textarea
           aria-label="Message Todo"
-          placeholder="Message Todo…"
+          placeholder="Talk with Todo…"
           value={draft}
           disabled={busy}
           maxLength={20000}
@@ -363,17 +369,21 @@ export function RoomChat({
               type="button"
               size="sm"
               variant="ghost"
+              className="room-chat-tool"
               disabled={busy}
               aria-label="Attach notes or a photo"
               onClick={() => inputFile.current?.click()}
             >
               <Plus size={15} />
-              Attach
+              <span className="room-chat-tool-label" aria-hidden="true">
+                Attach
+              </span>
             </Button>
             <Button
               type="button"
               size="sm"
               variant="ghost"
+              className="room-chat-tool"
               disabled={busy || !canSpeak}
               aria-label={listening ? "Stop voice input" : "Speak to Todo"}
               aria-pressed={listening}
@@ -385,31 +395,10 @@ export function RoomChat({
               onClick={dictate}
             >
               {listening ? <MicOff size={16} /> : <Mic size={16} />}
-              {listening ? "Stop" : "Speak"}
+              <span className="room-chat-tool-label" aria-hidden="true">
+                {listening ? "Stop" : "Speak"}
+              </span>
             </Button>
-            <label className="sr-only" htmlFor="todo-chat-help">
-              What would help?
-            </label>
-            <select
-              id="todo-chat-help"
-              value={mode}
-              disabled={busy}
-              aria-label="What would help?"
-              onChange={(event) => setMode(event.target.value)}
-            >
-              {[
-                ["chat", "Chat"],
-                ["summarize", "Summarize"],
-                ["notes", "Study notes"],
-                ["explain", "Explain"],
-                ["quiz", "Quiz"],
-                ["flashcards", "Flashcards"],
-              ].map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
           </div>
           {busy ? (
             <Button
@@ -423,10 +412,12 @@ export function RoomChat({
           ) : (
             <Button
               size="icon"
+              className="room-chat-send magnetic-surface"
+              {...arrowMotion}
               aria-label="Send to Todo"
               disabled={!draft.trim() || listening || !connection?.ai}
             >
-              <ArrowUp size={18} />
+              <ArrowRight size={19} />
             </Button>
           )}
         </div>

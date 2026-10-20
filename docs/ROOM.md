@@ -75,7 +75,7 @@ Each pink edit referenced its exact blue pose and requested: change **only** cap
 
 ## Simplified controls
 
-The bottom invitation contains only What are we doing? and Sit with Todo (or Edit your tasks once selected). `room/controls.css` applies the same 60% white glass and 18px blur to all tool panels. Ambience has Day/Night/Rain weather cards and independent stacked audio cards: Sound off, White noise, Brown noise, Rainy noise. Rain is a silent evening scene; selecting any weather preserves the existing sound choice. The volume slider and separate rain toggle are removed. Device/system volume controls playback level. The same new stoneware SVG mug is used on the table and while Todo drinks, with curved ceramic glazing, an inset coffee surface, contact shadow, and a saucer.
+The bottom invitation contains only What are we doing? and Sit with Todo (or Edit your tasks once selected). `room/polish.css` gives tools a more opaque warm surface, system sans-serif type, darker task text, and a short fade/zoom when changing panels. Room entry uses a small running Todo on a progress line; the percentage is capped by decoded artwork readiness, reaches 100%, then fades into the room. Reduced motion skips the running animation. Ambience has Day/Night/Rain weather cards and independent stacked audio cards: Sound off, White noise, Brown noise, Rainy noise. Rain is a silent evening scene; selecting any weather preserves the existing sound choice. The volume slider and separate rain toggle are removed. Device/system volume controls playback level. The same new stoneware SVG mug is used on the table and while Todo drinks, with curved ceramic glazing, an inset coffee surface, contact shadow, and a saucer.
 
 ## Completion and breaks
 

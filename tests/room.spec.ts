@@ -16,6 +16,10 @@ async function enter(page: Page) {
     "data-loaded",
     "true",
   );
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-arriving",
+    "false",
+  );
   await expect(page.locator(".room-pose.pose-visible")).toHaveJSProperty(
     "complete",
     true,
@@ -310,7 +314,7 @@ test("Agent pending animation follows a real pending browser request, saves note
       });
       return;
     }
-    expect(route.request().postDataJSON().mode).toBe("notes");
+    expect(route.request().postDataJSON().mode).toBe("chat");
     await new Promise((r) => setTimeout(r, 1500));
     await route.fulfill({
       json: {
@@ -320,7 +324,6 @@ test("Agent pending animation follows a real pending browser request, saves note
   });
   await enter(page);
   await page.getByRole("button", { name: "Agent", exact: true }).click();
-  await page.getByLabel("What would help?").selectOption("notes");
   await page.getByLabel("Message Todo").fill("Make notes about evaporation.");
   await page.getByRole("button", { name: "Send to Todo", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute(
@@ -857,7 +860,10 @@ test("custom focus setup darkens selected tasks, hides controls, prepares Todo a
     "false",
   );
   await page.getByLabel("Focus minutes", { exact: true }).fill("37");
-  await page.screenshot({ path: "outputs/todo-focus-setup.png" });
+  await page.screenshot({
+    path: "outputs/todo-focus-setup.png",
+    animations: "disabled",
+  });
   await page.getByRole("button", { name: "Focus", exact: true }).click();
   await expect(page.locator(".cozy-room")).toHaveAttribute(
     "data-quiet",
@@ -902,7 +908,10 @@ test("custom focus setup darkens selected tasks, hides controls, prepares Todo a
     expect(fits).toBe(true);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: "outputs/todo-quiet-focus.png" });
+  await page.screenshot({
+    path: "outputs/todo-quiet-focus.png",
+    animations: "disabled",
+  });
   await page.keyboard.press("Escape");
   await expect(page.locator(".cozy-room")).toHaveAttribute(
     "data-quiet",
@@ -1332,6 +1341,10 @@ test("a completed break stays calm at zero; End break restores the room without 
   page,
 }) => {
   await page.goto("/signin-with-chatgpt?return_to=/");
+  await expect(page.locator(".todo-root")).toHaveAttribute(
+    "data-ready",
+    "true",
+  );
   const before = await (await page.request.get("/api/room-summary")).json();
   await page.evaluate(() =>
     localStorage.setItem(
@@ -1467,6 +1480,11 @@ test("Agent is a single bottom composer, hides tools, frames Todo on laptops, an
   );
   await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo");
   await expect(page.getByLabel("Message Todo")).toBeFocused();
+  await expect(page.getByLabel("Message Todo")).toHaveAttribute(
+    "placeholder",
+    "Talk with Todo…",
+  );
+  await expect(page.getByRole("combobox")).toHaveCount(0);
   for (const name of [
     "Ambience",
     "Tasks",
@@ -1542,16 +1560,14 @@ test("Agent image attachment, Shift+Enter, Enter, and cancellation use the real 
   });
   await enter(page);
   await page.getByRole("button", { name: "Agent", exact: true }).click();
-  await page
-    .getByLabel("Attach text or image")
-    .setInputFiles({
-      name: "pixel.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jq3cAAAAASUVORK5CYII=",
-        "base64",
-      ),
-    });
+  await page.getByLabel("Attach text or image").setInputFiles({
+    name: "pixel.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jq3cAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
   await expect(page.getByText("pixel.png", { exact: true })).toBeVisible();
   const draft = page.getByLabel("Message Todo");
   await draft.fill("Explain this photo.");
@@ -1655,4 +1671,48 @@ test("Agent browser dictation is reviewed before sending, handles denial and rel
   await expect(
     page.getByRole("button", { name: "Tasks", exact: true }),
   ).toBeVisible();
+});
+
+test("room arrival waits for its artwork, reaches 100%, and then restores usable controls", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const artwork = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/art/study-room-round-v2.png", async (route) => {
+    await artwork;
+    await route.continue().catch(() => {});
+  });
+  await page.goto("/signin-with-chatgpt?return_to=/", {
+    waitUntil: "domcontentloaded",
+  });
+  await expect(page.locator(".intro-experience")).toHaveAttribute(
+    "data-loaded",
+    "true",
+  );
+  await page
+    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .click();
+  const progress = page.getByRole("progressbar", {
+    name: "Preparing your room",
+  });
+  await expect(progress).toBeVisible();
+  expect(Number(await progress.getAttribute("aria-valuenow"))).toBeLessThan(
+    100,
+  );
+  await expect(
+    page.getByRole("button", { name: "Tasks", exact: true }),
+  ).toHaveCount(0);
+  release();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-arriving",
+    "false",
+  );
+  await expect(page.locator(".room-arrival output")).toHaveText("100%");
+  await expect(
+    page.getByRole("button", { name: "Tasks", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Tasks", exact: true }).click();
+  await expect(page.getByLabel("New task", { exact: true })).toBeVisible();
 });

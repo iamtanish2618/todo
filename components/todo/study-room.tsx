@@ -63,6 +63,8 @@ import "./room/calm.css";
 import "./room/controls.css";
 import "./room/celebration.css";
 import "./room/agent.css";
+import "./room/polish.css";
+import { RoomArrival } from "./room/arrival";
 
 type Pane =
   | "focus"
@@ -147,6 +149,8 @@ export function StudyRoom(p: Props) {
   const quietBreak = p.started && p.phase === "break";
   const [pane, setPane] = useState<Pane | null>(null),
     [loaded, setLoaded] = useState(false),
+    [loadProgress, setLoadProgress] = useState(0),
+    [arrived, setArrived] = useState(false),
     [loadError, setLoadError] = useState(""),
     [retry, setRetry] = useState(0),
     [debug, setDebug] = useState(false);
@@ -186,7 +190,13 @@ export function StudyRoom(p: Props) {
     baseline = useRef(0),
     roomRoot = useRef<HTMLElement>(null),
     latest = useRef(p);
+  const currentPane = useRef(pane);
+  currentPane.current = pane;
   latest.current = p;
+  const finishArrival = useCallback(() => setArrived(true), []);
+  useEffect(() => {
+    if (!p.active) setArrived(false);
+  }, [p.active]);
   const storageKey = `todo.room.focus.${p.userId}`;
   useEffect(() => {
     setDebug(new URLSearchParams(location.search).get("debug") === "1");
@@ -206,6 +216,8 @@ export function StudyRoom(p: Props) {
   }, []);
   useEffect(() => {
     let stopped = false;
+    setLoaded(false);
+    setLoadProgress(0);
     const room = new Image(),
       idle = new Image(),
       day = new Image(),
@@ -220,13 +232,15 @@ export function StudyRoom(p: Props) {
     focused.src = p.female
       ? C.focusedPose.replace(".png", "-pink.png")
       : C.focusedPose;
-    Promise.all([
-      room.decode(),
-      idle.decode(),
-      day.decode(),
-      evening.decode(),
-      focused.decode(),
-    ])
+    let decoded = 0;
+    const assets = [room, idle, day, evening, focused];
+    Promise.all(
+      assets.map(async (image) => {
+        await image.decode();
+        decoded++;
+        if (!stopped) setLoadProgress(decoded / assets.length);
+      }),
+    )
       .then(() => {
         if (!stopped) setLoaded(true);
       })
@@ -1318,6 +1332,7 @@ export function StudyRoom(p: Props) {
       data-mode={p.agentMode ? "agent" : "companion"}
       data-agent={agentView}
       data-loaded={loaded}
+      data-arriving={p.active && !arrived}
       data-tone={tone}
       data-rain={rain}
       data-working={quietFocus}
@@ -1330,7 +1345,7 @@ export function StudyRoom(p: Props) {
         style={{ backgroundImage: `url(${C.image})` }}
         aria-hidden="true"
       />
-      <div className="cozy-room-stage">
+      <div className="cozy-room-stage" inert={!arrived} aria-hidden={!arrived}>
         <div className="room-scene-world">
           <RoomScene
             pose={pose}
@@ -1646,6 +1661,7 @@ export function StudyRoom(p: Props) {
         >
           {pane ? (
             <DialogPrimitive.Content
+              key={pane}
               className={
                 pane === "agent"
                   ? "room-agent-panel"
@@ -1665,17 +1681,20 @@ export function StudyRoom(p: Props) {
               aria-describedby="room-panel-description"
               onInteractOutside={(e) => e.preventDefault()}
               onOpenAutoFocus={(event) => {
-                if (pane !== "agent") return;
+                if (pane !== "agent" && pane !== "focus") return;
                 event.preventDefault();
                 roomRoot.current
                   ?.querySelector<HTMLTextAreaElement>(
-                    ".room-agent-panel textarea",
+                    pane === "agent"
+                      ? ".room-agent-panel textarea"
+                      : "#focus-minutes",
                   )
                   ?.focus({ preventScroll: true });
               }}
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
                 if (celebrationOpen.current) return;
+                if (currentPane.current && currentPane.current !== pane) return;
                 roomRoot.current
                   ?.querySelector<HTMLButtonElement>(".round-timer-face")
                   ?.focus({ preventScroll: true });
@@ -1736,27 +1755,20 @@ export function StudyRoom(p: Props) {
         onBreak={takeBreak}
         onContinue={continueFocusing}
       />
-      {!loaded ? (
-        <div className="room-loading" role="status">
-          {loadError ? (
-            <>
-              <p>{loadError}</p>
-              <Button
-                onClick={() => {
-                  setLoadError("");
-                  setRetry((v) => v + 1);
-                }}
-              >
-                Try again
-              </Button>
-            </>
-          ) : (
-            <>
-              <Loader2 size={22} className="animate-spin" />
-              <span>Warming your little corner…</span>
-            </>
-          )}
-        </div>
+      {p.active ? (
+        <RoomArrival
+          ready={loaded}
+          progress={loadProgress}
+          female={p.female}
+          reduced={p.reduced}
+          complete={arrived}
+          error={loadError}
+          onComplete={finishArrival}
+          onRetry={() => {
+            setLoadError("");
+            setRetry((value) => value + 1);
+          }}
+        />
       ) : null}
       {error && !pane ? (
         <p className="room-page-notice" role="alert">
