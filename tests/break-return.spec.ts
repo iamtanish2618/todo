@@ -23,6 +23,11 @@ async function expiringBreak(page: Page) {
     ),
   );
   await page.reload();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-arriving",
+    "false",
+    { timeout: 45000 },
+  );
   await expect(
     page.getByRole("alertdialog", { name: "Break’s over!" }),
   ).toBeVisible();
@@ -102,10 +107,6 @@ test("expired break speaks once, wipes diagonally, and restores tools without re
       exact: true,
     }),
   ).toBeVisible();
-  await page.screenshot({
-    path: "outputs/todo-break-reminder.png",
-    animations: "disabled",
-  });
   await expect(page.locator(".break-return")).toHaveAttribute(
     "data-stage",
     "sweep",

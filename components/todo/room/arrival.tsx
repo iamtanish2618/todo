@@ -55,8 +55,16 @@ export function RoomArrival({
       aria-hidden={complete}
       inert={complete}
     >
+      <div className="room-arrival-bokeh" aria-hidden="true">
+        {Array.from({ length: 7 }, (_, i) => (
+          <i key={i} style={{ "--bokeh": i } as CSSProperties} />
+        ))}
+      </div>
       <div className="room-arrival-content">
-        <p>Getting your room ready</p>
+        <div className="room-arrival-wordmark" aria-hidden="true">
+          todo<span style={{ color: "#daa966" }}>.</span>
+        </div>
+        <p>Make a little room for yourself.</p>
         <div
           className="room-arrival-track"
           style={{ "--arrival-progress": percent / 100 } as CSSProperties}

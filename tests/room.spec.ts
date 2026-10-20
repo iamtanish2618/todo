@@ -831,7 +831,7 @@ test("custom focus setup darkens selected tasks, hides controls, prepares Todo a
   await enter(page);
   await expect(page.locator(".round-room-art")).toHaveAttribute(
     "data-lamp-on",
-    "false",
+    "true",
   );
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   const title = `Quiet custom focus ${Date.now()}`;
@@ -1034,7 +1034,7 @@ for (const variant of [
   });
 }
 
-test("ambience uses three weather cards and independent recording choices; timer opens directly and all tools share glass", async ({
+test("ambience uses five weather cards and independent recording choices; timer opens directly and all tools share glass", async ({
   page,
 }) => {
   await enter(page);
@@ -1066,12 +1066,12 @@ test("ambience uses three weather cards and independent recording choices; timer
   const panel = page.getByRole("dialog");
   await expect(panel.getByRole("combobox")).toHaveCount(0);
   await expect(panel.getByRole("slider")).toHaveCount(0);
-  await expect(panel.getByRole("switch")).toHaveCount(0);
+  await expect(panel.getByRole("switch")).toHaveCount(1);
   await expect(
     panel
       .getByRole("group", { name: "Ambience", exact: true })
       .getByRole("button"),
-  ).toHaveCount(3);
+  ).toHaveCount(5);
   await expect(
     panel
       .getByRole("group", { name: "Sound effects", exact: true })

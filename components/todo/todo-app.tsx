@@ -244,6 +244,16 @@ export default function TodoApp({
   const chime = useCallback(() => {
     if (!sound) return;
     try {
+      let volume = 0.5;
+      try {
+        const prefs = JSON.parse(
+          localStorage.getItem("todo.room.polish.v1") || "{}",
+        );
+        if (prefs.muted) return;
+        if (typeof prefs.volume === "number")
+          volume = Math.max(0, Math.min(1, prefs.volume));
+      } catch {}
+      if (!volume) return;
       const context = audio.current ?? new AudioContext();
       audio.current = context;
       void context.resume();
@@ -256,7 +266,7 @@ export default function TodoApp({
         880,
         context.currentTime + 0.12,
       );
-      gain.gain.setValueAtTime(0.035, context.currentTime);
+      gain.gain.setValueAtTime(0.035 * volume, context.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.3);
       osc.start();
       osc.stop(context.currentTime + 0.3);
@@ -561,6 +571,20 @@ export default function TodoApp({
           if (begin) chime();
         }}
         onStart={start}
+        onExtend={() =>
+          setTimer((current) => {
+            if (!current.started || current.phase !== "focus") return current;
+            const extra = Math.max(0, Math.min(300, 7200 - current.duration));
+            return {
+              ...current,
+              duration: current.duration + extra,
+              remaining: current.remaining + extra,
+              deadline: current.deadline
+                ? current.deadline + extra * 1000
+                : null,
+            };
+          })
+        }
         onFinish={finish}
         onExit={() => {
           setPanel(null);

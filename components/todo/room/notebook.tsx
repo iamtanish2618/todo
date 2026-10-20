@@ -5,6 +5,9 @@ export function DeskNotebook() {
   const id = useId().replace(/:/g, "");
   return (
     <div className="desk-book" aria-hidden="true">
+      <span className="cinema-turning-page">
+        <i />
+      </span>
       <svg viewBox="0 0 360 140">
         <defs>
           <linearGradient id={`${id}-paper`} x1="0" y1="0" x2=".2" y2="1">

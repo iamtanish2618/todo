@@ -11,11 +11,13 @@ export const BREAK_OVER_MESSAGE =
 export function BreakReturn({
   female,
   reduced,
+  silent = false,
   onCovered,
   onComplete,
 }: {
   female: boolean;
   reduced: boolean;
+  silent?: boolean;
   onCovered: () => Promise<boolean>;
   onComplete: () => void;
 }) {
@@ -155,7 +157,7 @@ export function BreakReturn({
     };
     // Speech is an explicit break reminder, separate from optional ambient recordings/chimes.
     try {
-      if (!window.speechSynthesis || !window.SpeechSynthesisUtterance)
+      if (silent || !window.speechSynthesis || !window.SpeechSynthesisUtterance)
         throw new Error("No speech");
       speech = new SpeechSynthesisUtterance(BREAK_OVER_MESSAGE);
       const voices = window.speechSynthesis
@@ -187,7 +189,7 @@ export function BreakReturn({
       timeline?.kill();
       stopVoice();
     };
-  }, [female, reduced]);
+  }, [female, reduced, silent]);
 
   return (
     <div

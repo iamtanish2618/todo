@@ -68,14 +68,21 @@ function loadPlayerAPI() {
 export function RoomSoundPlayer({
   recording,
   paused,
+  volume = 0.5,
   onStop,
 }: {
   recording: Recording;
   paused: boolean;
+  volume?: number;
   onStop: () => void;
 }) {
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<Player | null>(null);
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
+  useEffect(() => {
+    player.current?.setVolume(Math.round(volume * 50));
+  }, [volume]);
   const suspended = useRef(paused);
   suspended.current = paused;
   const wasPlaying = useRef(false);
@@ -121,7 +128,7 @@ export function RoomSoundPlayer({
               if (disposed) return;
               clearTimeout(readiness);
               player.current = ready;
-              ready.setVolume(25);
+              ready.setVolume(Math.round(volumeRef.current * 50));
               setStatus("Press play in the video if it hasn't started.");
               if (!suspended.current) ready.playVideo();
             },

@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -16,6 +17,8 @@ import {
   CheckCheck,
   Coffee,
   CloudRain,
+  Snowflake,
+  Sunset,
   AudioLines,
   VolumeX,
   Sun,
@@ -24,6 +27,7 @@ import {
   Layers,
   ListTodo,
   Loader2,
+  GripVertical,
   Mic,
   Moon,
   Pause,
@@ -66,6 +70,18 @@ import "./room/agent.css";
 import "./room/polish.css";
 import { RoomArrival } from "./room/arrival";
 import { BreakReturn } from "./room/break-return";
+import { RoomCursor, useRoomCinema } from "./room/cinematic";
+import { WeatherMatch } from "./room/weather-match";
+import { useRoomSound } from "./room/sound";
+import {
+  useRoomPolish,
+  SoundMixControls,
+  CountUp,
+  ClockDigits,
+  WordReveal,
+} from "./room/polish-controls";
+import { EMPTY_MIX, roomEffect, type RoomWeather } from "./room/cinema-config";
+import "./room/cinematic.css";
 
 type Pane =
   | "focus"
@@ -121,6 +137,7 @@ type Props = {
   onAgentMode: (mode: boolean) => void;
   onTask: (task: string, begin?: boolean, taskId?: string) => void;
   onStart: () => void;
+  onExtend: () => void;
   onFinish: () => Promise<boolean>;
   onExit: () => void;
   onRestoreRoom: () => void;
@@ -172,14 +189,83 @@ export function StudyRoom(p: Props) {
     [answer, setAnswer] = useState(""),
     [flipped, setFlipped] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null),
-    [tone, setTone] = useState(() =>
-      new Date().getHours() >= 18 || new Date().getHours() < 7
-        ? "night"
-        : "morning",
-    ),
+    [tone, setTone] = useState<RoomWeather>("night"),
     [soundscape, setSoundscape] = useState<Soundscape>("off"),
     [sleeping, setSleeping] = useState(false);
+  useEffect(() => {
+    const hour = new Date().getHours();
+    setTone(
+      hour >= 7 && hour < 17
+        ? "morning"
+        : hour >= 17 && hour < 20
+          ? "sunset"
+          : "night",
+    );
+  }, []);
   const rain = tone === "rain";
+  const [weatherChoice, setWeatherChoice] = useState(0);
+  const [dragOver, setDragOver] = useState(false),
+    [printing, setPrinting] = useState(false),
+    [taskOrder, setTaskOrder] = useState<string[]>([]);
+  const draggedTask = useRef<string | null>(null);
+  const taskRects = useRef<Map<string, DOMRect> | null>(null);
+  const taskTweens = useRef(new Set<GSAPTween>());
+  useEffect(
+    () => () => {
+      taskTweens.current.forEach((t) => t.kill());
+      taskTweens.current.clear();
+    },
+    [],
+  );
+  useLayoutEffect(() => {
+    const before = taskRects.current;
+    taskRects.current = null;
+    if (!before || p.reduced) return;
+    const moves = Array.from(
+      roomRoot.current?.querySelectorAll<HTMLElement>("[data-task-id]") || [],
+    ).map((node) => ({
+      node,
+      y:
+        (before.get(node.dataset.taskId!)?.top ??
+          node.getBoundingClientRect().top) - node.getBoundingClientRect().top,
+    }));
+    let disposed = false;
+    void import("gsap").then(({ gsap }) => {
+      if (disposed) return;
+      for (const { node, y } of moves)
+        if (Math.abs(y) > 1) {
+          const tween = gsap.fromTo(
+            node,
+            { y },
+            {
+              y: 0,
+              duration: 0.34,
+              ease: "power2.out",
+              overwrite: true,
+              onComplete: () => taskTweens.current.delete(tween),
+            },
+          );
+          taskTweens.current.add(tween);
+        }
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [taskOrder, p.reduced]);
+  const rememberTaskOrder = (ids: string[]) => {
+    taskRects.current = new Map(
+      Array.from(
+        roomRoot.current?.querySelectorAll<HTMLElement>("[data-task-id]") || [],
+      ).map((node) => [node.dataset.taskId!, node.getBoundingClientRect()]),
+    );
+    setTaskOrder(ids);
+    try {
+      localStorage.setItem(`todo.room.order.${p.userId}`, JSON.stringify(ids));
+    } catch {}
+  };
+
+  const dragDepth = useRef(0);
+  const printTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [joining, setJoining] = useState("todo"),
     [friendCode, setFriendCode] = useState(""),
     [friendNotice, setFriendNotice] = useState("");
@@ -194,9 +280,86 @@ export function StudyRoom(p: Props) {
     baseline = useRef(0),
     roomRoot = useRef<HTMLElement>(null),
     latest = useRef(p);
+  const closePanel = useRef<() => void>(() => {});
+  const closingTween = useRef<GSAPTween | null>(null);
+  useEffect(
+    () => () => {
+      closingTween.current?.kill();
+    },
+    [],
+  );
   const currentPane = useRef(pane);
   currentPane.current = pane;
   latest.current = p;
+  const polish = useRoomPolish(setTone);
+  const [completionStats, setCompletionStats] = useState({
+    minutes: 0,
+    tasks: 0,
+  });
+  useRoomCinema(roomRoot, {
+    active: p.active && arrived,
+    reduced: p.reduced,
+    focus: quietFocus,
+    running: p.running,
+    remaining: p.remaining,
+    duration: p.duration,
+    timerId: p.timerId,
+    weather: tone,
+    panel: pane,
+    celebrating,
+    thunder: polish.settings.thunder,
+  });
+  useRoomSound(
+    roomRoot,
+    p.active && arrived,
+    p.sound && !polish.settings.muted && !celebrating && !breakReturn,
+    polish.settings.muted ? 0 : polish.settings.volume,
+    celebrating || breakReturn || polish.settings.muted
+      ? EMPTY_MIX
+      : polish.settings.mix,
+  );
+  useEffect(
+    () => () => {
+      if (printTimer.current) clearTimeout(printTimer.current);
+    },
+    [],
+  );
+  const printNote = async (title: string, text: string) => {
+    await makeRoomPDF(title, text);
+    setPrinting(true);
+    roomEffect(roomRoot.current, "print");
+    if (printTimer.current) clearTimeout(printTimer.current);
+    printTimer.current = setTimeout(() => setPrinting(false), 1500);
+  };
+  const importNote = async (file: File) => {
+    if (file.size > 150000 || !/\.(txt|md)$/i.test(file.name)) {
+      setError("Choose a text or Markdown file up to 150 KB.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      if (text.length > 50000) {
+        setError("Keep uploaded notes under 50,000 characters.");
+        return;
+      }
+      setNoteTitle(file.name.replace(/\.[^.]+$/, ""));
+      setNoteText(text);
+      setNoteView("write");
+      roomEffect(roomRoot.current, "page");
+    } catch {
+      setError("That file could not be read.");
+    }
+  };
+  useEffect(() => {
+    try {
+      const value = JSON.parse(
+        localStorage.getItem(`todo.room.order.${p.userId}`) || "[]",
+      );
+      if (Array.isArray(value))
+        setTaskOrder(value.filter((id) => typeof id === "string"));
+    } catch {}
+  }, [p.userId]);
+
   const finishArrival = useCallback(() => setArrived(true), []);
   useEffect(() => {
     if (!p.active) setArrived(false);
@@ -357,7 +520,12 @@ export function StudyRoom(p: Props) {
     if (p.focusCompletions <= handledCompletions.current) return;
     handledCompletions.current = p.focusCompletions;
     setPane(null);
+    setCompletionStats({
+      minutes: Math.max(0, Math.round((p.sessions[0]?.seconds || 0) / 60)),
+      tasks: p.tasks.filter((t) => t.done).length - baseline.current,
+    });
     setCelebrating(true);
+    roomEffect(roomRoot.current, "celebrate");
     void refresh();
   }, [p.focusCompletions, refresh]);
   useEffect(() => {
@@ -367,9 +535,7 @@ export function StudyRoom(p: Props) {
         if (latest.current.running) {
           latest.current.onStart();
         }
-        setPane(null);
-        latest.current.onAgentMode(false);
-        setError("");
+        closePanel.current();
       }
     };
     window.addEventListener("keydown", escape);
@@ -386,7 +552,8 @@ export function StudyRoom(p: Props) {
   }, [quietFocus, quietBreak, p.reduced]);
   const show = (next: Pane) => {
     setError("");
-    setPane((current) => (current === next ? null : next));
+    if (currentPane.current === next) closePanel.current();
+    else setPane(next);
   };
   const work = async (action: () => Promise<void>) => {
     if (busy) return;
@@ -412,6 +579,7 @@ export function StudyRoom(p: Props) {
       p.onTasks([task, ...p.tasks]);
       if (!p.started && !p.task) p.onTask(task.title, false, task.id);
       setDraft("");
+      roomEffect(roomRoot.current, "task");
     });
   };
   const toggle = async (task: Task) => {
@@ -429,7 +597,15 @@ export function StudyRoom(p: Props) {
         setChosen((v) => v.filter((id) => id !== next.id));
         if (!finishSit && p.running) p.onStart();
         setPane(null);
+        setCompletionStats({
+          minutes: Math.round(
+            (p.started ? p.duration - p.remaining : task.focusedSeconds || 0) /
+              60,
+          ),
+          tasks: 1,
+        });
         setCelebrating(true);
+        roomEffect(roomRoot.current, "celebrate");
       }
       void refresh();
     });
@@ -488,13 +664,15 @@ export function StudyRoom(p: Props) {
       setNoteView("saved");
     });
   const exportNote = () =>
-    void work(() => makeRoomPDF(noteTitle || "A little note", noteText));
+    void work(() => printNote(noteTitle || "A little note", noteText));
   const beginFocus = () => {
     setFocusTime(String(p.duration / 60));
     setError("");
     setPane("focus");
   };
-  const chooseWeather = (next: "morning" | "night" | "rain") => {
+  const chooseWeather = (next: RoomWeather) => {
+    setWeatherChoice((v) => v + 1);
+    polish.update({ matchTime: false });
     setTone(next);
   };
   // Duration is queued before the start updater, so the deadline uses the new time.
@@ -520,7 +698,14 @@ export function StudyRoom(p: Props) {
     void work(async () => {
       if (await p.onFinish()) {
         setPane(null);
-        if (p.phase === "focus") setCelebrating(true);
+        if (p.phase === "focus") {
+          setCompletionStats({
+            minutes: Math.round((p.duration - p.remaining) / 60),
+            tasks: 0,
+          });
+          setCelebrating(true);
+          roomEffect(roomRoot.current, "celebrate");
+        }
         await refresh();
       }
     });
@@ -597,7 +782,13 @@ export function StudyRoom(p: Props) {
         : sleeping
           ? "sleeping"
           : "idle";
-  const visibleTasks = p.tasks.filter((task) => !task.done);
+  const visibleTasks = p.tasks
+    .filter((task) => !task.done)
+    .sort((a, b) => {
+      const aa = taskOrder.indexOf(a.id),
+        bb = taskOrder.indexOf(b.id);
+      return (aa < 0 ? 999 : aa) - (bb < 0 ? 999 : bb);
+    });
   const finishedTasks = p.tasks
     .filter((task) => task.done)
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
@@ -631,9 +822,31 @@ export function StudyRoom(p: Props) {
   ].filter((k) => totalSits >= k.at);
   const close = () => {
     if (pane === "agent") p.onAgentMode(false);
-    setPane(null);
     setError("");
+    const node = roomRoot.current?.querySelector(
+      ".room-tool-panel,.room-agent-panel",
+    );
+    const closing = pane;
+    if (!node || p.reduced) {
+      setPane(null);
+      return;
+    }
+    void import("gsap").then(({ gsap }) => {
+      if (!node.isConnected || currentPane.current !== closing) return;
+      closingTween.current = gsap.to(node, {
+        opacity: 0,
+        x: -14,
+        scale: 0.985,
+        duration: 0.18,
+        ease: "power2.in",
+        overwrite: true,
+        onComplete: () => {
+          if (currentPane.current === closing) setPane(null);
+        },
+      });
+    });
   };
+  closePanel.current = close;
   const panelTitle: Record<Pane, string> = {
     focus: "Todo.",
     finished: "Finished tasks.",
@@ -712,6 +925,8 @@ export function StudyRoom(p: Props) {
                   ["morning", "Day", Sun],
                   ["night", "Night", Moon],
                   ["rain", "Rain", CloudRain],
+                  ["snow", "Snow", Snowflake],
+                  ["sunset", "Sunset", Sunset],
                 ] as const
               ).map(([value, label, Icon]) => (
                 <Button
@@ -720,11 +935,27 @@ export function StudyRoom(p: Props) {
                   aria-pressed={tone === value}
                   onClick={() => chooseWeather(value)}
                 >
+                  <i
+                    className="cinema-weather-preview"
+                    data-scene={value}
+                    aria-hidden="true"
+                  />
                   <Icon size={21} />
                   <span>{label}</span>
                 </Button>
               ))}
             </div>
+            <label className="cinema-time-match">
+              <span>Match my time of day</span>
+              <Switch
+                aria-label="Match my time of day"
+                checked={polish.settings.matchTime}
+                onCheckedChange={(matchTime) => {
+                  setWeatherChoice((v) => v + 1);
+                  polish.update({ matchTime });
+                }}
+              />
+            </label>
             <div
               className="room-sound-choices"
               role="group"
@@ -749,6 +980,24 @@ export function StudyRoom(p: Props) {
                 </Button>
               ))}
             </div>
+            <WeatherMatch
+              scene={tone}
+              sceneVersion={weatherChoice}
+              onChoose={(value) => {
+                polish.update({ matchTime: false });
+                setTone(value);
+              }}
+            />
+            <SoundMixControls
+              settings={polish.settings}
+              update={polish.update}
+              onQuiet={() => {
+                polish.update({ muted: true });
+                p.onReduced(true);
+                p.onSound(false);
+                setSoundscape("off");
+              }}
+            />
           </>
         );
       case "finished":
@@ -799,7 +1048,60 @@ export function StudyRoom(p: Props) {
                   <div
                     className={`room-task-row ${task.done ? "task-finished" : ""} ${chosen.includes(task.id) ? "task-selected" : ""}`}
                     key={task.id}
+                    data-task-id={task.id}
+                    draggable={!busy}
+                    onDragStart={(e) => {
+                      draggedTask.current = task.id;
+                      e.currentTarget.dataset.dragging = "true";
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", task.id);
+                    }}
+                    onDragEnd={(e) => {
+                      draggedTask.current = null;
+                      e.currentTarget.dataset.dragging = "false";
+                    }}
+                    onDragOver={(e) => {
+                      if (draggedTask.current) e.preventDefault();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const id = draggedTask.current;
+                      if (!id || id === task.id) return;
+                      const ids = visibleTasks
+                        .map((t) => t.id)
+                        .filter((x) => x !== id);
+                      ids.splice(ids.indexOf(task.id), 0, id);
+                      rememberTaskOrder(ids);
+                    }}
                   >
+                    <span
+                      className="cinema-drag-handle"
+                      role="button"
+                      tabIndex={busy ? -1 : 0}
+                      aria-disabled={busy}
+                      aria-label={`Reorder ${task.title}`}
+                      draggable={!busy}
+                      onKeyDown={(e) => {
+                        if (busy || !["ArrowUp", "ArrowDown"].includes(e.key))
+                          return;
+                        e.preventDefault();
+                        const ids = visibleTasks.map((t) => t.id),
+                          index = ids.indexOf(task.id),
+                          target = Math.max(
+                            0,
+                            Math.min(
+                              ids.length - 1,
+                              index + (e.key === "ArrowUp" ? -1 : 1),
+                            ),
+                          );
+                        if (target !== index) {
+                          [ids[index], ids[target]] = [ids[target], ids[index]];
+                          rememberTaskOrder(ids);
+                        }
+                      }}
+                    >
+                      <GripVertical size={13} />
+                    </span>
                     <button
                       className="room-task-select"
                       aria-label={
@@ -937,28 +1239,7 @@ export function StudyRoom(p: Props) {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       e.target.value = "";
-                      if (
-                        file.size > 150000 ||
-                        !/\.(txt|md)$/i.test(file.name)
-                      ) {
-                        setError(
-                          "Choose a text or Markdown file up to 150 KB.",
-                        );
-                        return;
-                      }
-                      void file
-                        .text()
-                        .then((text) => {
-                          if (text.length > 50000) {
-                            setError(
-                              "Keep uploaded notes under 50,000 characters.",
-                            );
-                            return;
-                          }
-                          setNoteTitle(file.name.replace(/\.[^.]+$/, ""));
-                          setNoteText(text);
-                        })
-                        .catch(() => setError("That file could not be read."));
+                      void importNote(file);
                     }}
                   />
                 </label>
@@ -1023,9 +1304,7 @@ export function StudyRoom(p: Props) {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            void work(() =>
-                              makeRoomPDF(note.title, note.content),
-                            )
+                            void work(() => printNote(note.title, note.content))
                           }
                         >
                           PDF
@@ -1062,19 +1341,33 @@ export function StudyRoom(p: Props) {
                   Cards you write yourself. No AI needed.
                 </p>
                 {cards.map((card) => (
-                  <article className="room-flashcard" key={card.id}>
+                  <article
+                    className="room-flashcard"
+                    key={card.id}
+                    data-flipped={flipped === card.id}
+                  >
                     <button
                       onClick={() =>
                         setFlipped(flipped === card.id ? null : card.id)
                       }
                       aria-label={`Flip card: ${card.question}`}
                     >
-                      {flipped === card.id ? card.answer : card.question}
-                      <small>
-                        {flipped === card.id
-                          ? "ANSWER"
-                          : "QUESTION · TAP TO TURN"}
-                      </small>
+                      <span className="cinema-flash-inner">
+                        <span
+                          className="cinema-flash-face"
+                          aria-hidden={flipped === card.id}
+                        >
+                          {card.question}
+                          <small>QUESTION · TAP TO TURN</small>
+                        </span>
+                        <span
+                          className="cinema-flash-face cinema-flash-back"
+                          aria-hidden={flipped !== card.id}
+                        >
+                          {card.answer}
+                          <small>ANSWER</small>
+                        </span>
+                      </span>
                     </button>
                     <Button
                       variant="ghost"
@@ -1146,19 +1439,56 @@ export function StudyRoom(p: Props) {
               Room light
               <select
                 value={tone}
-                onChange={(e) =>
-                  chooseWeather(e.target.value as "morning" | "night" | "rain")
-                }
+                onChange={(e) => chooseWeather(e.target.value as RoomWeather)}
               >
                 <option value="rain">Rain</option>
                 <option value="night">Quiet night</option>
                 <option value="morning">Soft morning</option>
+                <option value="snow">Snow</option>
+                <option value="sunset">Sunset</option>
               </select>
             </label>
             <Button variant="outline" onClick={() => setSleeping((v) => !v)}>
               <Moon size={16} />
               {sleeping ? "Wake Todo gently" : "Let Todo rest"}
             </Button>
+            <SoundMixControls
+              settings={polish.settings}
+              update={polish.update}
+              onQuiet={() => {
+                polish.update({ muted: true });
+                p.onReduced(true);
+                p.onSound(false);
+                setSoundscape("off");
+              }}
+            />
+            <div
+              className="cinema-outfit-choices"
+              role="group"
+              aria-label="Todo’s keepsake outfits"
+            >
+              {[
+                ["original", "Original", 0],
+                ["star", "Little star", 1],
+                ["glasses", "Round glasses", 3],
+              ].map(([value, label, at]) => (
+                <Button
+                  key={String(value)}
+                  variant="ghost"
+                  disabled={totalSits < Number(at)}
+                  aria-pressed={polish.settings.outfit === value}
+                  onClick={() => {
+                    polish.update({ outfit: String(value) });
+                    roomEffect(roomRoot.current, "outfit");
+                  }}
+                >
+                  {String(label)}
+                  {totalSits < Number(at) ? (
+                    <small>{String(at)} sits</small>
+                  ) : null}
+                </Button>
+              ))}
+            </div>
             <div className="room-settings-links">
               {[
                 ["home", Users, "Who is joining?"],
@@ -1233,10 +1563,20 @@ export function StudyRoom(p: Props) {
               className="room-friend-table"
               aria-label="Preview of a table for you and your friends"
             >
-              <span>you</span>
+              <span>
+                <img
+                  className="cinema-friend-preview"
+                  src={
+                    p.female
+                      ? C.poses.idle.replace(".png", "-pink.png")
+                      : C.poses.idle
+                  }
+                  alt="You"
+                />
+              </span>
               <i />
-              <span>friend</span>
-              <span>friend</span>
+              <span aria-label="Empty chair">♡</span>
+              <span aria-label="Empty chair">♡</span>
             </div>
             <label className="room-field">
               Join with a code
@@ -1382,6 +1722,15 @@ export function StudyRoom(p: Props) {
       data-working={quietFocus}
       data-quiet={quietRoom}
       data-resting={quietBreak}
+      data-panel-open={Boolean(pane) && !quietRoom}
+      data-season={
+        new Date().getMonth() < 2 || new Date().getMonth() === 11
+          ? "winter"
+          : new Date().getMonth() < 5
+            ? "spring"
+            : "summer"
+      }
+      data-outfit={polish.settings.outfit}
     >
       <link rel="preload" href={C.image} as="image" />
       <div
@@ -1403,6 +1752,8 @@ export function StudyRoom(p: Props) {
             sky={
               tone === "morning" ? "day" : tone === "rain" ? "evening" : "night"
             }
+            weather={tone}
+            arrived={arrived}
             focusing={quietFocus}
             interactive={!agentView}
             clock={p.started ? p.clock : null}
@@ -1455,13 +1806,27 @@ export function StudyRoom(p: Props) {
                   r="53"
                   pathLength="100"
                   strokeDasharray="100"
-                  strokeDashoffset={100 * (1 - p.remaining / p.duration)}
+                  strokeDashoffset={(100 * p.remaining) / p.duration}
                 />
               </svg>
               <span className="round-timer-label">
                 {p.phase === "break" ? "BREATHE" : "QUIET FOCUS"}
               </span>
-              <strong>{p.clock}</strong>
+              <strong>
+                <ClockDigits clock={p.clock} />
+              </strong>
+              <span className="cinema-clock-scene" aria-hidden="true">
+                {tone === "morning" || tone === "sunset" ? (
+                  <Sun size={7} />
+                ) : (
+                  <Moon size={7} />
+                )}
+              </span>
+              {!p.started ? (
+                <span className="cinema-clock-hint" aria-hidden="true">
+                  Start
+                </span>
+              ) : null}
               <span className="round-timer-action">
                 {p.running ? <Pause size={12} /> : <Play size={12} />}
               </span>
@@ -1480,6 +1845,34 @@ export function StudyRoom(p: Props) {
             ) : null}
           </div>
         </div>
+        <div className="cinema-panel-shade" aria-hidden="true" />
+        {quietFocus ? (
+          <div
+            className="cinema-focus-pill"
+            role="group"
+            aria-label="Focus controls"
+          >
+            <span>{p.task}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Pause focus"
+              onClick={p.onStart}
+            >
+              <Pause size={13} />
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={p.onExtend}
+              aria-label="Add five minutes"
+            >
+              +5 min
+            </Button>
+            <Button variant="ghost" onClick={done} disabled={busy}>
+              Done <Check size={13} />
+            </Button>
+          </div>
+        ) : null}
         <p className="sr-only" role="status">
           {quietFocus
             ? "Focus has started. Click the clock or press Escape to pause and show the room controls."
@@ -1624,7 +2017,10 @@ export function StudyRoom(p: Props) {
           <RoomSoundPlayer
             key={soundscape}
             recording={soundscape}
-            paused={celebrating || Boolean(breakReturn)}
+            paused={
+              celebrating || Boolean(breakReturn) || polish.settings.muted
+            }
+            volume={polish.settings.volume}
             onStop={() => setSoundscape("off")}
           />
         ) : null}
@@ -1750,7 +2146,42 @@ export function StudyRoom(p: Props) {
               inert={pane !== "agent" && quietRoom}
               aria-hidden={pane !== "agent" && quietRoom}
               data-lenis-prevent
+              data-drag-over={dragOver}
+              onDragEnter={(e) => {
+                if (pane !== "notes" || !e.dataTransfer.types.includes("Files"))
+                  return;
+                e.preventDefault();
+                dragDepth.current++;
+                setDragOver(true);
+              }}
+              onDragOver={(e) => {
+                if (pane === "notes" && e.dataTransfer.types.includes("Files"))
+                  e.preventDefault();
+              }}
+              onDragLeave={() => {
+                dragDepth.current = Math.max(0, dragDepth.current - 1);
+                if (!dragDepth.current) setDragOver(false);
+              }}
+              onDrop={(e) => {
+                if (pane !== "notes") return;
+                e.preventDefault();
+                dragDepth.current = 0;
+                setDragOver(false);
+                const file = e.dataTransfer.files[0];
+                if (file) void importNote(file);
+              }}
             >
+              {pane === "notes" && dragOver ? (
+                <div className="cinema-note-drop" aria-hidden="true">
+                  Drop into your notebook
+                </div>
+              ) : null}
+              {pane === "notes" && printing ? (
+                <div className="cinema-pdf-receipt" aria-hidden="true">
+                  <i />
+                  PDF
+                </div>
+              ) : null}
               <DialogPrimitive.Description
                 id="room-panel-description"
                 className="sr-only"
@@ -1770,7 +2201,9 @@ export function StudyRoom(p: Props) {
                   <header className="room-panel-heading">
                     <div>
                       <DialogPrimitive.Title id="room-panel-title" asChild>
-                        <h2>{panelTitle[pane]}</h2>
+                        <h2>
+                          <WordReveal text={panelTitle[pane]} />
+                        </h2>
                       </DialogPrimitive.Title>
                     </div>
                     <Button
@@ -1794,9 +2227,11 @@ export function StudyRoom(p: Props) {
           ) : null}
         </DialogPrimitive.Root>
       </div>
+      <RoomCursor />
       {p.active && breakReturn ? (
         <BreakReturn
           key={breakReturn}
+          silent={polish.settings.muted || polish.settings.volume === 0}
           female={p.female}
           reduced={p.reduced}
           onCovered={restoreAfterBreak}
@@ -1807,7 +2242,11 @@ export function StudyRoom(p: Props) {
         open={celebrating}
         female={p.female}
         reduced={p.reduced}
-        sound={p.sound}
+        sound={p.sound && !polish.settings.muted}
+        cue={polish.settings.cue}
+        volume={polish.settings.volume}
+        minutes={completionStats.minutes}
+        tasksDone={Math.max(0, completionStats.tasks)}
         busy={busy}
         onBreak={takeBreak}
         onContinue={continueFocusing}

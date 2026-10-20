@@ -1,8 +1,15 @@
 import { useId } from "react";
 import { ROOM_CONFIG as C } from "./config";
+import type { RoomWeather } from "./cinema-config";
 
 /** Clip only the four glass panes. Woodwork stays registered to the original artwork. */
-export function RoomWindow({ sky }: { sky: "day" | "night" | "evening" }) {
+export function RoomWindow({
+  sky,
+  weather,
+}: {
+  sky: "day" | "night" | "evening";
+  weather: RoomWeather;
+}) {
   const id = `glass-${useId().replace(/:/g, "")}`;
   return (
     <>
@@ -19,14 +26,19 @@ export function RoomWindow({ sky }: { sky: "day" | "night" | "evening" }) {
       <div
         className="room-window-world"
         data-sky={sky}
+        data-weather={weather}
         style={{ clipPath: `url(#${id})` }}
         role="img"
         aria-label={
-          sky === "day"
-            ? "A sunny morning outside"
-            : sky === "evening"
-              ? "A rainy evening outside"
-              : "A moonlit night outside"
+          weather === "snow"
+            ? "Snow falling outside"
+            : weather === "sunset"
+              ? "A soft sunset outside"
+              : sky === "day"
+                ? "A sunny morning outside"
+                : sky === "evening"
+                  ? "A rainy evening outside"
+                  : "A moonlit night outside"
         }
       >
         <img
@@ -45,33 +57,11 @@ export function RoomWindow({ sky }: { sky: "day" | "night" | "evening" }) {
           alt=""
           aria-hidden="true"
         />
+        <div className="cinema-sunset-sky" />
+        <div className="cinema-snow-sky" />
+        <div className="cinema-window-reflection" />
+        <div className="cinema-window-frost" />
         <div className="window-rain-haze" />
-        <div className="window-rain-drops" aria-hidden="true">
-          {Array.from({ length: 22 }, (_, i) => (
-            <i
-              key={i}
-              style={{
-                left: `${(i * 37 + 7) % 100}%`,
-                animationDelay: `${i * -0.61}s`,
-                animationDuration: `${2.8 + (i % 6) * 0.37}s`,
-                height: `${5 + (i % 4) * 2}px`,
-              }}
-            />
-          ))}
-        </div>
-        <div className="window-rain-beads" aria-hidden="true">
-          {Array.from({ length: 9 }, (_, i) => (
-            <i
-              key={i}
-              style={{
-                left: `${(i * 31 + 13) % 100}%`,
-                top: `${(i * 23 + 9) % 78}%`,
-                animationDelay: `${i * -1.7}s`,
-                animationDuration: `${10 + i * 0.7}s`,
-              }}
-            />
-          ))}
-        </div>
       </div>
       <div
         className="room-morning-light"

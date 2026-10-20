@@ -9,12 +9,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ROOM_CONFIG as C } from "./config";
+import { CountUp } from "./polish-controls";
+import type { EndCue } from "./cinema-config";
 
 /** A short, rounded two-note bell; no audio is created when sound effects are muted. */
-export function playCompletionCue() {
+export function playCompletionCue(volume = 1) {
   const context = new AudioContext();
   const master = context.createGain();
-  master.gain.value = 0.035;
+  master.gain.value = 0.035 * volume;
   master.connect(context.destination);
   let stopped = false;
   void context
@@ -63,6 +65,10 @@ export function CompletionCelebration({
   female,
   reduced,
   sound,
+  cue = "chime",
+  minutes = 0,
+  tasksDone = 0,
+  volume = 1,
   busy,
   onBreak,
   onContinue,
@@ -71,18 +77,33 @@ export function CompletionCelebration({
   female: boolean;
   reduced: boolean;
   sound: boolean;
+  cue?: EndCue;
+  minutes?: number;
+  tasksDone?: number;
+  volume?: number;
   busy: boolean;
   onBreak: () => void;
   onContinue: () => void;
 }) {
   useEffect(() => {
-    if (!open || !sound) return;
+    if (!open || !sound || cue === "silent" || volume === 0) return;
+    if (cue === "voice") {
+      if (!window.speechSynthesis) return;
+      const speech = new SpeechSynthesisUtterance(
+        "You did great. One little step at a time.",
+      );
+      speech.rate = 0.95;
+      speech.pitch = 1.2;
+      speech.volume = Math.min(0.8, volume);
+      window.speechSynthesis.speak(speech);
+      return () => window.speechSynthesis.cancel();
+    }
     try {
-      return playCompletionCue();
+      return playCompletionCue(volume);
     } catch {
       /* Device audio can be unavailable; the celebration remains usable. */
     }
-  }, [open, sound]);
+  }, [open, sound, cue, volume]);
   return (
     <Dialog open={open}>
       <DialogContent
@@ -116,7 +137,22 @@ export function CompletionCelebration({
         </div>
         <div className="celebration-message">
           <DialogTitle>You did it!</DialogTitle>
-          <DialogDescription>Todo is cheering for you.</DialogDescription>
+          <DialogDescription>
+            You did great. Every little moment counts.
+          </DialogDescription>
+        </div>
+        <div
+          className="cinema-completion-stats"
+          aria-label="Your focus this sit"
+        >
+          <span>
+            <CountUp value={minutes} reduced={reduced} />
+            minutes focused
+          </span>
+          <span>
+            <CountUp value={tasksDone} reduced={reduced} />
+            tasks finished
+          </span>
         </div>
         <div className="celebration-choices">
           <Button

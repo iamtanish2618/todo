@@ -1,11 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ROOM_CONFIG as C, zoneStyle, type RoomPose } from "./config";
 import { RoomPenguin } from "./penguin";
 import { RoomWindow } from "./window";
 import { DeskNotebook } from "./notebook";
 import { CeramicMug } from "./mug";
 import { WorkingFlippers } from "./flippers";
+import { RoomAtmosphere } from "./cinematic";
+import { roomEffect, type RoomWeather } from "./cinema-config";
 
 /** A fixed camera and separate object layers give the table genuine occlusion. */
 export function RoomScene({
@@ -17,6 +19,8 @@ export function RoomScene({
   focusing,
   interactive = true,
   clock,
+  weather,
+  arrived,
 }: {
   pose: RoomPose;
   female: boolean;
@@ -26,7 +30,49 @@ export function RoomScene({
   focusing: boolean;
   interactive?: boolean;
   clock: string | null;
+  weather: RoomWeather;
+  arrived: boolean;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const [intro, setIntro] = useState("sleep");
+  const entryPose = useRef(pose);
+  entryPose.current = pose;
+  const [propAction, setPropAction] = useState("");
+  const propTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const react = (kind: string) => {
+    if (focusing || !interactive) return;
+    setPropAction(kind);
+    roomEffect(root.current, kind);
+    if (propTimer.current) clearTimeout(propTimer.current);
+    propTimer.current = setTimeout(() => setPropAction(""), 1800);
+  };
+  useEffect(
+    () => () => {
+      if (propTimer.current) clearTimeout(propTimer.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (
+      !active ||
+      !arrived ||
+      reduced ||
+      focusing ||
+      entryPose.current !== "idle"
+    ) {
+      setIntro("awake");
+      return;
+    }
+    setIntro("sleep");
+    const warm = setTimeout(() => setLamp(true), 900);
+    const wake = setTimeout(() => setIntro("wake"), 1500),
+      finish = setTimeout(() => setIntro("awake"), 2950);
+    return () => {
+      clearTimeout(warm);
+      clearTimeout(wake);
+      clearTimeout(finish);
+    };
+  }, [active, arrived, reduced, focusing]);
   const [ready, setReady] = useState(reduced);
   const [lamp, setLamp] = useState(false);
   const [working, setWorking] = useState(false);
@@ -54,7 +100,12 @@ export function RoomScene({
   }, [active, reduced]);
   return (
     <div
+      ref={root}
       className="cozy-room-art round-room-art"
+      data-weather={weather}
+      data-intro={intro}
+      data-prop-action={propAction}
+      data-behavior="idle"
       data-entry={ready ? "ready" : "settling"}
       data-pose={scenePose}
       data-work-phase={focusing ? (working ? "writing" : "preparing") : "idle"}
@@ -68,7 +119,67 @@ export function RoomScene({
         height={1024}
         alt={`A miniature cozy room with an arched ${sky === "day" ? "sunlit" : sky === "evening" ? "rainy evening" : "moonlit"} window, plants, a chair and a complete round oak study table.`}
       />
-      <RoomWindow sky={sky} />
+      <RoomWindow sky={sky} weather={weather} />
+      <img
+        className="cinema-furniture-layer"
+        src={C.image}
+        alt=""
+        aria-hidden="true"
+        width={1536}
+        height={1024}
+      />
+      <img
+        className="cinema-shelf-layer"
+        src={C.image}
+        alt=""
+        aria-hidden="true"
+        width={1536}
+        height={1024}
+      />
+      <RoomAtmosphere />
+      <button
+        className="cinema-object-hit cinema-window-hit"
+        aria-label="Make a wish on a shooting star"
+        onClick={() => react("star")}
+        disabled={focusing || !interactive}
+      >
+        <span>Make a wish ✦</span>
+      </button>
+      <button
+        className="cinema-object-hit cinema-plant-hit"
+        aria-label="Touch the hanging plant"
+        onClick={() => react("plant")}
+        disabled={focusing || !interactive}
+      >
+        <span>A little breeze</span>
+      </button>
+      <button
+        className="cinema-object-hit cinema-lights-hit"
+        aria-label="Twinkle the string lights"
+        onClick={() => react("lights")}
+        disabled={focusing || !interactive}
+      >
+        <span>A little glow</span>
+      </button>
+      <button
+        className="cinema-object-hit cinema-picture-hit"
+        aria-label="Peek at the picture"
+        onClick={() => react("picture")}
+        disabled={focusing || !interactive}
+      >
+        <span>A tiny daydream</span>
+      </button>
+      <button
+        className="cinema-object-hit cinema-rug-hit"
+        aria-label="Pat the cozy rug"
+        onClick={() => react("rug")}
+        disabled={focusing || !interactive}
+      >
+        <span>Soft landing</span>
+      </button>
+      <div className="cinema-picture-surprise" aria-hidden="true">
+        ☾<span>little dreams</span>
+      </div>
       {clock ? (
         <div className="room-back-countdown" aria-hidden="true">
           {clock}
@@ -85,6 +196,8 @@ export function RoomScene({
           female={female}
           reduced={reduced}
           active={active}
+          calm={focusing || !interactive || pose !== "idle"}
+          intro={intro}
         />
       </div>
       <img
@@ -106,7 +219,10 @@ export function RoomScene({
         className="round-desk-lamp"
         aria-label={lamp ? "Turn table lamp off" : "Turn table lamp on"}
         aria-pressed={lamp}
-        onClick={() => setLamp((v) => !v)}
+        onClick={() => {
+          setLamp((v) => !v);
+          roomEffect(root.current, "lamp");
+        }}
         disabled={focusing || !interactive}
         tabIndex={focusing || !interactive ? -1 : 0}
       >
@@ -118,13 +234,35 @@ export function RoomScene({
         <span className="round-lamp-button" />
       </button>
       <DeskNotebook />
+      <button
+        className="cinema-object-hit cinema-book-hit"
+        aria-label="Turn the notebook page"
+        onClick={() => react("page")}
+        disabled={focusing || !interactive}
+      >
+        <span>One more page</span>
+      </button>
       <WorkingFlippers pose={scenePose} female={female} />
-      <div className="round-tea-set" aria-hidden="true">
+      <button
+        className="round-tea-set"
+        aria-label="Pour a little tea"
+        onClick={() => react("pour")}
+        disabled={focusing || !interactive}
+      >
         <span className="round-tea-pot">
           <i />
         </span>
         <span className="round-tea-lid" />
-      </div>
+        <span className="cinema-tea-stream" aria-hidden="true" />
+      </button>
+      <img
+        className="cinema-foreground-layer"
+        src={C.image}
+        alt=""
+        aria-hidden="true"
+        width={1536}
+        height={1024}
+      />
       <div className="round-jars" aria-hidden="true">
         <span />
         <span />

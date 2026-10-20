@@ -8,15 +8,20 @@ export function RoomPenguin({
   female,
   reduced,
   active,
+  calm = false,
+  intro = "awake",
 }: {
   pose: RoomPose;
   female: boolean;
   reduced: boolean;
   active: boolean;
+  calm?: boolean;
+  intro?: string;
 }) {
   const root = useRef<HTMLButtonElement>(null);
   const [reaction, setReaction] = useState("");
   const [missing, setMissing] = useState<string[]>([]);
+  const lastReaction = useRef("");
   const reactionTime = useRef(0),
     cleanup = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -35,6 +40,8 @@ export function RoomPenguin({
       targetY = 0,
       x = 0,
       y = 0,
+      velocityX = 0,
+      velocityY = 0,
       blinkUntil = 0,
       nextBlink = performance.now() + C.timing.blinkMin + Math.random() * 3000,
       nextGlance = performance.now() + 6000,
@@ -64,10 +71,17 @@ export function RoomPenguin({
         glanceUntil = now + 900;
         nextGlance = now + 7000 + Math.random() * 5000;
       }
-      x +=
-        ((tracking ? (now < glanceUntil ? -0.8 : targetX) : 0) - x) *
-        C.timing.lerp;
-      y += ((tracking ? targetY : 0) - y) * C.timing.lerp;
+      const behavior =
+        element.closest<HTMLElement>(".round-room-art")?.dataset.behavior;
+      const desiredX = tracking
+        ? behavior === "window" || now < glanceUntil
+          ? -0.8
+          : targetX
+        : 0;
+      velocityX = (velocityX + (desiredX - x) * 0.12) * 0.7;
+      velocityY = (velocityY + ((tracking ? targetY : 0) - y) * 0.12) * 0.7;
+      x = Math.max(-1.05, Math.min(1.05, x + velocityX));
+      y = Math.max(-1.05, Math.min(1.05, y + velocityY));
       element.style.setProperty("--gaze-x", `${x * 1.7}px`);
       element.style.setProperty("--gaze-y", `${y * 1.2}px`);
       if (now > nextBlink) {
@@ -100,10 +114,18 @@ export function RoomPenguin({
   }, [active, reduced, pose]);
   const boop = () => {
     const now = performance.now();
-    if (now - reactionTime.current < C.timing.reaction + C.timing.cooldown)
-      return;
+    if (calm || intro !== "awake" || now - reactionTime.current < 600) return;
     reactionTime.current = now;
-    setReaction(["awe", "pop", "giggle"][Math.floor(Math.random() * 3)]);
+    const reactions = [
+      "awe",
+      "pop",
+      "giggle",
+      "tickle",
+      ...(Math.random() < 0.12 ? ["hearts"] : []),
+    ].filter((r) => r !== lastReaction.current);
+    const next = reactions[Math.floor(Math.random() * reactions.length)];
+    lastReaction.current = next;
+    setReaction(next);
     if (cleanup.current) clearTimeout(cleanup.current);
     cleanup.current = setTimeout(() => setReaction(""), C.timing.reaction);
   };
@@ -125,6 +147,8 @@ export function RoomPenguin({
       ref={root}
       className={`room-pet ${reduced ? "pet-gentle" : ""}`}
       data-pose={pose}
+      data-intro={intro}
+      aria-disabled={calm}
       data-attention={pose === "writing" ? "notebook" : "room"}
       data-reaction={reaction || "idle"}
       aria-label="Say hello to Todo"
@@ -182,11 +206,39 @@ export function RoomPenguin({
             );
           })}
         </span>
+        <img
+          className="cinema-pom-patch"
+          src={source("idle")}
+          alt=""
+          aria-hidden="true"
+        />
+        <img
+          className="cinema-scarf-patch"
+          src={source("idle")}
+          alt=""
+          aria-hidden="true"
+        />
+        <span className="cinema-yawn" aria-hidden="true" />
+        <span className="cinema-glasses" aria-hidden="true">
+          <i />
+          <i />
+        </span>
+        <span className="cinema-hat-pin" aria-hidden="true">
+          ✦
+        </span>
+        <span className="cinema-heart-eyes" aria-hidden="true">
+          ♥<i>♥</i>
+        </span>
       </span>
+      {reaction === "pop" ? (
+        <span className="cinema-surprise-mark" aria-hidden="true">
+          !
+        </span>
+      ) : null}
       {reaction === "awe" ? (
         <Sparkles className="room-pet-spark" size={22} />
       ) : null}
-      {reaction === "giggle" ? (
+      {reaction === "giggle" || reaction === "hearts" ? (
         <span className="room-pet-heart" aria-hidden="true">
           ♡
         </span>
