@@ -840,3 +840,93 @@ test("custom focus setup darkens selected tasks, hides controls, prepares Todo a
     .click();
   expect(errors).toEqual([]);
 });
+
+for (const variant of [
+  { female: false, reduced: false },
+  { female: true, reduced: false },
+  { female: true, reduced: true },
+]) {
+  test(`writing keeps ${variant.female ? "her" : "his"} attention on the notebook and restores idle on pause${variant.reduced ? " with reduced motion" : ""}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.emulateMedia({
+      reducedMotion: variant.reduced ? "reduce" : "no-preference",
+    });
+    await page.addInitScript(
+      ({ female }) =>
+        localStorage.setItem("todo.character.v1", female ? "female" : "male"),
+      variant,
+    );
+    await enter(page);
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    const title = `Notebook attention ${variant.female ? "pink" : "blue"} ${Date.now()}`;
+    await page.getByLabel("New task", { exact: true }).fill(title);
+    await page.getByRole("button", { name: "Add task", exact: true }).click();
+    await page
+      .getByRole("button", { name: `Focus on ${title}`, exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Choose timer", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Focus", exact: true }).click();
+    const pet = page.locator(".room-pet");
+    await expect(pet).toHaveAttribute("data-attention", "notebook");
+    const src = `/art/room-todo-focused-v1${variant.female ? "-pink" : ""}.png`;
+    await expect(page.locator(".room-pose.pose-visible")).toHaveAttribute(
+      "src",
+      src,
+    );
+    await expect(page.locator(".room-pose.pose-visible")).toHaveJSProperty(
+      "naturalWidth",
+      1254,
+    );
+    await expect(page.locator(".room-gaze")).toHaveCSS("visibility", "hidden");
+    const flippers = page.locator(".todo-fur-flipper");
+    await expect(flippers).toHaveCount(2);
+    for (const image of await flippers.all())
+      await expect(image).toHaveAttribute("href", src);
+    await page.mouse.move(30, 25);
+    await page.waitForTimeout(250);
+    await page.mouse.move(1350, 60);
+    await expect(pet).toHaveAttribute("data-attention", "notebook");
+    await expect(page.locator(".room-gaze")).toHaveCSS("visibility", "hidden");
+    if (variant.reduced) {
+      await expect(page.locator(".todo-write-left")).toHaveCSS(
+        "animation-name",
+        "none",
+      );
+    } else {
+      // The shoulder rotates in place; it never translates away from the torso.
+      for (let i = 0; i < 3; i++) {
+        const matrix = await page.locator(".todo-write-left").evaluate((e) => {
+          const m = new DOMMatrix(getComputedStyle(e).transform);
+          return { x: m.e, y: m.f };
+        });
+        expect(Math.abs(matrix.x)).toBeLessThan(0.01);
+        expect(Math.abs(matrix.y)).toBeLessThan(0.01);
+        await page.waitForTimeout(350);
+      }
+    }
+    await page.screenshot({
+      path: `outputs/todo-natural-writing-${variant.female ? "pink" : "blue"}${variant.reduced ? "-gentle" : ""}.png`,
+    });
+    await page
+      .getByRole("button", { name: "Pause table timer", exact: true })
+      .click();
+    await expect(pet).toHaveAttribute("data-attention", "room");
+    await expect(page.locator(".room-pose.pose-visible")).toHaveAttribute(
+      "src",
+      variant.female
+        ? "/art/room-todo-idle-pink.png"
+        : "/art/room-todo-idle.png",
+    );
+    await expect(page.locator(".todo-writing-rig")).toHaveCSS("opacity", "0");
+    await page.getByRole("button", { name: "Tasks", exact: true }).click();
+    await page
+      .getByRole("button", { name: `Delete ${title}`, exact: true })
+      .click();
+    expect(errors).toEqual([]);
+  });
+}

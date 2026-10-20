@@ -232,13 +232,17 @@ export function StudyRoom(p: Props) {
     let stopped = false;
     const room = new Image(),
       idle = new Image(),
-      day = new Image();
+      day = new Image(),
+      focused = new Image();
     room.src = C.image;
     day.src = C.dayImage;
     idle.src = p.female
       ? C.poses.idle.replace(".png", "-pink.png")
       : C.poses.idle;
-    Promise.all([room.decode(), idle.decode(), day.decode()])
+    focused.src = p.female
+      ? C.focusedPose.replace(".png", "-pink.png")
+      : C.focusedPose;
+    Promise.all([room.decode(), idle.decode(), day.decode(), focused.decode()])
       .then(() => {
         if (!stopped) setLoaded(true);
       })

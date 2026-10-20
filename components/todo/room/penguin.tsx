@@ -58,7 +58,8 @@ export function RoomPenguin({
     const tick = () => {
       if (disposed || document.hidden) return;
       const now = performance.now();
-      const tracking = pose !== "sleeping" && pose !== "typing";
+      const tracking =
+        pose !== "sleeping" && pose !== "typing" && pose !== "writing";
       if (now > nextGlance) {
         glanceUntil = now + 900;
         nextGlance = now + 7000 + Math.random() * 5000;
@@ -66,14 +67,7 @@ export function RoomPenguin({
       x +=
         ((tracking ? (now < glanceUntil ? -0.8 : targetX) : 0) - x) *
         C.timing.lerp;
-      y +=
-        ((tracking
-          ? pose === "writing"
-            ? 0.7 + targetY * 0.15
-            : targetY
-          : 0) -
-          y) *
-        C.timing.lerp;
+      y += ((tracking ? targetY : 0) - y) * C.timing.lerp;
       element.style.setProperty("--gaze-x", `${x * 1.7}px`);
       element.style.setProperty("--gaze-y", `${y * 1.2}px`);
       if (now > nextBlink) {
@@ -113,10 +107,10 @@ export function RoomPenguin({
     if (cleanup.current) clearTimeout(cleanup.current);
     cleanup.current = setTimeout(() => setReaction(""), C.timing.reaction);
   };
-  // The writing rig uses the idle torso plus a separately animated flipper and desk notebook.
-  // This avoids crossfading a second notebook into the character's lap.
+  // Focus artwork has a real lowered head and downward pupils, with no baked-in props.
   const poseSource = (p: RoomPose) => {
-    const base = C.poses[p === "writing" || p === "tea" ? "idle" : p];
+    const base =
+      p === "writing" ? C.focusedPose : C.poses[p === "tea" ? "idle" : p];
     return female ? base.replace(".png", "-pink.png") : base;
   };
   const source = (p: RoomPose) =>
@@ -131,6 +125,7 @@ export function RoomPenguin({
       ref={root}
       className={`room-pet ${reduced ? "pet-gentle" : ""}`}
       data-pose={pose}
+      data-attention={pose === "writing" ? "notebook" : "room"}
       data-reaction={reaction || "idle"}
       aria-label="Say hello to Todo"
       onClick={boop}

@@ -29,6 +29,7 @@ export const ROOM_CONFIG = {
     tea: "/art/room-todo-tea.png",
     sleeping: "/art/room-todo-sleeping.png",
   },
+  focusedPose: "/art/room-todo-focused-v1.png",
   eyes: {
     width: 11,
     height: 11,

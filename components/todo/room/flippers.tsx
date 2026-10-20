@@ -1,7 +1,17 @@
 import { useId } from "react";
+import { ROOM_CONFIG as C } from "./config";
 /** Attached shoulder pivots keep the rounded flippers connected during each stroke or sip. */
-export function WorkingFlippers({ pose }: { pose: string }) {
+export function WorkingFlippers({
+  pose,
+  female,
+}: {
+  pose: string;
+  female: boolean;
+}) {
   const id = useId().replace(/:/g, "");
+  const furSource = female
+    ? C.focusedPose.replace(".png", "-pink.png")
+    : C.focusedPose;
   return (
     <svg
       className="todo-flipper-rig"
@@ -10,6 +20,48 @@ export function WorkingFlippers({ pose }: { pose: string }) {
       data-action={pose}
     >
       <defs>
+        {/* Actual character fur, softly masked at the shoulder instead of a flat fill. */}
+        <linearGradient
+          id={`${id}-shoulder`}
+          x1="0"
+          y1="490"
+          x2="0"
+          y2="530"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="black" />
+          <stop offset=".7" stopColor="white" />
+        </linearGradient>
+        <filter
+          id={`${id}-feather`}
+          x="-.08"
+          y="-.08"
+          width="1.16"
+          height="1.16"
+        >
+          <feGaussianBlur stdDeviation=".55" />
+        </filter>
+        <mask
+          id={`${id}-flipper`}
+          maskUnits="userSpaceOnUse"
+          x="625"
+          y="480"
+          width="115"
+          height="110"
+        >
+          <path
+            d="M660 491C636 500 628 524 640 551C649 572 686 576 716 562C735 550 710 528 692 515C678 504 669 494 660 491Z"
+            fill={`url(#${id}-shoulder)`}
+            filter={`url(#${id}-feather)`}
+          />
+        </mask>
+        <clipPath id={`${id}-grip`}>
+          <ellipse cx="704" cy="555" rx="25" ry="17" />
+        </clipPath>
+        <radialGradient id={`${id}-contact`}>
+          <stop stopColor="#473323" stopOpacity=".18" />
+          <stop offset="1" stopColor="#473323" stopOpacity="0" />
+        </radialGradient>
         <linearGradient id={`${id}-fur`} x1="0" y1="0" x2="1" y2="1">
           <stop stopColor="#625b54" />
           <stop offset=".5" stopColor="#413d39" />
@@ -38,46 +90,62 @@ export function WorkingFlippers({ pose }: { pose: string }) {
         </pattern>
       </defs>
       <g className="todo-writing-rig">
+        <ellipse
+          className="todo-pencil-contact"
+          cx="733"
+          cy="619"
+          rx="17"
+          ry="4"
+          fill={`url(#${id}-contact)`}
+        />
         <g className="todo-write-left">
-          <path
-            d="M651 509Q636 515 642 535Q657 561 683 583Q701 594 714 578Q722 567 707 553L679 521Q663 506 651 509Z"
-            fill={`url(#${id}-fur)`}
-          />
-          <path
-            d="M651 509Q636 515 642 535Q657 561 683 583Q701 594 714 578Q722 567 707 553L679 521Q663 506 651 509Z"
-            fill={`url(#${id}-fur-lines)`}
-            opacity=".6"
-          />
-          <g className="todo-held-pencil">
-            <path d="M685 551L690 548L725 600L720 603Z" fill="#e2b452" />
-            <path d="M690 548L692 551L725 600L723 601Z" fill="#ffe1a0" />
-            <path d="M720 603L725 600L727 610Z" fill="#dbc39a" />
-            <path d="M725 605L727 610L723 607Z" fill="#50463a" />
-            <path
-              d="M685 551L681 545Q682 540 686 541L690 548Z"
-              fill="#cb8d83"
+          <g transform="rotate(13 654 505)">
+            <image
+              className="todo-fur-flipper"
+              href={furSource}
+              x="568.32"
+              y="256"
+              width="384"
+              height="384"
+              mask={`url(#${id}-flipper)`}
             />
           </g>
-          <path
-            d="M682 557Q700 549 709 565Q711 579 699 582Q687 579 682 570Z"
-            fill={`url(#${id}-fur)`}
-          />
-          <path
-            d="M682 557Q700 549 709 565Q711 579 699 582Q687 579 682 570Z"
-            fill={`url(#${id}-fur-lines)`}
-            opacity=".6"
-          />
+          <g className="todo-writing-wrist">
+            <g className="todo-held-pencil" transform="translate(9 9)">
+              <path d="M685 551L690 548L725 600L720 603Z" fill="#d6a444" />
+              <path d="M690 548L692 551L725 600L723 601Z" fill="#ffe1a0" />
+              <path d="M720 603L725 600L727 610Z" fill="#dbc39a" />
+              <path d="M725 605L727 610L723 607Z" fill="#50463a" />
+              <path
+                d="M685 551L681 545Q682 540 686 541L690 548Z"
+                fill="#cb8d83"
+              />
+            </g>
+          </g>
+          {/* A small matching fur overlap occludes the pencil where the flipper grips it. */}
+          <g transform="rotate(13 654 505)" clipPath={`url(#${id}-grip)`}>
+            <image
+              href={furSource}
+              x="568.32"
+              y="256"
+              width="384"
+              height="384"
+              mask={`url(#${id}-flipper)`}
+            />
+          </g>
         </g>
         <g className="todo-write-right">
-          <path
-            d="M863 510Q879 516 871 538L849 582Q840 602 822 595Q811 589 819 573L838 528Q847 508 863 510Z"
-            fill={`url(#${id}-fur)`}
-          />
-          <path
-            d="M863 510Q879 516 871 538L849 582Q840 602 822 595Q811 589 819 573L838 528Q847 508 863 510Z"
-            fill={`url(#${id}-fur-lines)`}
-            opacity=".6"
-          />
+          <g transform="translate(1518 0) scale(-1 1) rotate(6 654 505)">
+            <image
+              className="todo-fur-flipper"
+              href={furSource}
+              x="568.32"
+              y="256"
+              width="384"
+              height="384"
+              mask={`url(#${id}-flipper)`}
+            />
+          </g>
         </g>
       </g>
       <g className="todo-coffee-rig">

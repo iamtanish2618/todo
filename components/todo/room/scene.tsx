@@ -108,7 +108,7 @@ export function RoomScene({
         <span className="round-lamp-button" />
       </button>
       <DeskNotebook />
-      <WorkingFlippers pose={scenePose} />
+      <WorkingFlippers pose={scenePose} female={female} />
       <div className="round-tea-set" aria-hidden="true">
         <span className="round-tea-pot">
           <i />
