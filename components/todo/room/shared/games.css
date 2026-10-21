@@ -284,7 +284,27 @@
   }
 }
 .table-bubbles-screen {
-  background: radial-gradient(ellipse at 50% 35%, #f6efdedb, #dce9e9e8);
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    #263448,
+    #111925 70%,
+    #0c111b
+  );
+  color: #f3f2fa;
+}
+.table-bubbles-screen .table-game-toolbar,
+.table-bubbles-screen .table-doodle-help {
+  background: #1c283ced;
+  color: #f3f2fa;
+  border: 1px solid #b7cbe04d;
+  box-shadow: 0 6px 24px #0003;
+}
+.table-bubbles-screen .table-game-toolbar button:hover {
+  background: #ffffff15;
+  color: #fff;
+}
+.table-bubbles-screen :focus-visible {
+  outline-color: #f2cc88;
 }
 .table-bubble-field {
   position: absolute;
@@ -303,7 +323,12 @@
 }
 .table-pop-bubble {
   position: absolute;
-  margin: -25px 0 0 -25px;
+  left: 0;
+  top: 0;
+  margin: 0;
+  width: 72px;
+  aspect-ratio: 1;
+  opacity: 0;
   border-radius: 50%;
   border: 1px solid #ffffffd9;
   background:
@@ -318,7 +343,7 @@
   box-shadow:
     inset 1px 2px 7px #fff,
     inset -4px -7px 14px #b6a9c329,
-    0 9px 25px #7f96981f;
+    0 9px 25px #0003;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -336,7 +361,7 @@
   transform: rotate(-32deg);
 }
 .table-pop-bubble:focus-visible {
-  outline: 3px solid #78563b;
+  outline: 3px solid #f2cc88;
   outline-offset: 6px;
 }
 .table-pop-bubble[data-popped="true"] {
@@ -348,7 +373,7 @@
   inset: -16px;
   display: grid;
   place-items: center;
-  color: #af8551;
+  color: #f2cc88;
   font-size: 30px;
   animation: table-pop-spark 0.28s ease-out both;
 }

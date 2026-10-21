@@ -874,3 +874,165 @@ for (const character of ["male", "female"] as const) {
     expect(errors).toEqual([]);
   });
 }
+
+test("Todo renders equations as math while keeping code and untrusted markup safe", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/status", (route) =>
+    route.fulfill({
+      json: {
+        ai: true,
+        vision: true,
+        provider: "gemini",
+        friends: false,
+        quota: { used: 0, limit: 20, resting: false, resetsAt: "tomorrow" },
+      },
+    }),
+  );
+  const reply = String.raw`Let's test $f(x) = x^2 - 4x$ on the interval $[0,4]$.
+
+- **Check conditions:**
+  1. $f(0)=0$
+  2. $f(4)=0$. All conditions are met.
+- **Find $c$:**
+
+$$
+f'(c)=2c-4=0 \quad\Rightarrow\quad c=2
+$$
+
+A fraction: $\frac{1}{2}$ and a root: $\sqrt{x}$.
+
+Keep code literal:
+
+~~~txt
+$x^2$
+~~~
+
+<script>alert('unsafe')</script>`;
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({ json: { text: reply } }),
+  );
+  await enter(page);
+  await dock(page, "agent").click();
+  await page
+    .getByRole("textbox", { name: "Message Todo" })
+    .fill("Explain this example.");
+  await page.getByRole("button", { name: "Send to Todo", exact: true }).click();
+  const answer = page.getByRole("article", { name: "Todo's reply" });
+  await expect(answer.locator(".katex")).toHaveCount(8);
+  await expect(answer.locator(".katex-display")).toHaveCount(1);
+  await expect(answer.locator(".katex-mathml math")).toHaveCount(8);
+  await expect(answer.locator(".katex-html .msupsub").first()).toBeVisible();
+  await expect(answer.locator("code")).toHaveText("$x^2$");
+  await expect(answer.locator("script")).toHaveCount(0);
+  await expect(answer.locator(".katex-error")).toHaveCount(0);
+  await page.evaluate(() => document.fonts.ready);
+  const fits = await answer.evaluate(
+    (el) => el.scrollWidth <= el.clientWidth + 1,
+  );
+  expect(fits).toBe(true);
+  await page.screenshot({ path: "outputs/todo-math-chat-fixed.png" });
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      json: { text: String.raw`An incomplete equation: $\frac{1}{$.` },
+    }),
+  );
+  await page
+    .getByRole("textbox", { name: "Message Todo" })
+    .fill("Check an incomplete equation.");
+  await page.getByRole("button", { name: "Send to Todo", exact: true }).click();
+  await expect(
+    page
+      .getByRole("article", { name: "Todo's reply" })
+      .last()
+      .locator(".katex-error"),
+  ).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+for (const reduced of [false, true]) {
+  test(`Bubble Pop uses a dark random field with varied speeds${reduced ? " and respects reduced motion" : ""}`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    if (reduced) await page.emulateMedia({ reducedMotion: "reduce" });
+    await enter(page);
+    await dock(page, "focus").click();
+    await dock(page, "focus").click();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Take a break", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Start break", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.getByRole("button", { name: /^Bubble Pop/ }).click();
+    const field = page.locator(".table-bubbles-screen");
+    await expect(field).toBeVisible();
+    await expect(page.locator(".table-pop-bubble")).toHaveCount(24);
+    await page.mouse.move(10, 900);
+    await page.waitForTimeout(800);
+    const sample = () =>
+      page.locator(".table-pop-bubble").evaluateAll((nodes) =>
+        nodes.map((n) => {
+          const matrix = new DOMMatrix(getComputedStyle(n).transform);
+          return { x: matrix.m41, y: matrix.m42 };
+        }),
+      );
+    const before = await sample();
+    expect(
+      new Set(before.map((p) => Math.round(p.x / 10))).size,
+    ).toBeGreaterThan(12);
+    expect(
+      new Set(before.map((p) => Math.round(p.y / 10))).size,
+    ).toBeGreaterThan(12);
+    await page.waitForTimeout(1100);
+    const after = await sample();
+    const distance = after.map((p, i) =>
+      Math.hypot(p.x - before[i].x, p.y - before[i].y),
+    );
+    if (reduced) expect(Math.max(...distance)).toBeLessThan(0.5);
+    else {
+      expect(distance.filter((d) => d > 8).length).toBeGreaterThan(16);
+      expect(Math.max(...distance) - Math.min(...distance)).toBeGreaterThan(15);
+    }
+    await expect(field).toHaveCSS("background-image", /rgb\(17, 25, 37\)/);
+    await page.screenshot({
+      path: `outputs/todo-dark-random-bubbles${reduced ? "-gentle" : ""}.png`,
+    });
+    const bubble = page.getByRole("button", {
+      name: "Pop bubble 4",
+      exact: true,
+    });
+    await bubble.focus();
+    await page.keyboard.press("Space");
+    await expect(bubble).toHaveAttribute("data-popped", "true");
+    await expect(bubble).toHaveAttribute("data-popped", "false", {
+      timeout: 3500,
+    });
+    await page.setViewportSize({ width: 1100, height: 760 });
+    await page.waitForTimeout(350);
+    const bounds = await page
+      .locator(".table-pop-bubble")
+      .evaluateAll((nodes) =>
+        nodes.every((n) => {
+          const r = n.getBoundingClientRect();
+          return (
+            r.left >= 0 &&
+            r.right <= innerWidth &&
+            r.top >= 80 &&
+            r.bottom <= innerHeight - 45
+          );
+        }),
+      );
+    expect(bounds).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(field).toHaveCount(0);
+    await page.getByRole("button", { name: "End break", exact: true }).click();
+    expect(errors).toEqual([]);
+  });
+}

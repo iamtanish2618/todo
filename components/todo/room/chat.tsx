@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import Markdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Connection, type Note } from "@/lib/todo/client";
@@ -276,7 +278,22 @@ export function RoomChat({
                 <p>{m.content}</p>
               ) : (
                 <div className="room-chat-body">
-                  <Markdown skipHtml disallowedElements={["img"]}>
+                  <Markdown
+                    skipHtml
+                    disallowedElements={["img"]}
+                    remarkPlugins={[remarkMath]}
+                    rehypePlugins={[
+                      [
+                        rehypeKatex,
+                        {
+                          trust: false,
+                          maxSize: 12,
+                          maxExpand: 500,
+                          errorColor: "#6b4e38",
+                        },
+                      ],
+                    ]}
+                  >
                     {m.content}
                   </Markdown>
                 </div>

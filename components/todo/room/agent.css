@@ -112,6 +112,24 @@
 .room-chat-body > :first-child {
   margin-top: 0;
 }
+.room-chat-body {
+  min-width: 0;
+}
+.room-chat-body .katex {
+  font-size: 1.08em;
+  white-space: normal;
+}
+.room-chat-body .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+  text-align: left;
+}
+.room-chat-body .katex-display > .katex {
+  white-space: nowrap;
+  text-align: left;
+}
 .room-chat-body > :last-child {
   margin-bottom: 0;
 }
