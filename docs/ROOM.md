@@ -46,6 +46,8 @@ After 60 seconds without input, the local idle companion crossfades to the actua
 
 Agent replies render inline `$…$` and display `$$…$$` equations through remark-math and KaTeX, including accessible MathML and locally bundled fonts. HTML remains disabled, code blocks remain literal, and untrusted TeX commands cannot load remote content. Wide display equations scroll inside their message; incomplete equations fall back to readable text without interrupting the chat. Browser coverage uses a deterministic API fixture rather than spending the user's AI quota.
 
+`scripts/prepare-math-assets.mjs` runs before dev/build to publish the installed KaTeX WOFF2 fonts under `/fonts/katex/` and generate `vendor/katex.css` with absolute public URLs. This avoids relative package font URLs that the stylesheet bundler otherwise retains without copying the font files. The package's MIT license accompanies the fonts.
+
 ### Generation prompt set
 
 Blue poses used `todo-seated.png` as the exact character reference and `study-room.png` only as a lighting/camera reference. The shared prompt requested identity preservation; blue knitted pom-pom cap and small matching scarf; the same fluffy charcoal/cream baby penguin, rounded flippers, orange beak/feet and glossy brown eyes; straight-on camera slightly above eye level; amber key light from the right and cool window fill from the left; full seated body with visible feet, centered on genuine transparent alpha; no room, chair, floor shadow, text, extra characters, fingers or winks. Pose-specific actions were:

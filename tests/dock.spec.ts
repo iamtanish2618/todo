@@ -929,6 +929,14 @@ $x^2$
   await expect(answer.locator("script")).toHaveCount(0);
   await expect(answer.locator(".katex-error")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
+  expect(
+    await page.evaluate(
+      () =>
+        Array.from(document.fonts).filter(
+          (font) => font.family.startsWith("KaTeX") && font.status === "loaded",
+        ).length,
+    ),
+  ).toBeGreaterThan(0);
   const fits = await answer.evaluate(
     (el) => el.scrollWidth <= el.clientWidth + 1,
   );
