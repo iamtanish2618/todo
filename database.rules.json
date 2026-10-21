@@ -39,7 +39,7 @@
               ".validate": "newData.isBoolean()"
             },
             "playing": {
-              ".validate": "newData.val() == 'doodle' || newData.val() == 'breathe'"
+              ".validate": "newData.val() == 'doodle' || newData.val() == 'bubbles' || newData.val() == 'breathe'"
             },
             "$other": {
               ".validate": false

@@ -63,6 +63,26 @@ test("Firebase rules deny public/root access, impersonation, edited join order a
   expect(
     (
       await db(
+        `tables/${code}/members/${id}/playing`,
+        a.idToken,
+        "PUT",
+        "bubbles",
+      )
+    ).ok,
+  ).toBe(true);
+  expect(
+    (
+      await db(
+        `tables/${code}/members/${id}/playing`,
+        a.idToken,
+        "PUT",
+        "unknown-game",
+      )
+    ).status,
+  ).toBe(401);
+  expect(
+    (
+      await db(
         `tables/${code}/members/${id}/name`,
         b.idToken,
         "PUT",

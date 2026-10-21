@@ -37,6 +37,7 @@ export function RoomScene({
 }) {
   const root = useRef<HTMLDivElement>(null);
   const [intro, setIntro] = useState("sleep");
+  const introPlayed = useRef(false);
   const entryPose = useRef(pose);
   entryPose.current = pose;
   const [propAction, setPropAction] = useState("");
@@ -55,16 +56,23 @@ export function RoomScene({
     [],
   );
   useEffect(() => {
+    if (!active || !arrived) {
+      introPlayed.current = false;
+      setIntro("awake");
+      return;
+    }
+    // A mode change must not replay sleeping artwork or cover the pupils.
     if (
-      !active ||
-      !arrived ||
+      introPlayed.current ||
       reduced ||
       focusing ||
       entryPose.current !== "idle"
     ) {
+      introPlayed.current = true;
       setIntro("awake");
       return;
     }
+    introPlayed.current = true;
     setIntro("sleep");
     const warm = setTimeout(() => setLamp(true), 900);
     const wake = setTimeout(() => setIntro("wake"), 1500),

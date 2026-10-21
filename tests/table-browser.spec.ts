@@ -291,7 +291,7 @@ test("four original penguins seat gently, nicknames appear and Friends stays cle
     pages.map((p) => act(p, "qa.session.leave();qa.voice.leave()")),
   );
 });
-test("shared doodles, late breathing invitation and immediate break-end cleanup", async ({
+test("shared doodles, late bubble invitation and immediate break-end cleanup", async ({
   browser,
 }) => {
   const a = await peer(browser, 30),
@@ -350,24 +350,34 @@ test("shared doodles, late breathing invitation and immediate break-end cleanup"
   await expect(a.locator(".table-doodle-screen")).toHaveCount(0);
   await b.getByRole("button", { name: "Done", exact: true }).click();
   await a.getByRole("button", { name: "Play", exact: true }).click();
-  await a.getByRole("button", { name: /^Breathing Bubble/ }).click();
+  await a.getByRole("button", { name: /^Bubble Pop/ }).click();
   await act(b, "qa.games.setBreak(false);qa.session.setStatus('idle')");
   await b.waitForTimeout(600);
   await act(b, "qa.session.setStatus('break');qa.games.setBreak(true)");
-  await expect(b.getByText("Ink started Breathing Bubble")).toBeVisible();
+  await expect(b.getByText("Ink started Bubble Pop")).toBeVisible();
   await b.getByRole("button", { name: "Join", exact: true }).click();
+  await expect(b.getByRole("dialog", { name: "Bubble Pop" })).toBeVisible();
+  const target = await a
+    .getByRole("button", { name: "Pop bubble 1", exact: true })
+    .boundingBox();
+  await a.mouse.click(
+    target!.x + target!.width / 2,
+    target!.y + target!.height / 2,
+  );
   await expect(
-    b.getByRole("region", { name: "Breathing Bubble" }),
-  ).toBeVisible();
+    b.getByRole("button", { name: "Pop bubble 1", exact: true }),
+  ).toHaveAttribute("data-popped", "true");
+  await expect(a.locator(".table-pop-bubble")).toHaveCount(24);
+  await a.screenshot({ path: "outputs/todo-bubble-pop.png" });
   await act(b, "qa.games.setBreak(false);qa.session.setStatus('focusing')");
-  await expect(b.locator(".table-breath-panel")).toHaveCount(0);
+  await expect(b.locator(".table-bubbles-screen")).toHaveCount(0);
   await expect(
     b.getByRole("button", { name: "Play", exact: true }),
   ).toHaveCount(0);
   await expect(
     b.getByText("Break's over, we'll save your spot."),
   ).toBeVisible();
-  await expect(a.locator(".table-breath-panel")).toBeVisible();
+  await expect(a.locator(".table-bubbles-screen")).toBeVisible();
   await Promise.all(
     [a, b].map((p) =>
       act(p, "qa.games.dispose();qa.session.leave();qa.voice.leave()"),
@@ -540,15 +550,20 @@ test("solo break Play closes back to the existing room; keyboard and reduced mot
     { timeout: 45000 },
   );
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.getByRole("button", { name: /^Breathing Bubble/ }).click();
-  await expect(page.locator(".table-breath-panel")).toBeVisible();
-  expect(
-    await page
-      .locator(".table-breath-orb")
-      .evaluate((el) => getComputedStyle(el).transform),
-  ).toBe("none");
+  await page.getByRole("button", { name: /^Bubble Pop/ }).click();
+  await expect(page.locator(".table-bubbles-screen")).toBeVisible();
+  await expect(page.locator(".table-pop-bubble")).toHaveCount(24);
+  const bubble = page.getByRole("button", {
+    name: "Pop bubble 1",
+    exact: true,
+  });
+  await bubble.focus();
+  await page.keyboard.press("Space");
+  await expect(bubble).toHaveAttribute("data-popped", "true");
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.locator(".table-bubbles-screen")).toHaveCount(0);
   await page.getByRole("button", { name: "End break", exact: true }).click();
-  await expect(page.locator(".table-breath-panel")).toHaveCount(0);
+  await expect(page.locator(".table-bubbles-screen")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toHaveCount(0);

@@ -17,7 +17,7 @@ export const COLORS = {
 } as const;
 export type Color = keyof typeof COLORS;
 export type Status = "arriving" | "idle" | "focusing" | "break";
-export type Game = "doodle" | "breathe";
+export type Game = "doodle" | "bubbles";
 export type Member = {
   id: string;
   name: string;
@@ -103,7 +103,9 @@ export function readMember(value: unknown, key: string): Member | null {
     !["arriving", "idle", "focusing", "break"].includes(String(value.status)) ||
     !["muted", "live"].includes(String(value.mic)) ||
     typeof value.hasMicPermission !== "boolean" ||
-    ![null, undefined, "doodle", "breathe"].includes(value.playing as null)
+    ![null, undefined, "doodle", "bubbles", "breathe"].includes(
+      value.playing as null,
+    )
   )
     return null;
   return {
@@ -114,7 +116,9 @@ export function readMember(value: unknown, key: string): Member | null {
     status: value.status as Status,
     mic: value.mic as Member["mic"],
     hasMicPermission: value.hasMicPermission,
-    playing: (value.playing || null) as Member["playing"],
+    playing: (value.playing === "breathe"
+      ? "bubbles"
+      : value.playing || null) as Member["playing"],
   };
 }
 export function readEnvelope(value: unknown): Envelope | null {
@@ -137,6 +141,7 @@ export function readEnvelope(value: unknown): Envelope | null {
       "game_state",
       "doodle",
       "doodle_clear",
+      "bubble_pop",
     ].includes(value.event) ||
     !object(value.data)
   )

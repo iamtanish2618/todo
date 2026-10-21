@@ -1,17 +1,24 @@
 import { test, expect } from "@playwright/test";
 import {
-  breathPhase,
+  readBubblePop,
   readStroke,
   BreakGameSession,
 } from "../lib/todo/table/games";
 import { TableSession } from "../lib/todo/table/session";
-test("breathing cycle, late phase and stroke validation", () => {
-  expect(breathPhase(0, 0).label).toBe("Breathe in");
-  expect(breathPhase(4000, 0).label).toBe("Hold");
-  expect(breathPhase(7000, 0).label).toBe("Breathe out");
-  expect(breathPhase(19000, 12000)).toEqual(breathPhase(7000, 0));
-  expect(breathPhase(60000, 0).finished).toBe(true);
-  expect(breathPhase(64000, 0).progress).toBe(0);
+test("bubble events validate the current game, time and slot; strokes stay bounded", () => {
+  const pop = { index: 2, startAt: 1000, at: 2000 };
+  expect(readBubblePop(pop, 1000, 2000)).toEqual(pop);
+  for (const data of [
+    { ...pop, index: -1 },
+    { ...pop, index: 24 },
+    { ...pop, index: 1.5 },
+    { ...pop, at: NaN },
+    { ...pop, at: Infinity },
+    { ...pop, at: 4000 },
+    { ...pop, startAt: 999 },
+  ])
+    expect(readBubblePop(data, 1000, 2000)).toBeNull();
+  expect(readBubblePop(pop, 1000, 20000)).toBeNull();
   expect(
     readStroke({ sid: "abc", color: "blue", pts: [[-1, 2]] })?.pts,
   ).toEqual([[0, 1]]);
@@ -38,7 +45,7 @@ test("games are break-only, optional and close without touching the timer", () =
   expect(games.getSnapshot().notice).toContain("Break's over");
   games.setBreak(true);
   expect(games.getSnapshot().notice).toBe("");
-  games.start("breathe", 5000);
+  games.start("bubbles", 5000);
   expect(games.getSnapshot().startAt).toBe(5000);
   games.dispose();
 });

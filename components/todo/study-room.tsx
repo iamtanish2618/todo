@@ -383,6 +383,7 @@ export function StudyRoom(p: Props) {
     active: p.active && arrived,
     reduced: p.reduced,
     focus: quietFocus,
+    resting: quietBreak,
     running: p.running,
     remaining: p.remaining,
     duration: p.duration,
@@ -633,6 +634,65 @@ export function StudyRoom(p: Props) {
     const dismiss = setTimeout(() => setPane(null), p.reduced ? 0 : 650);
     return () => clearTimeout(dismiss);
   }, [quietFocus, quietBreak, p.reduced]);
+  const restHistory = useRef({ resting: false, playing: false });
+  useEffect(() => {
+    const before = restHistory.current;
+    restHistory.current = {
+      resting: p.active && quietBreak,
+      playing: p.active && Boolean(breakGameState.game),
+    };
+    const entered = quietBreak && !before.resting;
+    const returned = quietBreak && before.playing && !breakGameState.game;
+    if (!p.active || (!entered && !returned)) return;
+    const room = roomRoot.current,
+      wash = room?.querySelector(".room-rest-transition"),
+      art = room?.querySelector(".round-room-art");
+    if (!room || !wash || !art) return;
+    room.dataset.breakTransition = returned ? "return" : "enter";
+    let disposed = false,
+      cleanup = () => {};
+    void import("gsap").then(({ gsap }) => {
+      if (disposed) return;
+      const context = gsap.context(() => {
+        const timeline = gsap.timeline({
+          onComplete: () => {
+            room.dataset.breakTransition = "settled";
+          },
+        });
+        timeline
+          .fromTo(
+            wash,
+            { opacity: 0, xPercent: p.reduced ? 0 : -5 },
+            { opacity: 0.3, xPercent: 0, duration: 0.25, ease: "power2.out" },
+          )
+          .to(wash, {
+            opacity: 0,
+            xPercent: p.reduced ? 0 : 5,
+            duration: p.reduced ? 0.15 : 0.8,
+            ease: "power2.out",
+          });
+        if (!p.reduced)
+          timeline.fromTo(
+            art,
+            { scale: 1.012, opacity: 0.94, transformOrigin: "50% 58%" },
+            {
+              scale: 1,
+              opacity: 1,
+              duration: 1.05,
+              ease: "power2.out",
+              clearProps: "transform,opacity,transformOrigin",
+            },
+            0,
+          );
+      }, room);
+      cleanup = () => context.revert();
+    });
+    return () => {
+      disposed = true;
+      cleanup();
+      room.dataset.breakTransition = "settled";
+    };
+  }, [quietBreak, breakGameState.game, p.active, p.reduced]);
   const show = (next: Pane) => {
     setError("");
     if (currentPane.current === next) closePanel.current();
@@ -1880,6 +1940,7 @@ export function StudyRoom(p: Props) {
         inert={!arrived || Boolean(breakReturn)}
         aria-hidden={!arrived || Boolean(breakReturn)}
       >
+        <div className="room-rest-transition" aria-hidden="true" />
         {table.config.games && (
           <BreakGames games={breakGames} reduced={p.reduced} sound={p.sound} />
         )}
@@ -2196,7 +2257,7 @@ export function StudyRoom(p: Props) {
             active={pane === "tasks" || pane === "finished" ? "focus" : pane}
             reduced={p.reduced}
             focus={quietFocus}
-            hidden={quietBreak || celebrating}
+            hidden={quietFocus || quietBreak || celebrating}
             agent={p.agentMode}
             resting={resting}
             onChoose={(item: DockItem) => {

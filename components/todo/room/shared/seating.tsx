@@ -207,7 +207,7 @@ export function TableSeats({
               >
                 <i />
                 <span>{m.id === table.id ? `${m.name} · you` : m.name}</span>
-                {m.playing === "breathe" && (
+                {m.playing === "bubbles" && (
                   <em className="table-mini-bubble" />
                 )}
                 {m.mic === "live" ? <Mic size={12} /> : <MicOff size={12} />}

@@ -461,7 +461,7 @@
   border: 1px solid #fff9;
   animation: table-bubble-mini 12s ease-in-out infinite;
 }
-.table-seat[data-playing="breathe"] .room-pet-breathe {
+.table-seat[data-playing="bubbles"] .room-pet-breathe {
   animation-duration: 12s;
 }
 .table-seat[data-playing="doodle"] .table-character {

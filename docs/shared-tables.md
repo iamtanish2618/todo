@@ -60,7 +60,7 @@ The 3:2 room and complete oak table are preserved. Original penguins slide to pe
 
 Friends uses a wider sidebar with one Leave table action. Successful code/link copies animate a small confirmation inside the code capsule, without changing its size. The room’s image cutouts stay registered rather than moving independently with the cursor; the shooting-star cursor, eyes and character animations remain.
 
-Play appears only during a break. Doodle Art opens in a full-viewport portal, beyond the room’s aspect-ratio letterboxing. Clear resets the shared mist, and Done/Escape closes the drawing surface with focus restoration. It also closes automatically when the local break ends; normalized stroke batches are capped at 50 points, 20Hz per sender and 200 recent stroke IDs. Fog regrows gradually. Breathing Bubble has a 4-second inhale, 2-second hold and 6-second exhale for one calm minute; its tone is off by default. Late break participants can request the current activity and join optionally. Focused members never receive game invitations. Ending/skipping a break closes local game UI immediately and leaves other members' breaks alone. Games and speaking analysis share GSAP's ticker; no extra RAF loop is introduced.
+Play appears only during a break. Doodle Art opens in a full-viewport portal, beyond the room’s aspect-ratio letterboxing. Clear resets the shared mist, and Done/Escape closes the drawing surface with focus restoration. It also closes automatically when the local break ends; normalized stroke batches are capped at 50 points, 20Hz per sender and 200 recent stroke IDs. Fog regrows gradually. Bubble Pop replaces Breathing Bubble: 24 floating bubbles pop with a small sparkle, then regrow. Hover/focus holds a target still. Tablemates can join the same activity and share validated pops; there are no scores or recordings. Late break participants can request the current activity and join optionally. Focused members never receive game invitations. Ending/skipping a break closes local game UI immediately and leaves other members' breaks alone. Games and speaking analysis share GSAP's ticker; no extra RAF loop is introduced.
 
 ## Verification
 
@@ -97,8 +97,8 @@ Use headphones and two or three separate browser profiles/windows:
 7. Host starts Sit together; consenting idle clients should share a deadline within 500ms. Declining or already-focusing clients keep their own work.
 8. Disconnect/reconnect one browser. Presence returns, old voice connections are replaced and no orphan microphone remains after Leave.
 9. **Real-device check required:** a phone on mobile data and a laptop on Wi-Fi. If audio fails, provision TURN; a local/emulator test cannot establish that a strict network will work.
-10. Play is absent in idle/focus/recap and present in break. Share a doodle, clear it, join a breathing activity late, end one member's break and confirm only their game closes.
-11. Test keyboard navigation, visible focus and OS reduced motion. Reduced motion uses fades and suppresses wave/sparkles/breathing transforms.
+10. Play is absent in idle/focus/recap and present in break. Share a doodle, clear it, join Bubble Pop late, end one member's break and confirm only their game closes.
+11. Test keyboard navigation, visible focus and OS reduced motion. Reduced motion uses fades and suppresses wave/sparkles/bubble drifting transforms.
 12. Recheck saved tasks, completed-task history, timer editing, notes/flashcards, three supplied looping audio recordings, Agent chat/attachments and quota behavior.
 
 No automated test is a substitute for listening on two real devices with headphones. Cross-network audio, real permission revocation/unplugging and iOS hardware behavior must be checked on those devices.
@@ -132,3 +132,13 @@ The final cleanup regression also covers two tabs signed in to the same account.
 - Tests cover actual clipboard payloads, repeat confirmation, unclipped full-screen shared strokes and cursor/room registration. Fixtures wait for the app document’s hydration and are excluded from production’s entry graph.
 
 Verification for this refinement: all 16 shared-table checks passed across the main run and targeted reruns, plus 3 focused cursor/break-return regression checks. TypeScript and scoped lint passed (the existing avatar image warning remains). The initial combined run experienced timeouts under heavy laptop load; affected checks passed when rerun sequentially. The original 39 full-repository lint errors remain outside this change.
+
+## Focus, daylight and Bubble Pop (v30)
+
+The full dock fades out during focus; the small existing focus controls and physical clock remain usable. The wake-up sequence runs once per room entry. Focus and breaks suppress the idle sleepy-lid effect, and closed lids have a visible crease. Coffee and writing flippers share warmer daylight shading.
+
+Play has a warm, high-contrast button with a restrained invitation pulse. The game picker zooms in gently, game exit fades back to the room, and break entry/game return have a soft light sweep and small camera settle. OS reduced motion uses fades and stationary bubbles.
+
+Bubble Pop reuses the break-only lifecycle and full-viewport portal. Its 24 real buttons support mouse, touch, Tab and Space. A shared pop contains only a bounded slot, game start and timestamp; the receiver verifies current break membership, active game, slot and timestamp. Pops are ephemeral, rate limited to 20 per second, and disappear when the local break ends. The legacy `breathe` presence value remains accepted for tabs opened before this release; it is no longer a menu option. Database ownership/access rules are unchanged.
+
+Verification: 10 focused checks passed across protocol/session validation, Firebase rules, shared Doodle/Bubble Pop, solo/reduced-motion play, focus pause/extend, daylight pupils, hidden dock, and game return. TypeScript and scoped lint passed (the existing avatar image warning remains). Native desktop checks exercised focus → break → Bubble Pop → room without using production task data. Full-repository lint retains its documented pre-existing errors.

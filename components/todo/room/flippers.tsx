@@ -64,9 +64,9 @@ export function WorkingFlippers({
           <stop offset="1" stopColor="#473323" stopOpacity="0" />
         </radialGradient>
         <linearGradient id={`${id}-fur`} x1="0" y1="0" x2="1" y2="1">
-          <stop stopColor="#625b54" />
-          <stop offset=".5" stopColor="#413d39" />
-          <stop offset="1" stopColor="#2e2d2a" />
+          <stop stopColor="#84766a" />
+          <stop offset=".5" stopColor="#655d54" />
+          <stop offset="1" stopColor="#49453e" />
         </linearGradient>
 
         <pattern
@@ -154,7 +154,15 @@ export function WorkingFlippers({
           <path
             d="M652 511Q638 529 659 546L716 558Q739 565 747 546Q750 536 732 530L681 517Q662 505 652 511Z"
             fill={`url(#${id}-fur-lines)`}
-            opacity=".6"
+            opacity=".38"
+          />
+          <path
+            className="todo-fur-rim"
+            d="M652 513Q662 509 681 520L732 533"
+            fill="none"
+            stroke="#d1b48b"
+            strokeWidth="3"
+            strokeLinecap="round"
           />
         </g>
         <g className="todo-sip-right">
@@ -166,7 +174,15 @@ export function WorkingFlippers({
           <path
             d="M863 511Q878 527 861 543L812 559Q791 567 783 546Q780 536 796 529L838 515Q856 505 863 511Z"
             fill={`url(#${id}-fur-lines)`}
-            opacity=".6"
+            opacity=".38"
+          />
+          <path
+            className="todo-fur-rim"
+            d="M863 513Q854 507 838 518L797 532"
+            fill="none"
+            stroke="#dac09b"
+            strokeWidth="3"
+            strokeLinecap="round"
           />
         </g>
         <g className="todo-sip-cup">

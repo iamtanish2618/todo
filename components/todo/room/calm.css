@@ -761,3 +761,22 @@
     animation: none;
   }
 }
+
+/* Match the fur's warm scene lighting on both the animated and original layers. */
+.todo-fur-rim {
+  opacity: 0.2;
+  transition: opacity 1.4s ease;
+}
+.round-room-art[data-weather="morning"] .todo-fur-rim {
+  opacity: 0.6;
+}
+.round-room-art[data-weather="morning"] .todo-coffee-rig {
+  filter: brightness(1.1) saturate(0.88);
+}
+.round-room-art[data-weather="sunset"] .todo-fur-rim {
+  opacity: 0.4;
+}
+
+.round-room-art[data-weather="morning"] .todo-writing-rig {
+  filter: brightness(1.22) contrast(0.92) saturate(0.9);
+}

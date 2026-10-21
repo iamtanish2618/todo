@@ -6,6 +6,7 @@ type CinemaState = {
   active: boolean;
   reduced: boolean;
   focus: boolean;
+  resting: boolean;
   running: boolean;
   remaining: number;
   duration: number;
@@ -434,7 +435,7 @@ export function useRoomCinema(
           now + C.idle.min + Math.random() * (C.idle.max - C.idle.min),
         );
       }
-      if (calm || (s.panel && art.dataset.behavior !== "nod")) {
+      if (calm || s.resting || (s.panel && art.dataset.behavior !== "nod")) {
         setData(art, "behavior", "idle");
       } else if (now - lastInput > C.idle.sleep && motion) {
         art.dataset.behavior = "sleepy";

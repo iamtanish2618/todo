@@ -12,7 +12,10 @@
   align-items: center;
   color: #2a2622;
   isolation: isolate;
-  transition: opacity 0.3s;
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s ease,
+    visibility 0s;
 }
 .todo-dock-glass {
   position: absolute;
@@ -187,6 +190,12 @@
 .todo-dock[data-hidden="true"] {
   opacity: 0;
   pointer-events: none;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.98);
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s ease,
+    visibility 0s 0.45s;
 }
 .cozy-room[data-dock="true"] .cinema-focus-pill {
   bottom: 4%;

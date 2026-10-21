@@ -152,6 +152,19 @@
   transition: transform 0.065s ease-out;
   box-shadow: inset 0 -1px 1px #73604d66;
 }
+/* A crease makes a closed eye read as a lid, never an empty white eyeball. */
+.room-idle-lid::after {
+  content: "";
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 55%;
+  height: 1.5px;
+  border-radius: 50%;
+  background: #63513dcc;
+  transform: rotate(-3deg);
+  box-shadow: 0 1px 2px #fff4;
+}
 .room-pet[data-blink="true"] .room-idle-lid {
   transform: scaleY(1);
 }

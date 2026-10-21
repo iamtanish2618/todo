@@ -127,6 +127,9 @@ test("focus reuses saved tasks and real timer deadline; pause and extend remain 
     "true",
   );
   await expect(page.locator(".dock-panel")).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "Room dock", includeHidden: true }),
+  ).toBeHidden();
   const timer = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("todo.timer.v1")!),
   );
@@ -694,4 +697,114 @@ test("cursor follows input while the room cutouts stay registered", async ({
   expect(pos.x).toBeCloseTo(1150, 0);
   expect(pos.y).toBeCloseTo(700, 0);
   await page.screenshot({ path: "outputs/todo-stable-room-cursor.png" });
+});
+
+test("daylight break keeps Todo awake, invites play and returns gently from bubbles", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await enter(page);
+  await dock(page, "ambience").click();
+  await page.getByRole("button", { name: "Day", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await dock(page, "focus").click();
+  await dock(page, "focus").click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-working",
+    "true",
+  );
+  await expect(page.locator(".todo-dock")).toBeHidden();
+  await expect(page.locator(".round-room-art")).toHaveAttribute(
+    "data-work-phase",
+    "writing",
+  );
+  expect(
+    await page
+      .locator(".todo-writing-rig")
+      .evaluate((el) => getComputedStyle(el).filter),
+  ).toContain("brightness(1.22)");
+  await page.screenshot({ path: "outputs/todo-focus-dock-hidden.png" });
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByRole("button", { name: "Take a break", exact: true }).click();
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-resting",
+    "true",
+  );
+  await expect(page.locator(".room-rest-transition")).toHaveCount(1);
+  await expect(page.locator(".round-room-art")).toHaveAttribute(
+    "data-intro",
+    "awake",
+  );
+  await expect(page.locator(".room-pet .room-gaze")).toHaveCSS("opacity", "1");
+  await expect(page.locator(".dock-panel")).toHaveCount(0);
+  await expect(page.locator(".todo-dock")).toBeHidden();
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-break-transition",
+    "settled",
+  );
+  await page.waitForTimeout(700);
+  await page.clock.install();
+  await page.clock.fastForward(65000);
+  await page.mouse.move(1150, 700);
+  await page.clock.runFor(300);
+  await page.waitForTimeout(250);
+  await expect(page.locator(".round-room-art")).not.toHaveAttribute(
+    "data-behavior",
+    "sleepy",
+  );
+  const eyes = await page
+    .locator(".room-seated-anchor .room-idle-lid")
+    .evaluateAll((nodes) =>
+      nodes.map((n) => new DOMMatrix(getComputedStyle(n).transform).m22),
+    );
+  expect(eyes.every((y) => y < 0.05)).toBe(true);
+  const rim = await page
+    .locator(".todo-sip-left .todo-fur-rim")
+    .evaluate((el) => Number(getComputedStyle(el).opacity));
+  expect(rim).toBeGreaterThan(0.5);
+  await page.screenshot({ path: "outputs/todo-daylight-break-fixed.png" });
+  const play = page.getByRole("button", { name: "Play", exact: true });
+  await expect(play).toBeVisible();
+  await play.hover();
+  await page.clock.runFor(350);
+  expect(
+    await play.evaluate(
+      (el) => new DOMMatrix(getComputedStyle(el).transform).m11,
+    ),
+  ).toBeGreaterThan(1);
+  await play.click();
+  await page.clock.runFor(500);
+  await expect(page.getByRole("region", { name: "Break games" })).toBeVisible();
+  await expect(page.getByText("Breathing Bubble", { exact: true })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: /^Bubble Pop/ }).click();
+  await page.clock.runFor(500);
+  await expect(page.locator(".table-pop-bubble")).toHaveCount(24);
+  await page.getByRole("button", { name: "Pop bubble 4", exact: true }).focus();
+  await page.keyboard.press("Space");
+  await expect(
+    page.getByRole("button", { name: "Pop bubble 4", exact: true }),
+  ).toHaveAttribute("data-popped", "true");
+  await page.clock.runFor(1800);
+  await expect(
+    page.getByRole("button", { name: "Pop bubble 4", exact: true }),
+  ).toHaveAttribute("data-popped", "false");
+  await page.screenshot({ path: "outputs/todo-bubble-game-desktop.png" });
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page.locator(".table-game-screen")).toHaveAttribute(
+    "data-leaving",
+    "true",
+  );
+  await page.clock.runFor(400);
+  await expect(page.locator(".table-game-screen")).toHaveCount(0);
+  await page.clock.runFor(1200);
+  await expect(play).toBeVisible();
+  await expect(play).toBeFocused();
+  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page.clock.runFor(4000);
+  await expect(page.locator(".todo-dock")).toBeVisible();
+  expect(errors).toEqual([]);
 });

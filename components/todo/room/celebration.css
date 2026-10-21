@@ -200,3 +200,36 @@
     transition: none !important;
   }
 }
+
+.room-rest-transition {
+  position: absolute;
+  inset: -6%;
+  z-index: 16;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    125deg,
+    transparent 15%,
+    #ffecd0b3 48%,
+    #e5eff299 64%,
+    transparent 85%
+  );
+}
+.room-break-actions {
+  animation: room-break-arrive 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes room-break-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(9px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .room-break-actions {
+    animation: none;
+  }
+}

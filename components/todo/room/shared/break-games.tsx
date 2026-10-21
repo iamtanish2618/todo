@@ -1,16 +1,19 @@
 "use client";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 import { gsap } from "gsap";
-import { Wind, PencilLine, X, Sparkles } from "lucide-react";
-import {
-  BreakGameSession,
-  breathPhase,
-  type Stroke,
-} from "@/lib/todo/table/games";
+import { CircleDashed, PencilLine, X } from "lucide-react";
+import { BreakGameSession, type Stroke } from "@/lib/todo/table/games";
 import { COLORS } from "@/lib/todo/table/protocol";
 import type { TableSession } from "@/lib/todo/table/session";
 import { Button } from "@/components/ui/button";
+import { BubbleField } from "./bubble-game";
 import "./games.css";
 export function useBreakGames(table: TableSession, active: boolean) {
   const [games] = useState(() => new BreakGameSession(table));
@@ -32,7 +35,6 @@ export function useBreakGames(table: TableSession, active: boolean) {
 export function BreakGames({
   games,
   reduced,
-  sound,
 }: {
   games: BreakGameSession;
   reduced: boolean;
@@ -55,9 +57,7 @@ export function BreakGames({
         <div className="table-game-invite" role="status">
           <span>
             {state.invite.name} started{" "}
-            {state.invite.game === "breathe"
-              ? "Breathing Bubble"
-              : "Doodle Art"}
+            {state.invite.game === "bubbles" ? "Bubble Pop" : "Doodle Art"}
           </span>
           <Button
             onClick={() =>
@@ -96,33 +96,50 @@ export function BreakGames({
           </button>
           <button
             className="table-game-choice"
-            onClick={() => games.start("breathe")}
+            onClick={() => games.start("bubbles")}
           >
-            <Wind size={20} />
+            <CircleDashed size={20} />
             <span>
-              Breathing Bubble<small>One quiet minute, together.</small>
+              Bubble Pop<small>Little bubbles. Satisfying little pops.</small>
             </span>
           </button>
         </section>
       )}
-      {state.game === "doodle" && (
-        <DoodleOverlay games={games} reduced={reduced} />
-      )}
-      {state.game === "breathe" && (
-        <BreathingBubble games={games} reduced={reduced} sound={sound} />
+      {state.game && (
+        <GameOverlay
+          key={state.game}
+          games={games}
+          reduced={reduced}
+          game={state.game}
+        />
       )}
     </>
   );
 }
 /** Portal avoids the room stage's aspect ratio, zoom and clipping ancestors. */
-function DoodleOverlay({
+function GameOverlay({
   games,
   reduced,
+  game,
 }: {
   games: BreakGameSession;
   reduced: boolean;
+  game: "doodle" | "bubbles";
 }) {
-  const root = useRef<HTMLElement>(null);
+  const root = useRef<HTMLElement>(null),
+    exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [closing, setClosing] = useState(false);
+  const exit = useCallback(() => {
+    if (exitTimer.current) return;
+    setClosing(true);
+    exitTimer.current = setTimeout(() => games.stop(), reduced ? 120 : 320);
+  }, [games, reduced]);
+  useEffect(
+    () => () => {
+      if (exitTimer.current) clearTimeout(exitTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     const previous =
       document.activeElement instanceof HTMLElement
@@ -135,7 +152,7 @@ function DoodleOverlay({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        games.stop();
+        exit();
       }
       if (event.key === "Tab") {
         const buttons =
@@ -155,34 +172,67 @@ function DoodleOverlay({
     document.addEventListener("keydown", keys, true);
     return () => {
       document.removeEventListener("keydown", keys, true);
-      if (previous?.isConnected) previous.focus();
+      if (
+        previous?.isConnected &&
+        previous !== document.body &&
+        previous !== document.documentElement
+      )
+        previous.focus();
+      else
+        document
+          .querySelector<HTMLButtonElement>(
+            ".cozy-room-active .table-game-play",
+          )
+          ?.focus();
     };
-  }, [games]);
+  }, [exit]);
   if (typeof document === "undefined") return null;
   return createPortal(
     <section
       ref={root}
-      className="table-doodle-screen"
+      className={`table-doodle-screen table-game-screen ${game === "bubbles" ? "table-bubbles-screen" : ""}`}
+      data-leaving={closing}
       role="dialog"
       aria-modal="true"
-      aria-label="Doodle Art"
+      aria-label={game === "doodle" ? "Doodle Art" : "Bubble Pop"}
       aria-describedby="doodle-help"
     >
-      <DoodleCanvas games={games} reduced={reduced} />
+      {game === "doodle" ? (
+        <DoodleCanvas games={games} reduced={reduced} />
+      ) : (
+        <BubbleField games={games} reduced={reduced} closing={closing} />
+      )}
       <div className="table-game-toolbar">
         <span>
-          <PencilLine size={16} />
-          Doodle Art
+          {game === "doodle" ? (
+            <PencilLine size={16} />
+          ) : (
+            <CircleDashed size={16} />
+          )}
+          {game === "doodle" ? "Doodle Art" : "Bubble Pop"}
         </span>
-        <Button variant="ghost" onClick={() => games.clear()}>
-          Clear
-        </Button>
-        <Button data-doodle-done variant="ghost" onClick={() => games.stop()}>
+        {game === "doodle" && (
+          <Button
+            variant="ghost"
+            disabled={closing}
+            onClick={() => games.clear()}
+          >
+            Clear
+          </Button>
+        )}
+        <Button
+          data-doodle-done
+          variant="ghost"
+          disabled={closing}
+          onClick={exit}
+        >
           Done <X size={14} />
         </Button>
       </div>
       <p id="doodle-help" className="table-doodle-help">
-        Draw anywhere · Esc to return
+        {game === "doodle"
+          ? "Draw anywhere · Esc to return"
+          : "Tap a bubble · Space works too · Esc to return"}
       </p>
     </section>,
     document.body,
@@ -397,115 +447,5 @@ function DoodleCanvas({
       className="table-doodle"
       aria-label="Draw anywhere on the misty screen. Use Clear to start again."
     />
-  );
-}
-
-function BreathingBubble({
-  games,
-  reduced,
-  sound,
-}: {
-  games: BreakGameSession;
-  reduced: boolean;
-  sound: boolean;
-}) {
-  const root = useRef<HTMLElement>(null),
-    [tone, setTone] = useState(false);
-  const state = games.getSnapshot();
-  useEffect(() => {
-    const el = root.current,
-      bubble = el?.querySelector<HTMLElement>(".table-breath-orb"),
-      label = el?.querySelector<HTMLElement>(".table-breath-label");
-    if (!el || !bubble || !label) return;
-    const tick = () => {
-      const phase = breathPhase(games.now(), state.startAt),
-        smooth = phase.progress * phase.progress * (3 - 2 * phase.progress);
-      bubble.style.transform = reduced
-        ? "none"
-        : `scale(${0.65 + 0.35 * smooth})`;
-      bubble.style.opacity = String(reduced ? 0.65 + 0.35 * smooth : 1);
-      label.textContent = phase.label;
-      el.dataset.phase = phase.label;
-      el.closest<HTMLElement>(".cozy-room")?.style.setProperty(
-        "--table-breath",
-        String(smooth),
-      );
-    };
-    gsap.ticker.add(tick);
-    return () => {
-      gsap.ticker.remove(tick);
-      el.closest<HTMLElement>(".cozy-room")?.style.removeProperty(
-        "--table-breath",
-      );
-    };
-  }, [games, reduced, state.startAt]);
-  useEffect(() => {
-    if (!tone || !sound) return;
-    const ctx = new AudioContext(),
-      osc = ctx.createOscillator(),
-      gain = ctx.createGain();
-    osc.type = "sine";
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    gain.gain.value = 0;
-    osc.start();
-    void ctx.resume();
-    const tick = () => {
-      const p = breathPhase(games.now(), state.startAt);
-      gain.gain.setTargetAtTime(
-        document.hidden || p.finished ? 0 : 0.003 + 0.003 * p.progress,
-        ctx.currentTime,
-        0.15,
-      );
-      osc.frequency.setTargetAtTime(
-        196 + 24 * p.progress,
-        ctx.currentTime,
-        0.15,
-      );
-    };
-    gsap.ticker.add(tick);
-    return () => {
-      gsap.ticker.remove(tick);
-      gain.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
-      osc.stop(ctx.currentTime + 0.08);
-      setTimeout(() => void ctx.close(), 100);
-    };
-  }, [games, tone, sound, state.startAt]);
-  return (
-    <section
-      ref={root}
-      className="table-game-panel table-breath-panel"
-      aria-label="Breathing Bubble"
-    >
-      <header>
-        <h2>Breathing Bubble</h2>
-        <button
-          onClick={() => games.stop()}
-          aria-label="Close Breathing Bubble"
-        >
-          <X size={16} />
-        </button>
-      </header>
-      <div className="table-breath-space">
-        <div className="table-breath-orb">
-          <Sparkles size={24} />
-        </div>
-      </div>
-      <p className="table-breath-label" aria-live="off">
-        Breathe in
-      </p>
-      {sound && (
-        <Button
-          variant="ghost"
-          aria-pressed={tone}
-          onClick={() => setTone((v) => !v)}
-        >
-          {tone ? "Tone on" : "Tone off"}
-        </Button>
-      )}
-      <Button variant="ghost" onClick={() => games.stop()}>
-        Done
-      </Button>
-    </section>
   );
 }

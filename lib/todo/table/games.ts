@@ -24,28 +24,23 @@ export function readStroke(data: Record<string, unknown>): Stroke | null {
   }
   return { sid: data.sid, color: data.color, pts };
 }
-export function breathPhase(now: number, startAt: number) {
-  const elapsed = Math.max(0, now - startAt),
-    phase = elapsed % 12000;
-  return {
-    finished: elapsed >= 60000,
-    label:
-      elapsed >= 60000
-        ? "A little room to breathe."
-        : phase < 4000
-          ? "Breathe in"
-          : phase < 6000
-            ? "Hold"
-            : "Breathe out",
-    progress:
-      elapsed >= 60000
-        ? 0
-        : phase < 4000
-          ? phase / 4000
-          : phase < 6000
-            ? 1
-            : 1 - (phase - 6000) / 6000,
-  };
+export const BUBBLE_COUNT = 24;
+export type BubblePop = { index: number; startAt: number; at: number };
+export function readBubblePop(
+  data: Record<string, unknown>,
+  startAt: number,
+  now: number,
+): BubblePop | null {
+  return Number.isInteger(data.index) &&
+    Number(data.index) >= 0 &&
+    Number(data.index) < BUBBLE_COUNT &&
+    data.startAt === startAt &&
+    typeof data.at === "number" &&
+    Number.isFinite(data.at) &&
+    data.at >= Math.max(startAt, now - 10000) &&
+    data.at <= now + 1500
+    ? { index: Number(data.index), startAt, at: data.at }
+    : null;
 }
 export type GameSnapshot = {
   active: boolean;
@@ -143,6 +138,19 @@ export class BreakGameSession {
     if (this.snapshot.active && this.snapshot.game === "doodle")
       this.table.send("doodle", stroke);
   }
+  popBubble(index: number) {
+    if (!this.snapshot.active || this.snapshot.game !== "bubbles") return;
+    const data = readBubblePop(
+      { index, startAt: this.snapshot.startAt, at: this.now() },
+      this.snapshot.startAt,
+      this.now(),
+    );
+    if (!data) return;
+    this.table.send("bubble_pop", data);
+    this.remote.forEach((fn) =>
+      fn({ from: this.table.getSnapshot().id, event: "bubble_pop", data }),
+    );
+  }
   clear() {
     if (this.snapshot.active && this.snapshot.game === "doodle") {
       this.table.send("doodle_clear", {});
@@ -181,7 +189,7 @@ export class BreakGameSession {
       if (m.event === "game_state" && m.data.to !== table.id) return;
       const { game, startAt } = m.data;
       if (
-        !["doodle", "breathe"].includes(String(game)) ||
+        !["doodle", "bubbles"].includes(String(game)) ||
         typeof startAt !== "number" ||
         !Number.isFinite(startAt) ||
         startAt > this.now() + 5000 ||
@@ -197,6 +205,15 @@ export class BreakGameSession {
             startAt,
           },
         });
+      return;
+    }
+    if (
+      m.event === "bubble_pop" &&
+      this.snapshot.game === "bubbles" &&
+      member.playing === "bubbles"
+    ) {
+      const pop = readBubblePop(m.data, this.snapshot.startAt, this.now());
+      if (pop) this.remote.forEach((fn) => fn({ ...m, data: pop }));
       return;
     }
     if (this.snapshot.game !== "doodle" || member.playing !== "doodle") return;

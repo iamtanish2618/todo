@@ -275,7 +275,7 @@ export class TableSession {
     const max =
       event === "reaction"
         ? 1
-        : event === "doodle"
+        : event === "doodle" || event === "bubble_pop"
           ? 20
           : event === "signal"
             ? TABLE.signalPerSecond
@@ -351,7 +351,7 @@ export class TableSession {
     const max =
       msg.event === "reaction"
         ? 1
-        : msg.event === "doodle"
+        : msg.event === "doodle" || msg.event === "bubble_pop"
           ? 20
           : msg.event === "signal"
             ? TABLE.signalPerSecond

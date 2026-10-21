@@ -13,7 +13,7 @@
   backdrop-filter: blur(25px);
   box-shadow: 0 10px 35px #32251d25;
   color: #3b302a;
-  animation: table-game-enter 0.3s ease both;
+  animation: table-game-enter 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .table-game-panel header {
   display: flex;
@@ -103,40 +103,6 @@
   font-size: 12px;
   color: #3f352c;
 }
-.table-breath-panel {
-  align-items: center;
-  text-align: center;
-}
-.table-breath-space {
-  height: 150px;
-  display: grid;
-  place-items: center;
-}
-.table-breath-orb {
-  height: 128px;
-  width: 128px;
-  border-radius: 50%;
-  border: 1px solid #fff;
-  display: grid;
-  place-items: center;
-  background: radial-gradient(
-    circle at 30% 25%,
-    #ffffffd9,
-    #d3e5e694 35%,
-    #b6cad666 68%,
-    #fff8
-  );
-  box-shadow:
-    inset 0 0 24px #fff8,
-    0 8px 24px #748d9a25;
-  color: #fff;
-  transform: scale(0.65);
-}
-.table-breath-label {
-  font-size: 16px;
-  min-height: 24px;
-  color: #40382f;
-}
 .table-game-end {
   position: absolute;
   z-index: 40;
@@ -164,7 +130,7 @@
 @keyframes table-game-enter {
   from {
     opacity: 0;
-    transform: translateY(5px) scale(0.98);
+    transform: translateY(8px) scale(0.94);
   }
   to {
     opacity: 1;
@@ -197,21 +163,12 @@
     opacity: 1;
   }
 }
-.cozy-room[data-break-game="breathe"] .room-pet-breathe {
-  animation: none;
-  transform-origin: 50% 90%;
-  transform: scale(
-    calc(1 + var(--table-breath, 0) * 0.012),
-    calc(1 + var(--table-breath, 0) * 0.025)
-  );
-}
 .cozy-room[data-break-game="doodle"] .room-seated-anchor .room-pet {
   transform: rotate(-3deg);
   transform-origin: 50% 90%;
   transition: transform 0.5s ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cozy-room[data-break-game="breathe"] .room-pet-breathe,
   .cozy-room[data-break-game="doodle"] .room-seated-anchor .room-pet {
     transform: none;
   }
@@ -257,4 +214,162 @@
   padding: 7px 14px;
   border-radius: 20px;
   background: #faf4e2c9;
+}
+
+/* Play is a clear invitation, with a gentle zoom rather than a springy bounce. */
+.cozy-room .room-break-actions .table-game-play {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(135deg, #946837, #6b482b);
+  color: #fff8e5;
+  border: 1px solid #e4bf7a;
+  font-weight: 750;
+  min-width: 104px;
+  box-shadow:
+    0 3px 12px #5a3a2529,
+    inset 0 1px #ffebbd66;
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease;
+}
+.cozy-room .room-break-actions .table-game-play:hover {
+  transform: translateY(-2px) scale(1.045);
+}
+.table-game-play::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid #c69449;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: table-play-invite 2.8s ease-out 3;
+}
+@keyframes table-play-invite {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.98);
+  }
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+.table-game-screen {
+  transition: opacity 0.32s ease;
+}
+.table-game-screen[data-leaving="true"] {
+  opacity: 0;
+  animation: none;
+}
+.table-game-screen[data-leaving="true"] :is(button, canvas) {
+  pointer-events: none;
+}
+.table-game-screen[data-leaving="true"] .table-game-toolbar {
+  animation: none;
+  transform: translateX(-50%) translateY(6px) scale(0.97);
+}
+.table-game-screen .table-game-toolbar {
+  transition: transform 0.32s ease;
+  animation: table-toolbar-arrive 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes table-toolbar-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+.table-bubbles-screen {
+  background: radial-gradient(ellipse at 50% 35%, #f6efdedb, #dce9e9e8);
+}
+.table-bubble-field {
+  position: absolute;
+  inset: 0;
+  animation: table-bubbles-arrive 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes table-bubbles-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.table-pop-bubble {
+  position: absolute;
+  margin: -25px 0 0 -25px;
+  border-radius: 50%;
+  border: 1px solid #ffffffd9;
+  background:
+    radial-gradient(
+      ellipse at 27% 22%,
+      #fffffff2 0%,
+      #ffffff26 16%,
+      transparent 38%
+    ),
+    radial-gradient(ellipse at 70% 82%, #e4bad855, transparent 55%),
+    radial-gradient(circle, #e5f2f01a 40%, #b0d0d566 75%, #ffffffcc);
+  box-shadow:
+    inset 1px 2px 7px #fff,
+    inset -4px -7px 14px #b6a9c329,
+    0 9px 25px #7f96981f;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  filter: hue-rotate(var(--bubble-hue));
+  will-change: transform, opacity;
+}
+.table-pop-bubble > span {
+  position: absolute;
+  left: 18%;
+  top: 13%;
+  width: 31%;
+  height: 17%;
+  border-radius: 50%;
+  background: #fff9;
+  transform: rotate(-32deg);
+}
+.table-pop-bubble:focus-visible {
+  outline: 3px solid #78563b;
+  outline-offset: 6px;
+}
+.table-pop-bubble[data-popped="true"] {
+  pointer-events: none;
+}
+.table-pop-bubble[data-popped="true"]::after {
+  content: "✦";
+  position: absolute;
+  inset: -16px;
+  display: grid;
+  place-items: center;
+  color: #af8551;
+  font-size: 30px;
+  animation: table-pop-spark 0.28s ease-out both;
+}
+@keyframes table-pop-spark {
+  from {
+    opacity: 0.9;
+    transform: scale(0.65) rotate(-20deg);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.3) rotate(15deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-game-play::after,
+  .table-game-screen .table-game-toolbar,
+  .table-bubble-field,
+  .table-pop-bubble::after {
+    animation: none !important;
+  }
+  .cozy-room .room-break-actions .table-game-play:hover {
+    transform: none;
+  }
 }
