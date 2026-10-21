@@ -17,8 +17,8 @@ import { WorkingFlippers } from "../flippers";
 const SEATS: Record<number, { x: number[]; scale: number }> = {
   1: { x: [50], scale: 1.3 },
   2: { x: [42, 58], scale: 1.1 },
-  3: { x: [34, 50, 66], scale: 0.95 },
-  4: { x: [30, 43.5, 57, 70.5], scale: 0.85 },
+  3: { x: [33, 48, 63], scale: 0.9 },
+  4: { x: [28, 40.5, 53, 65.5], scale: 0.78 },
 };
 const EMOJI = { wave: "👋", cheer: "✦", heart: "♡", coffee: "☕" };
 export function TableSeats({

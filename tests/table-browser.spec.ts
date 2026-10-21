@@ -57,6 +57,11 @@ async function peer(
       : "/signin-with-chatgpt?return_to=" +
           encodeURIComponent(invite ? "/?room=" + invite : "/"),
   );
+  await expect(page.locator(".todo-root")).toHaveAttribute(
+    "data-ready",
+    "true",
+    { timeout: 45000 },
+  );
   await page.evaluate(
     async ({ email, password, mount }) => {
       const { harness, mountRoom } = await import(
@@ -103,7 +108,7 @@ async function state(page: Page) {
   }>;
 }
 const act = (page: Page, code: string) => page.evaluate(code);
-test("Firebase presence, real audio WebRTC with a listen-only peer, quiet focus and cleanup", async ({
+test("Firebase presence, real audio WebRTC with a listen-only peer, manual microphone control and cleanup", async ({
   browser,
 }) => {
   const a = await peer(browser, 1),
@@ -139,9 +144,9 @@ test("Firebase presence, real audio WebRTC with a listen-only peer, quiet focus 
       { timeout: 10000 },
     )
     .toBe(true);
-  await act(a, "qa.voice.setFocus(true)");
-  expect((await state(a)).voice.muted).toBe(true);
-  await act(a, "qa.voice.setFocus(false)");
+  await act(a, "qa.session.setStatus('focusing')");
+  expect((await state(a)).voice.muted).toBe(false);
+  await act(a, "qa.session.setStatus('break')");
   expect((await state(a)).voice.muted).toBe(false);
   await act(a, "qa.voice.setMuted(true)");
   expect((await state(a)).voice.muted).toBe(true);
@@ -151,6 +156,73 @@ test("Firebase presence, real audio WebRTC with a listen-only peer, quiet focus 
     .toBe((await state(b)).table.id);
   await act(b, "qa.session.leave();qa.voice.leave()");
   expect((await state(b)).voice.peers).toEqual({});
+});
+test("Friends is wider, has one leave action and confirms repeat copies inside the code", async ({
+  browser,
+}) => {
+  const page = await peer(browser, 9);
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as unknown as { copiedText: string }).copiedText = text;
+        },
+      },
+    });
+  });
+  await page
+    .getByRole("textbox", { name: "Nickname", exact: true })
+    .fill("Tanish");
+  await page.getByRole("button", { name: "Create table", exact: true }).click();
+  await expect.poll(async () => (await state(page)).table.state).toBe("joined");
+  const panel = page.locator('.dock-panel[data-dock-pane="friends"]');
+  const size = await panel.boundingBox();
+  expect(size!.width).toBeGreaterThanOrEqual(300);
+  expect(size!.x + size!.width).toBeLessThanOrEqual(1440);
+  await expect(
+    panel.getByRole("button", { name: /Unmute|Mic on|Close table/ }),
+  ).toHaveCount(0);
+  await expect(
+    panel.getByRole("switch", { name: "Table is quiet" }),
+  ).toHaveCount(0);
+  await expect(
+    panel.getByRole("switch", { name: "Mute everyone" }),
+  ).toBeVisible();
+  const copy = page.getByRole("button", { name: "Copy table code" });
+  await copy.click();
+  await expect(page.locator('.table-code [role="status"]')).toHaveText(
+    "Copied!",
+  );
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { copiedText: string }).copiedText,
+    ),
+  ).toBe((await state(page)).table.code);
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: "outputs/todo-friends-copied.png" });
+  await expect(page.locator(".table-copy-feedback")).toHaveCount(0, {
+    timeout: 3000,
+  });
+  await copy.click();
+  await expect(page.locator(".table-copy-feedback")).toHaveText("Copied!");
+  await page
+    .getByRole("button", { name: "Copy invite link", exact: true })
+    .click();
+  await expect(page.locator(".table-copy-feedback")).toHaveText("Link copied!");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { copiedText: string }).copiedText,
+    ),
+  ).toContain("?room=PENG-");
+  expect(await panel.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  await page.getByRole("button", { name: "Leave table", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Create table", exact: true }),
+  ).toBeVisible();
 });
 test("four original penguins seat gently, nicknames appear and Friends stays clear", async ({
   browser,
@@ -231,8 +303,8 @@ test("shared doodles, late breathing invitation and immediate break-end cleanup"
   await act(b, "qa.session.setStatus('break');qa.games.setBreak(true)");
   await a.waitForTimeout(3200);
   await a.getByRole("button", { name: "Play", exact: true }).click();
-  await a.getByRole("button", { name: /^Window Doodle/ }).click();
-  await expect(b.getByText("Ink started Window Doodle")).toBeVisible();
+  await a.getByRole("button", { name: /^Doodle Art/ }).click();
+  await expect(b.getByText("Ink started Doodle Art")).toBeVisible();
   await b.getByRole("button", { name: "Join", exact: true }).click();
   await expect(b.locator(".table-doodle")).toBeVisible();
   await a.waitForTimeout(600);
@@ -242,14 +314,17 @@ test("shared doodles, late breathing invitation and immediate break-end cleanup"
   );
   const rect = await a.locator(".table-doodle").boundingBox();
   expect(rect).not.toBeNull();
-  await a.mouse.move(
-    rect!.x + rect!.width * 0.3,
-    rect!.y + rect!.height * 0.32,
-  );
+  expect(rect).toEqual({
+    x: 0,
+    y: 0,
+    width: a.viewportSize()!.width,
+    height: a.viewportSize()!.height,
+  });
+  await a.mouse.move(rect!.x + rect!.width * 0.7, rect!.y + rect!.height * 0.7);
   await a.mouse.down();
   await a.mouse.move(
-    rect!.x + rect!.width * 0.37,
-    rect!.y + rect!.height * 0.36,
+    rect!.x + rect!.width * 0.8,
+    rect!.y + rect!.height * 0.75,
     { steps: 12 },
   );
   await a.mouse.up();
@@ -259,8 +334,8 @@ test("shared doodles, late breathing invitation and immediate break-end cleanup"
       d = c
         .getContext("2d")!
         .getImageData(
-          Math.round(c.width * 0.34) - 8,
-          Math.round(c.height * 0.343) - 8,
+          Math.round(c.width * 0.75) - 8,
+          Math.round(c.height * 0.725) - 8,
           16,
           16,
         ).data;
@@ -270,7 +345,9 @@ test("shared doodles, late breathing invitation and immediate break-end cleanup"
   });
   expect(alpha).toBeLessThan(160);
 
-  await a.getByRole("button", { name: "Done", exact: true }).click();
+  await a.screenshot({ path: "outputs/todo-fullscreen-doodle.png" });
+  await a.keyboard.press("Escape");
+  await expect(a.locator(".table-doodle-screen")).toHaveCount(0);
   await b.getByRole("button", { name: "Done", exact: true }).click();
   await a.getByRole("button", { name: "Play", exact: true }).click();
   await a.getByRole("button", { name: /^Breathing Bubble/ }).click();

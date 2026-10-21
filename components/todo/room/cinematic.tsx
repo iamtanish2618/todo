@@ -98,9 +98,6 @@ export function useRoomCinema(
       element.querySelector<HTMLCanvasElement>(".cinema-particles")!;
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
-    for (const [key, value] of Object.entries(C.parallax))
-      if (key !== "lerp")
-        element.style.setProperty(`--cinema-${key}`, String(value));
     const pointerMedia = matchMedia("(pointer:fine)");
     const lowPower =
       innerWidth < 800 ||
@@ -119,10 +116,6 @@ export function useRoomCinema(
       dpr = 1;
     let px = innerWidth / 2,
       py = innerHeight / 2,
-      tx = 0,
-      ty = 0,
-      x = 0,
-      y = 0,
       lastInput = performance.now(),
       hover = false,
       pointerSeen = false;
@@ -271,14 +264,6 @@ export function useRoomCinema(
     const pointer = (e: PointerEvent) => {
       px = e.clientX;
       py = e.clientY;
-      tx = Math.max(
-        -1,
-        Math.min(1, (px - bounds.left - width / 2) / (width / 2)),
-      );
-      ty = Math.max(
-        -1,
-        Math.min(1, (py - bounds.top - height / 2) / (height / 2)),
-      );
       pointerSeen = true;
       activity();
     };
@@ -356,30 +341,7 @@ export function useRoomCinema(
         low = true;
         resize();
       }
-      // Keep the glass backdrop stable while using a dock panel. The room still follows
-      // the cursor when tools are closed; this avoids repainting three frosted surfaces.
-      const panelStill = element.dataset.dock === "true" && Boolean(s.panel);
-      const targetX =
-          motion && !calm && !low && !panelStill
-            ? pointerMedia.matches
-              ? tx
-              : Math.sin(seconds * 0.13) * 0.25
-            : 0,
-        targetY =
-          motion && !calm && !low && !panelStill
-            ? pointerMedia.matches
-              ? ty
-              : Math.cos(seconds * 0.11) * 0.18
-            : 0;
-      const lerp = 1 - Math.pow(1 - C.parallax.lerp, dt * 60);
-      x += (targetX - x) * lerp;
-      y += (targetY - y) * lerp;
-      const depthX = `${Math.round(x * 1000) / 1000}px`,
-        depthY = `${Math.round(y * 1000) / 1000}px`;
-      if (element.style.getPropertyValue("--depth-x") !== depthX)
-        element.style.setProperty("--depth-x", depthX);
-      if (element.style.getPropertyValue("--depth-y") !== depthY)
-        element.style.setProperty("--depth-y", depthY);
+      // Keep the room cutouts registered. Only the cursor and characters follow input.
       if (motion && pointerMedia.matches) {
         dot.style.transform = `translate3d(${px}px,${py}px,0) scale(${hover ? 1.2 : 1})`;
         trailPoints.forEach((point, i) => {
@@ -715,8 +677,6 @@ export function useRoomCinema(
       if (originalIcon && oldIconHref) originalIcon.href = oldIconHref;
       else icon.remove();
       element.dataset.customCursor = "false";
-      element.style.removeProperty("--depth-x");
-      element.style.removeProperty("--depth-y");
     };
   }, [state.active, root]);
 }

@@ -1,7 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Copy,
+  Check,
+  Sparkles,
   Heart,
   Coffee,
   PartyPopper,
@@ -32,7 +34,15 @@ export function FriendsPanel({
     [code, setCode] = useState(initialCode),
     [color, setColor] = useState<Color>("blue"),
     [minutes, setMinutes] = useState("25"),
-    [copied, setCopied] = useState("");
+    [copied, setCopied] = useState<{ label: string; id: number } | null>(null),
+    [copyError, setCopyError] = useState("");
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+    },
+    [],
+  );
   const joined = table.state === "joined" || table.state === "reconnecting",
     host = table.id === table.host;
   async function copy(link: boolean) {
@@ -40,9 +50,15 @@ export function FriendsPanel({
       const url = new URL(location.href);
       url.searchParams.set("room", table.code);
       await navigator.clipboard.writeText(link ? url.toString() : table.code);
-      setCopied(link ? "Link copied" : "Code copied");
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      setCopyError("");
+      setCopied((previous) => ({
+        label: link ? "Link copied!" : "Copied!",
+        id: (previous?.id ?? 0) + 1,
+      }));
+      copyTimer.current = setTimeout(() => setCopied(null), 1900);
     } catch {
-      setCopied("Select and copy the code above.");
+      setCopyError("Couldn’t copy automatically. Select the code to copy it.");
     }
   }
   return (
@@ -124,21 +140,31 @@ export function FriendsPanel({
       ) : (
         <>
           <small>YOUR TABLE CODE</small>
-          <div className="table-code">
+          <div className="table-code" data-copied={Boolean(copied)}>
             <strong>{table.code}</strong>
+            {copied && (
+              <span
+                key={copied.id}
+                className="table-copy-feedback"
+                role="status"
+              >
+                <Sparkles size={16} aria-hidden="true" />
+                {copied.label}
+              </span>
+            )}
             <Button
               size="icon"
               variant="ghost"
               aria-label="Copy table code"
               onClick={() => void copy(false)}
             >
-              <Copy size={15} />
+              {copied ? <Check size={17} /> : <Copy size={17} />}
             </Button>
           </div>
           <Button variant="ghost" onClick={() => void copy(true)}>
             Copy invite link
           </Button>
-          {copied && <small role="status">{copied}</small>}
+          {copyError && <small role="status">{copyError}</small>}
           <div className="table-seat-slots">
             {Array.from({ length: 4 }, (_, i) => {
               const m = table.members[i];
@@ -218,14 +244,6 @@ export function FriendsPanel({
               <LogOut size={15} />
               Leave table
             </Button>
-            {host && (
-              <Button
-                variant="ghost"
-                onClick={() => session.hostAction("close_room")}
-              >
-                Close table
-              </Button>
-            )}
           </div>
         </>
       )}

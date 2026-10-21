@@ -178,7 +178,6 @@ export function StudyRoom(p: Props) {
   const { voice: tableVoice, state: voiceState } = useTableVoice(
     tableSession,
     p.active && table.config.voice,
-    p.started && p.phase === "focus",
   );
   const { games: breakGames, state: breakGameState } = useBreakGames(
     tableSession,
@@ -1885,11 +1884,7 @@ export function StudyRoom(p: Props) {
           <BreakGames games={breakGames} reduced={p.reduced} sound={p.sound} />
         )}
         {table.members.length > 0 && table.config.voice && (
-          <PersistentMic
-            voice={tableVoice}
-            state={voiceState}
-            focusing={quietFocus}
-          />
+          <PersistentMic voice={tableVoice} state={voiceState} />
         )}
         {table.state === "reconnecting" && (
           <p className="table-reconnect" role="status">

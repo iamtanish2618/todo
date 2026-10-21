@@ -40,7 +40,7 @@ Microphones start muted. Permission is requested only from Unmute. A listener ca
 
 Remote audio uses a hidden playsinline audio element plus a Web Audio gain for consistent per-person volume, including browsers where audio.volume is ineffective. A blocked AudioContext/playback exposes an Enable sound button. Speaking detection uses 512-sample RMS at 15Hz on GSAP's existing ticker. No microphone stream is created for that indicator alone.
 
-Quiet table is on by default: focus mutes the mic, and a break restores the previous choice. Manual unmute during focus is allowed. Host requests can only mute, never enable another person's mic. Host migration follows current member order.
+The bottom-left microphone button is the single mic control. Starting focus or a break leaves the user’s manual mic choice unchanged. Friends retains Mute everyone for incoming audio; there is no automatic quiet-table mode. Host requests can only mute, never enable another person's mic. Host migration follows current member order.
 
 Default ICE server: `stun:stun.l.google.com:19302`. Some networks cannot establish direct peer-to-peer audio. Optional configuration:
 
@@ -58,7 +58,9 @@ Codes use `PENG-XXXXXX`, cryptographic randomness and a 32-character unambiguous
 
 The 3:2 room and complete oak table are preserved. Original penguins slide to percentage-based seats, wear their chosen knit color, and show an arrival nickname before settling into table name tags. The scene uses original assets only; the user's screenshot contributes layout guidance, not artwork.
 
-Play appears only during a break. Window Doodle is clipped to the existing four window panes; normalized stroke batches are capped at 50 points, 20Hz per sender and 200 recent stroke IDs. Fog regrows gradually. Breathing Bubble has a 4-second inhale, 2-second hold and 6-second exhale for one calm minute; its tone is off by default. Late break participants can request the current activity and join optionally. Focused members never receive game invitations. Ending/skipping a break closes local game UI immediately and leaves other members' breaks alone. Games and speaking analysis share GSAP's ticker; no extra RAF loop is introduced.
+Friends uses a wider sidebar with one Leave table action. Successful code/link copies animate a small confirmation inside the code capsule, without changing its size. The room’s image cutouts stay registered rather than moving independently with the cursor; the shooting-star cursor, eyes and character animations remain.
+
+Play appears only during a break. Doodle Art opens in a full-viewport portal, beyond the room’s aspect-ratio letterboxing. Clear resets the shared mist, and Done/Escape closes the drawing surface with focus restoration. It also closes automatically when the local break ends; normalized stroke batches are capped at 50 points, 20Hz per sender and 200 recent stroke IDs. Fog regrows gradually. Breathing Bubble has a 4-second inhale, 2-second hold and 6-second exhale for one calm minute; its tone is off by default. Late break participants can request the current activity and join optionally. Focused members never receive game invitations. Ending/skipping a break closes local game UI immediately and leaves other members' breaks alone. Games and speaking analysis share GSAP's ticker; no extra RAF loop is introduced.
 
 ## Verification
 
@@ -90,8 +92,8 @@ Use headphones and two or three separate browser profiles/windows:
 2. Open an invite URL; log in if needed; the Friends panel must prefill the code. Try a wrong code, a duplicate nickname and a fifth person.
 3. Unmute A; B/C must hear A and show its speaking ring. Keep B microphone permission unrequested and verify B can still listen. Mute A and verify silence.
 4. Change per-person volume, mute all incoming, deny permission, unplug a microphone and revoke permission. Check friendly messages and the persistent Mic on indicator.
-5. Focus with a live mic: it auto-mutes. Enter a break and verify restoration. Check manual unmute remains possible.
-6. Leave as host, then try next host's ask-to-mute, remove and close controls. A non-host must not control the room.
+5. Focus with a live mic, then enter a break: verify that the manual mic choice stays unchanged. Only the bottom-left mic control toggles local capture.
+6. Leave as host, then try the next host’s ask-to-mute and remove controls. Friends must have no Close table button. A non-host must not control the room.
 7. Host starts Sit together; consenting idle clients should share a deadline within 500ms. Declining or already-focusing clients keep their own work.
 8. Disconnect/reconnect one browser. Presence returns, old voice connections are replaced and no orphan microphone remains after Leave.
 9. **Real-device check required:** a phone on mobile data and a laptop on Wi-Fi. If audio fails, provision TURN; a local/emulator test cannot establish that a strict network will work.
@@ -101,7 +103,7 @@ Use headphones and two or three separate browser profiles/windows:
 
 No automated test is a substitute for listening on two real devices with headphones. Cross-network audio, real permission revocation/unplugging and iOS hardware behavior must be checked on those devices.
 
-## Completed verification for this update
+## Shared tables baseline (v28)
 
 - 15 shared-table checks passed in Chrome, using the real Firebase emulators/rules and real WebRTC with a synthetic microphone. Includes wrong/missing rooms, capacity, duplicate names, host migration/moderation, listening without capture, denied capture, incoming volume, reconnect recovery, real Todo invite entry, matching timer deadlines, shared doodles, late breathing joins, solo breaks and reduced motion.
 - All 21 existing dock/room regression checks passed, including tasks, timer pause/extend, notes/PDF/flashcards, AI request/quota UI, scene changes, the three supplied seamless recordings, open eyes, cursor, keyboard, resizing, break return and desktop frame budget.
@@ -120,3 +122,13 @@ Stage file map:
 | Hardening | `database.rules.json`, `firebase.emulators.json`, `tests/table-*.spec.ts`, `tests/fixtures/table-harness.tsx`, config/status routes, shared timer bridge in `todo-app.tsx`, this guide |
 
 The final cleanup regression also covers two tabs signed in to the same account. Leave removes protected nodes before releasing their private ownership claim, and only cancels its server disconnect fallback after successful cleanup. Each teammate’s writing/coffee animation follows their own presence status.
+
+## Friends and Doodle refinement
+
+- Removed the duplicate panel mic button, quiet toggle/automatic focus muting and Close table action.
+- The right sidebar is 300–370px on desktop, with slightly tighter three/four-person seating so faces remain clear.
+- Clipboard success is shown only after the browser confirms the write, fades back to the selectable code, and replays on subsequent copies. Failure offers a manual-copy fallback.
+- Doodle covers 100vw × 100dvh, including room letterboxing. The drawing protocol, rate limits, live sharing and break lifecycle are unchanged.
+- Tests cover actual clipboard payloads, repeat confirmation, unclipped full-screen shared strokes and cursor/room registration. Fixtures wait for the app document’s hydration and are excluded from production’s entry graph.
+
+Verification for this refinement: all 16 shared-table checks passed across the main run and targeted reruns, plus 3 focused cursor/break-return regression checks. TypeScript and scoped lint passed (the existing avatar image warning remains). The initial combined run experienced timeouts under heavy laptop load; affected checks passed when rerun sequentially. The original 39 full-repository lint errors remain outside this change.

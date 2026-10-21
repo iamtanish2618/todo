@@ -1,11 +1,6 @@
 "use client";
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { gsap } from "gsap";
 import { Wind, PencilLine, X, Sparkles } from "lucide-react";
 import {
@@ -62,7 +57,7 @@ export function BreakGames({
             {state.invite.name} started{" "}
             {state.invite.game === "breathe"
               ? "Breathing Bubble"
-              : "Window Doodle"}
+              : "Doodle Art"}
           </span>
           <Button
             onClick={() =>
@@ -96,7 +91,7 @@ export function BreakGames({
           >
             <PencilLine size={20} />
             <span>
-              Window Doodle<small>Make a little space in the mist.</small>
+              Doodle Art<small>A whole screen to draw together.</small>
             </span>
           </button>
           <button
@@ -111,26 +106,86 @@ export function BreakGames({
         </section>
       )}
       {state.game === "doodle" && (
-        <>
-          <DoodleCanvas games={games} reduced={reduced} />
-          <div className="table-game-toolbar">
-            <span>
-              <PencilLine size={15} />
-              Window Doodle
-            </span>
-            <Button variant="ghost" onClick={() => games.clear()}>
-              Clear
-            </Button>
-            <Button variant="ghost" onClick={() => games.stop()}>
-              Done
-            </Button>
-          </div>
-        </>
+        <DoodleOverlay games={games} reduced={reduced} />
       )}
       {state.game === "breathe" && (
         <BreathingBubble games={games} reduced={reduced} sound={sound} />
       )}
     </>
+  );
+}
+/** Portal avoids the room stage's aspect ratio, zoom and clipping ancestors. */
+function DoodleOverlay({
+  games,
+  reduced,
+}: {
+  games: BreakGameSession;
+  reduced: boolean;
+}) {
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const previous =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    root.current
+      ?.querySelector<HTMLButtonElement>("[data-doodle-done]")
+      ?.focus();
+    const keys = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        games.stop();
+      }
+      if (event.key === "Tab") {
+        const buttons =
+          root.current?.querySelectorAll<HTMLButtonElement>("button");
+        if (!buttons?.length) return;
+        const first = buttons[0],
+          last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", keys, true);
+    return () => {
+      document.removeEventListener("keydown", keys, true);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [games]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <section
+      ref={root}
+      className="table-doodle-screen"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Doodle Art"
+      aria-describedby="doodle-help"
+    >
+      <DoodleCanvas games={games} reduced={reduced} />
+      <div className="table-game-toolbar">
+        <span>
+          <PencilLine size={16} />
+          Doodle Art
+        </span>
+        <Button variant="ghost" onClick={() => games.clear()}>
+          Clear
+        </Button>
+        <Button data-doodle-done variant="ghost" onClick={() => games.stop()}>
+          Done <X size={14} />
+        </Button>
+      </div>
+      <p id="doodle-help" className="table-doodle-help">
+        Draw anywhere · Esc to return
+      </p>
+    </section>,
+    document.body,
   );
 }
 function DoodleCanvas({
@@ -140,8 +195,7 @@ function DoodleCanvas({
   games: BreakGameSession;
   reduced: boolean;
 }) {
-  const ref = useRef<HTMLCanvasElement>(null),
-    clip = `doodle-${useId().replace(/:/g, "")}`;
+  const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
@@ -338,26 +392,14 @@ function DoodleCanvas({
     };
   }, [games, reduced]);
   return (
-    <>
-      <svg width="0" height="0" aria-hidden="true">
-        <defs>
-          <clipPath id={clip} clipPathUnits="objectBoundingBox">
-            <path d="M.273 .269V.211C.273 .149 .324 .09 .395 .077V.269Z" />
-            <path d="M.408 .077C.48 .081 .529 .148 .531 .211V.269H.408Z" />
-            <path d="M.273 .287H.395V.423H.273Z" />
-            <path d="M.408 .287H.531V.423H.408Z" />
-          </clipPath>
-        </defs>
-      </svg>
-      <canvas
-        ref={ref}
-        className="table-doodle"
-        style={{ clipPath: `url(#${clip})` }}
-        aria-label="Draw on the misty window. Use Clear to start again."
-      />
-    </>
+    <canvas
+      ref={ref}
+      className="table-doodle"
+      aria-label="Draw anywhere on the misty screen. Use Clear to start again."
+    />
   );
 }
+
 function BreathingBubble({
   games,
   reduced,

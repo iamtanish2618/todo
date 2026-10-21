@@ -18,7 +18,6 @@ export type VoiceSnapshot = {
   muted: boolean;
   permission: boolean;
   incomingMuted: boolean;
-  quiet: boolean;
   message: string;
   blocked: boolean;
   speaking: Record<string, boolean>;
@@ -33,7 +32,6 @@ export class TableVoice {
     muted: true,
     permission: false,
     incomingMuted: false,
-    quiet: true,
     message: "",
     blocked: false,
     speaking: {},
@@ -54,8 +52,6 @@ export class TableVoice {
   private busy = false;
   private epoch = 0;
   private desiredMuted = true;
-  private focus = false;
-  private restoreLive = false;
   private permissionStatus: PermissionStatus | null = null;
   private gestureReady = false;
   private pending: Envelope[] = [];
@@ -396,20 +392,6 @@ export class TableVoice {
       this.session?.setMic(false, false);
     } finally {
       this.busy = false;
-    }
-  }
-  setQuiet(quiet: boolean) {
-    this.update({ quiet });
-  }
-  setFocus(focus: boolean) {
-    if (focus === this.focus) return;
-    this.focus = focus;
-    if (focus && this.snapshot.quiet) {
-      this.restoreLive = !this.snapshot.muted;
-      void this.setMuted(true);
-    } else if (!focus && this.restoreLive) {
-      this.restoreLive = false;
-      if (this.stream) void this.setMuted(false);
     }
   }
   setPeerVolume(id: string, value: number) {

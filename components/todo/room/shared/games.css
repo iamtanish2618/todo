@@ -216,7 +216,45 @@
     transform: none;
   }
 }
-/* Above the window's decorative hotspot; clipping keeps the rest of the room interactive. */
-.table-doodle {
-  z-index: 17;
+/* Full viewport drawing surface, outside the room's transformed stage. */
+.table-doodle-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  font-family: var(--font-nunito), "Nunito", system-ui, sans-serif;
+  animation: table-game-fade 0.25s ease both;
+}
+.table-doodle-screen .table-doodle {
+  z-index: 1;
+}
+.table-doodle-screen .table-game-toolbar {
+  position: absolute;
+  top: max(24px, env(safe-area-inset-top));
+  z-index: 2;
+  padding: 7px 10px 7px 18px;
+  gap: 12px;
+  font-size: 14px;
+  background: #fbf4e8ed;
+  box-shadow: 0 5px 25px #30251918;
+}
+.table-doodle-screen .table-game-toolbar button {
+  font-size: 13px;
+}
+.table-doodle-help {
+  position: absolute;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #483e34;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: #faf4e2c9;
 }

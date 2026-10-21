@@ -646,3 +646,52 @@ test("shooting-star cursor stays visible on the light rendering path and dock ho
   expect(Math.min(...sizes)).toBeGreaterThanOrEqual(0.95);
   await page.screenshot({ path: "outputs/todo-gentle-dock-cursor.png" });
 });
+
+test("cursor follows input while the room cutouts stay registered", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "hardwareConcurrency", {
+      configurable: true,
+      get: () => 8,
+    }),
+  );
+  await enter(page);
+  await page.waitForTimeout(1500);
+  const layers = page.locator(
+    ".cozy-room-image, .cinema-furniture-layer, .cinema-foreground-layer, .round-table-front, .room-window-world",
+  );
+  const snapshot = () =>
+    layers.evaluateAll((nodes) =>
+      nodes.map((n) => {
+        const r = n.getBoundingClientRect(),
+          css = getComputedStyle(n);
+        return {
+          x: r.x,
+          y: r.y,
+          w: r.width,
+          h: r.height,
+          transform: css.transform,
+          translate: css.translate,
+        };
+      }),
+    );
+  await page.mouse.move(160, 120);
+  await page.waitForTimeout(400);
+  const before = await snapshot();
+  expect(before.length).toBeGreaterThanOrEqual(5);
+  await page.mouse.move(1150, 700, { steps: 12 });
+  await page.waitForTimeout(400);
+  expect(await snapshot()).toEqual(before);
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-custom-cursor",
+    "true",
+  );
+  const pos = await page.locator(".cinema-cursor-dot").evaluate((el) => {
+    const m = new DOMMatrix(getComputedStyle(el).transform);
+    return { x: m.m41, y: m.m42 };
+  });
+  expect(pos.x).toBeCloseTo(1150, 0);
+  expect(pos.y).toBeCloseTo(700, 0);
+  await page.screenshot({ path: "outputs/todo-stable-room-cursor.png" });
+});

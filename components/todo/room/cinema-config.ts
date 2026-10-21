@@ -1,14 +1,5 @@
 /** Small, explicit dials for the room's motion. Positions share the 1536 × 1024 art. */
 export const CINEMA = {
-  parallax: {
-    far: 2,
-    wall: 4,
-    furniture: 7,
-    table: 10,
-    character: 11,
-    foreground: 14,
-    lerp: 0.08,
-  },
   entry: { reveal: 1.2, sleep: 1500, wake: 1450 },
   idle: { min: 6000, max: 12000, sleep: 60000, blinkMin: 3000, blinkMax: 6000 },
   particles: { full: 86, low: 28, snow: 72, rain: 42, dust: 20 },
