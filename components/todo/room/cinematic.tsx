@@ -260,6 +260,7 @@ export function useRoomCinema(
       if (art.dataset.behavior === "sleepy") {
         art.dataset.behavior = "startle";
         behaviorUntil = lastInput + 650;
+        nextBehavior = lastInput + C.idle.min;
       }
     };
     const pointer = (e: PointerEvent) => {
@@ -314,6 +315,7 @@ export function useRoomCinema(
     };
     visibility();
     element.addEventListener("pointermove", pointer, { passive: true });
+    element.addEventListener("pointerdown", activity, { passive: true });
     element.addEventListener("pointerover", over, { passive: true });
     element.addEventListener("click", click);
     element.addEventListener("keydown", activity);
@@ -414,8 +416,10 @@ export function useRoomCinema(
       }
       if (
         !calm &&
+        !s.resting &&
         motion &&
         !s.panel &&
+        now - lastInput <= C.idle.sleep &&
         now > nextBehavior &&
         now > behaviorUntil
       ) {
@@ -438,7 +442,7 @@ export function useRoomCinema(
       if (calm || s.resting || (s.panel && art.dataset.behavior !== "nod")) {
         setData(art, "behavior", "idle");
       } else if (now - lastInput > C.idle.sleep && motion) {
-        art.dataset.behavior = "sleepy";
+        setData(art, "behavior", "sleepy");
       } else if (now > behaviorUntil && art.dataset.behavior !== "idle") {
         setData(art, "behavior", "idle");
       }
@@ -670,6 +674,7 @@ export function useRoomCinema(
       removeTick();
       observer.disconnect();
       element.removeEventListener("pointermove", pointer);
+      element.removeEventListener("pointerdown", activity);
       element.removeEventListener("pointerover", over);
       element.removeEventListener("click", click);
       element.removeEventListener("keydown", activity);

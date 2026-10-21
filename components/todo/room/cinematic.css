@@ -682,7 +682,7 @@
 .room-pet[data-intro="sleep"] .room-pose {
   opacity: 0;
 }
-.room-pet[data-intro="sleep"] .room-pose:nth-child(5) {
+.room-pet[data-intro="sleep"] .room-pose[data-pose-layer="sleeping"] {
   opacity: 1;
 }
 .room-pet[data-intro="sleep"] .room-gaze {
@@ -829,11 +829,38 @@
     transform: translateY(3px) scaleY(0.985);
   }
 }
-.round-room-art[data-behavior="sleepy"] .room-idle-lid {
-  transform: scaleY(1);
-  transition-duration: 1.5s;
+/* Use the real closed-eye artwork: a full cream lid over the idle portrait
+   reads as missing pupils. Only the local idle companion dozes, never a
+   remote friend or a penguin that is writing / taking a break. */
+.round-room-art[data-behavior="sleepy"]
+  :is(.room-seated-anchor, .table-seat[data-self="true"])
+  .room-pet[data-pose="idle"]
+  .room-pose {
+  opacity: 0;
 }
-.round-room-art[data-behavior="sleepy"] .room-pet-breathe {
+.round-room-art[data-behavior="sleepy"]
+  :is(.room-seated-anchor, .table-seat[data-self="true"])
+  .room-pet[data-pose="idle"]
+  .room-pose[data-pose-layer="sleeping"] {
+  opacity: 1;
+}
+.round-room-art[data-behavior="sleepy"]
+  :is(.room-seated-anchor, .table-seat[data-self="true"])
+  .room-pet[data-pose="idle"]
+  :is(
+    .room-gaze,
+    .cinema-pom-patch,
+    .cinema-scarf-patch,
+    .table-knit-tint,
+    .cinema-glasses,
+    .cinema-hat-pin
+  ) {
+  visibility: hidden;
+}
+.round-room-art[data-behavior="sleepy"]
+  :is(.room-seated-anchor, .table-seat[data-self="true"])
+  .room-pet[data-pose="idle"]
+  .room-pet-breathe {
   animation: cinema-doze 8s ease-in-out infinite;
 }
 @keyframes cinema-doze {

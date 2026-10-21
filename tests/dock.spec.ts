@@ -808,3 +808,69 @@ test("daylight break keeps Todo awake, invites play and returns gently from bubb
   await expect(page.locator(".todo-dock")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+for (const character of ["male", "female"] as const) {
+  test(`idle ${character} Todo sleeps with closed-eye artwork and wakes with pupils intact`, async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.addInitScript(
+      (choice) => localStorage.setItem("todo.character.v1", choice),
+      character,
+    );
+    await enter(page);
+    await page.waitForTimeout(500);
+    const art = page.locator(".round-room-art");
+    const pet = page.locator(".room-seated-anchor .room-pet");
+    const sleeping = pet.locator('[data-pose-layer="sleeping"]');
+    const idle = pet.locator('[data-pose-layer="idle"]');
+    const gaze = pet.locator(".room-gaze");
+    await expect(idle).toHaveCSS("opacity", "1");
+    await expect(gaze).toBeVisible();
+    await expect(sleeping).toHaveAttribute(
+      "src",
+      `/art/room-todo-sleeping${character === "female" ? "-pink" : ""}.png`,
+    );
+    expect(
+      await sleeping.evaluate(
+        (img: HTMLImageElement) => img.complete && img.naturalWidth > 0,
+      ),
+    ).toBe(true);
+    await page.clock.install();
+    for (const wake of ["pointer", "keyboard", "click"] as const) {
+      await page.clock.fastForward(65000);
+      await page.clock.runFor(300);
+      await expect(art).toHaveAttribute("data-behavior", "sleepy");
+      await expect(sleeping).toHaveCSS("opacity", "1");
+      await expect(idle).toHaveCSS("opacity", "0");
+      await expect(gaze).toBeHidden();
+      // A real closed-eye portrait replaces the face; no pupil-covering blank discs.
+      const lids = await pet
+        .locator(".room-idle-lid")
+        .evaluateAll((nodes) =>
+          nodes.map((n) => new DOMMatrix(getComputedStyle(n).transform).m22),
+        );
+      expect(lids.every((scale) => scale < 0.05)).toBe(true);
+      if (wake === "pointer")
+        await page.screenshot({
+          path: `outputs/todo-idle-sleep-${character}.png`,
+        });
+      if (wake === "pointer") await page.mouse.move(1150, 700);
+      else if (wake === "keyboard") {
+        await pet.focus();
+        await page.keyboard.press("ArrowRight");
+      } else await pet.click();
+      await page.clock.runFor(900);
+      await expect(art).not.toHaveAttribute("data-behavior", "sleepy");
+      await expect(sleeping).toHaveCSS("opacity", "0");
+      await expect(idle).toHaveCSS("opacity", "1");
+      await expect(gaze).toBeVisible();
+      if (wake === "pointer")
+        await page.screenshot({
+          path: `outputs/todo-idle-awake-${character}.png`,
+        });
+    }
+    expect(errors).toEqual([]);
+  });
+}

@@ -81,6 +81,8 @@ export function RoomPenguin({
       }
       const behavior =
         element.closest<HTMLElement>(".round-room-art")?.dataset.behavior;
+      // Auto-sleep uses the closed-eye portrait, never the tracking-eye patches.
+      const asleep = behavior === "sleepy" && pose === "idle";
       const desiredX = tracking
         ? behavior === "window" || now < glanceUntil
           ? -0.8
@@ -98,6 +100,7 @@ export function RoomPenguin({
       }
       element.dataset.blink = String(
         now < blinkUntil &&
+          !asleep &&
           pose !== "sleeping" &&
           pose !== "typing" &&
           now - reactionTime.current > 1200,
@@ -167,6 +170,7 @@ export function RoomPenguin({
         {(Object.keys(C.poses) as RoomPose[]).map((p) => (
           <img
             key={`${p}-${female}`}
+            data-pose-layer={p}
             src={source(p)}
             alt=""
             aria-hidden="true"
