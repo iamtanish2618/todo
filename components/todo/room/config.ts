@@ -54,6 +54,8 @@ export const ROOM_CONFIG = {
     blinkMax: 6000,
     lerp: 0.1,
   },
+  // Stage 1 visual tuning; no timer, voice, or storage behavior changes.
+  visiblePolish: { enabled: true, minimumText: 13, doodleFogOpacity: 0.35 },
   dailyLimit: 25,
   defaultMinutes: 25,
   breakMinutes: 5,

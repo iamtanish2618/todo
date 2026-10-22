@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import { gsap } from "gsap";
 import { CircleDashed, PencilLine, X } from "lucide-react";
 import { BreakGameSession, type Stroke } from "@/lib/todo/table/games";
+import { ROOM_CONFIG as C } from "../config";
 import { COLORS } from "@/lib/todo/table/protocol";
 import type { TableSession } from "@/lib/todo/table/session";
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,7 @@ function GameOverlay({
       ref={root}
       className={`table-doodle-screen table-game-screen ${game === "bubbles" ? "table-bubbles-screen" : ""}`}
       data-leaving={closing}
+      data-visible-polish={C.visiblePolish.enabled}
       role="dialog"
       aria-modal="true"
       aria-label={game === "doodle" ? "Doodle Art" : "Bubble Pop"}
@@ -297,7 +299,7 @@ function DoodleCanvas({
       canvas.height = fog.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       f.setTransform(dpr, 0, 0, dpr, 0, 0);
-      f.fillStyle = "#e7f2f5b3";
+      f.fillStyle = "#e7f2f5";
       f.fillRect(0, 0, w, h);
       lastPoint = null;
     };
@@ -353,7 +355,7 @@ function DoodleCanvas({
     const off = games.listen((m) => {
       if (m.event === "doodle_clear") {
         f.clearRect(0, 0, w, h);
-        f.fillStyle = "#e7f2f5b3";
+        f.fillStyle = "#e7f2f5";
         f.fillRect(0, 0, w, h);
         strokes.clear();
       } else if (m.event === "doodle") {
@@ -405,7 +407,13 @@ function DoodleCanvas({
         lastFog = time;
       }
       ctx.clearRect(0, 0, w, h);
+      // Apply opacity once when compositing: fog regeneration cannot build
+      // the backdrop into an opaque white wash. Erased paths still refill.
+      ctx.globalAlpha = C.visiblePolish.enabled
+        ? C.visiblePolish.doodleFogOpacity
+        : 0.7;
       ctx.drawImage(fog, 0, 0, w, h);
+      ctx.globalAlpha = 1;
       if (!reduced) {
         for (const dot of dots) {
           if (dot.life <= 0) continue;

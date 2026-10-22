@@ -35,7 +35,7 @@ import {
   Play,
   Plus,
   Send,
-  Settings2,
+  Settings,
   Sparkles,
   Timer as TimerIcon,
   Trash2,
@@ -95,6 +95,7 @@ import { TableSeats } from "./room/shared/seating";
 import { FriendsPanel } from "./room/shared/friends";
 import { TableChat } from "./room/shared/table-chat";
 import "./room/shared/shared.css";
+import "./room/visible-polish.css";
 
 type Pane =
   | "focus"
@@ -228,6 +229,7 @@ export function StudyRoom(p: Props) {
   celebrationOpen.current = celebrating;
   const quietFocus = p.running && p.phase === "focus";
   const quietBreak = p.started && p.phase === "break";
+  const [chatOpen, setChatOpen] = useState(false);
   const [pane, setPane] = useState<Pane | null>(null),
     [loaded, setLoaded] = useState(false),
     [loadProgress, setLoadProgress] = useState(0),
@@ -619,7 +621,7 @@ export function StudyRoom(p: Props) {
     handledCompletions.current = p.focusCompletions;
     setPane(null);
     setCompletionStats({
-      minutes: Math.max(0, Math.round((p.sessions[0]?.seconds || 0) / 60)),
+      minutes: Math.max(0, Math.floor((p.sessions[0]?.seconds || 0) / 60)),
       tasks: p.tasks.filter((t) => t.done).length - baseline.current,
     });
     setCelebrating(true);
@@ -644,8 +646,11 @@ export function StudyRoom(p: Props) {
     roomRoot.current
       ?.querySelector<HTMLButtonElement>(".round-timer-face")
       ?.focus({ preventScroll: true });
-    // Keep the setup mounted just long enough to dissolve with the other tools.
-    const dismiss = setTimeout(() => setPane(null), p.reduced ? 0 : 650);
+    // Quiet UI and the setup card must never occupy the same rendered state.
+    const dismiss = setTimeout(() => {
+      closingTween.current?.kill();
+      setPane(null);
+    }, 0);
     return () => clearTimeout(dismiss);
   }, [quietFocus, quietBreak, p.reduced]);
   const restHistory = useRef({ resting: false, playing: false });
@@ -777,7 +782,7 @@ export function StudyRoom(p: Props) {
         if (!finishSit && p.running) p.onStart();
         setPane(null);
         setCompletionStats({
-          minutes: Math.round(
+          minutes: Math.floor(
             (p.started ? p.duration - p.remaining : task.focusedSeconds || 0) /
               60,
           ),
@@ -865,6 +870,8 @@ export function StudyRoom(p: Props) {
     const task = chosen
       .map((id) => p.tasks.find((t) => t.id === id && !t.done))
       .find(Boolean);
+    closingTween.current?.kill();
+    setPane(null);
     p.onDuration(minutes);
     p.onTask(task?.title || "Quiet focus", true, task?.id);
     baseline.current = p.tasks.filter((t) => t.done).length;
@@ -879,7 +886,7 @@ export function StudyRoom(p: Props) {
         setPane(null);
         if (p.phase === "focus") {
           setCompletionStats({
-            minutes: Math.round((p.duration - p.remaining) / 60),
+            minutes: Math.floor((p.duration - p.remaining) / 60),
             tasks: 0,
           });
           setCelebrating(true);
@@ -971,7 +978,9 @@ export function StudyRoom(p: Props) {
     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
   const focusTimeLabel = (seconds = 0) =>
     seconds > 0
-      ? `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s of focus`
+      ? seconds < 60
+        ? "less than a minute focused"
+        : `${Math.floor(seconds / 60)} ${Math.floor(seconds / 60) === 1 ? "minute" : "minutes"} focused`
       : "Not timed";
   const selected = chosen
     .map((id) => p.tasks.find((t) => t.id === id && !t.done))
@@ -1727,7 +1736,9 @@ export function StudyRoom(p: Props) {
                 >
                   {String(label)}
                   {totalSits < Number(at) ? (
-                    <small>{String(at)} sits</small>
+                    <small>
+                      {String(at)} {Number(at) === 1 ? "sit" : "sits"}
+                    </small>
                   ) : null}
                 </Button>
               ))}
@@ -1737,7 +1748,6 @@ export function StudyRoom(p: Props) {
                 ["home", Users, "Who is joining?"],
                 ["month", TimerIcon, "This month"],
                 ["corner", LampDesk, "Your corner"],
-                ["friends", Users, "Bring friends"],
               ].map(([id, Icon, label]) => {
                 const I = Icon as typeof Users;
                 return (
@@ -1761,9 +1771,15 @@ export function StudyRoom(p: Props) {
             <p className="room-helper">Little moments, quietly adding up.</p>
             <div className="room-month-counters">
               {[
-                ["minutes", summary?.minutes || 0],
-                ["sits", summary?.sits || 0],
-                ["tasks done", summary?.tasksDone || 0],
+                [
+                  summary?.minutes === 1 ? "minute" : "minutes",
+                  summary?.minutes || 0,
+                ],
+                [summary?.sits === 1 ? "sit" : "sits", summary?.sits || 0],
+                [
+                  summary?.tasksDone === 1 ? "task finished" : "tasks finished",
+                  summary?.tasksDone || 0,
+                ],
               ].map(([label, value]) => (
                 <div key={String(label)}>
                   <strong>{value}</strong>
@@ -1921,7 +1937,13 @@ export function StudyRoom(p: Props) {
       aria-hidden={!p.active}
       inert={!p.active}
       data-dock={dockEnabled}
-      style={{ "--glass-tint": polish.settings.glass } as CSSProperties}
+      data-visible-polish={C.visiblePolish.enabled}
+      style={
+        {
+          "--glass-tint": polish.settings.glass,
+          "--room-min-text": `${C.visiblePolish.minimumText}px`,
+        } as CSSProperties
+      }
       data-character={p.female ? "female" : "male"}
       data-mode={p.agentMode ? "agent" : "companion"}
       data-agent={agentView}
@@ -1932,9 +1954,11 @@ export function StudyRoom(p: Props) {
       data-working={quietFocus}
       data-quiet={quietRoom}
       data-break-game={quietBreak ? breakGameState.game || "" : ""}
+      data-game-menu={breakGameState.menu}
       data-shared-table={table.members.length > 0}
+      data-table-size={table.members.length}
       data-resting={quietBreak}
-      data-panel-open={Boolean(pane) && !quietRoom}
+      data-panel-open={(Boolean(pane) || chatOpen) && !quietRoom}
       data-season={
         new Date().getMonth() < 2 || new Date().getMonth() === 11
           ? "winter"
@@ -1951,11 +1975,15 @@ export function StudyRoom(p: Props) {
         aria-hidden="true"
       />
       <TableChat
+        glass={polish.settings.glass}
+        onOpenChange={setChatOpen}
         session={tableSession}
         table={table}
         games={breakGames}
         active={p.active && arrived}
-        available={!quietFocus && !agentView && !celebrating && !breakReturn}
+        available={
+          !pane && !quietFocus && !agentView && !celebrating && !breakReturn
+        }
       />
       <div
         className="cozy-room-stage"
@@ -1980,7 +2008,10 @@ export function StudyRoom(p: Props) {
             role="group"
             aria-label="Shared focus invitation"
           >
-            <span>Sit together for {table.sit.minutes} minutes?</span>
+            <span>
+              Sit together for {table.sit.minutes}{" "}
+              {table.sit.minutes === 1 ? "minute" : "minutes"}?
+            </span>
             <button onClick={() => setAcceptedSit(table.sit!.startAt)}>
               Join focus
             </button>
@@ -2182,10 +2213,11 @@ export function StudyRoom(p: Props) {
           variant="ghost"
           size="icon"
           className="room-nav-settings"
-          aria-label="Open room settings"
+          aria-label="Settings"
+          title="Settings"
           onClick={() => show("settings")}
         >
-          <Settings2 size={18} />
+          <Settings size={18} />
         </Button>
         {!dockEnabled ? (
           <nav
@@ -2363,8 +2395,8 @@ export function StudyRoom(p: Props) {
             {keepsakes.map((k) => (
               <button
                 key={k.name}
-                aria-label={k.name}
-                title={k.name}
+                aria-label={`${k.name} — view keepsakes`}
+                title={`${k.name} — view keepsakes`}
                 onClick={() => setPane("corner")}
               >
                 <k.Icon size={18} />
@@ -2394,7 +2426,7 @@ export function StudyRoom(p: Props) {
           }}
           modal={false}
         >
-          {pane ? (
+          {pane && (pane === "agent" || !quietRoom) ? (
             <DialogPrimitive.Content
               key={pane}
               data-dock-pane={dockEnabled ? pane : undefined}
