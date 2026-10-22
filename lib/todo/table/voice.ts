@@ -12,6 +12,9 @@ type Peer = {
   nextStats: number;
   held: number;
   volume: number;
+  makingOffer: boolean;
+  offerPending: boolean;
+  restartPending: boolean;
   watchdog?: ReturnType<typeof setTimeout>;
 };
 export type VoiceSnapshot = {
@@ -156,7 +159,9 @@ export class TableVoice {
     if (this.iceConfig !== table.config.iceServers) {
       this.iceConfig = table.config.iceServers;
       for (const p of this.peers.values()) {
-        try { p.pc.setConfiguration({ iceServers: this.iceConfig }); } catch {}
+        try {
+          p.pc.setConfiguration({ iceServers: this.iceConfig });
+        } catch {}
       }
     }
     if (table.state !== "joined" || !table.config.voice) {
@@ -196,8 +201,15 @@ export class TableVoice {
       retries: 0,
       held: 0,
       volume: this.snapshot.volumes[id] ?? 1,
+      makingOffer: false,
+      offerPending: false,
+      restartPending: false,
     };
     this.peers.set(id, peer);
+    pc.onsignalingstatechange = () => {
+      if (pc.signalingState === "stable" && peer.offerPending && table.id < id)
+        void this.offer(id, peer);
+    };
     if (table.id < id) pc.addTransceiver("audio", { direction: "sendrecv" });
     pc.onicecandidate = (e) => {
       if (e.candidate)
@@ -265,9 +277,18 @@ export class TableVoice {
     await transceiver.sender.setParameters(params).catch(() => {});
   }
   private async offer(id: string, peer: Peer, restart = false) {
+    peer.restartPending ||= restart;
+    if (peer.makingOffer || peer.pc.signalingState !== "stable") {
+      peer.offerPending = true;
+      return;
+    }
+    peer.makingOffer = true;
+    peer.offerPending = false;
+    const restartIce = peer.restartPending;
+    peer.restartPending = false;
     try {
       await this.attach(peer);
-      const offer = await peer.pc.createOffer({ iceRestart: restart });
+      const offer = await peer.pc.createOffer({ iceRestart: restartIce });
       await peer.pc.setLocalDescription(offer);
       if (this.peers.get(id) === peer)
         this.session?.send("signal", {
@@ -277,6 +298,10 @@ export class TableVoice {
         });
     } catch {
       if (this.peers.has(id)) this.trouble(id);
+    } finally {
+      peer.makingOffer = false;
+      if (peer.offerPending && peer.pc.signalingState === "stable")
+        void this.offer(id, peer);
     }
   }
   private async receive(m: Envelope) {
@@ -300,12 +325,16 @@ export class TableVoice {
     }
     if (m.data.to !== table.id) return;
     if (m.event === "voice_retry" && table.id < m.from) {
+      if (m.data.manual === true) {
+        await this.session?.refreshConfig();
+        this.sync();
+      }
       const p = this.peers.get(m.from);
       if (m.data.renegotiate === true) {
-        if (p && p.pc.signalingState === "stable") await this.offer(m.from, p);
+        if (p) await this.offer(m.from, p);
         return;
       }
-      if (p && p.retries === 0) {
+      if (p && (p.retries === 0 || m.data.manual === true)) {
         p.retries++;
         await this.offer(m.from, p, true);
       }
@@ -414,8 +443,7 @@ export class TableVoice {
         // different browsers don't remain stuck on their initial silent track.
         const table = this.session.getSnapshot();
         for (const [id, peer] of this.peers) {
-          if (table.id < id && peer.pc.signalingState === "stable")
-            void this.offer(id, peer);
+          if (table.id < id) void this.offer(id, peer);
           else if (table.id > id)
             this.session.send("voice_retry", { to: id, renegotiate: true });
         }
@@ -466,13 +494,15 @@ export class TableVoice {
   }
   async retry() {
     await this.unlock();
+    await this.session?.refreshConfig();
     const table = this.session?.getSnapshot();
     if (!table || table.state !== "joined") return;
     this.update({ message: "Reconnecting voice…" });
+    this.sync();
     for (const [id, peer] of this.peers) {
       peer.retries = 0;
       if (table.id < id) void this.offer(id, peer, true);
-      else this.session?.send("voice_retry", { to: id });
+      else this.session?.send("voice_retry", { to: id, manual: true });
     }
   }
   setPeerVolume(id: string, value: number) {
@@ -553,6 +583,7 @@ export class TableVoice {
     p.pc.onicecandidate = null;
     p.pc.ontrack = null;
     p.pc.onconnectionstatechange = null;
+    p.pc.onsignalingstatechange = null;
     p.pc.close();
     if (p.watchdog) clearTimeout(p.watchdog);
     p.audio.pause();

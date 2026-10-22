@@ -3,6 +3,11 @@ import { Mic, MicOff, Volume2, VolumeX, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { TableVoice, VoiceSnapshot } from "@/lib/todo/table/voice";
+const needsReconnect = (state: VoiceSnapshot) =>
+  state.message.includes("Voice couldn’t connect") ||
+  Object.values(state.peers).some(
+    (s) => s === "failed" || s === "disconnected",
+  );
 export function VoiceControls({
   voice,
   state,
@@ -31,7 +36,7 @@ export function VoiceControls({
           Tap to enable sound
         </Button>
       )}
-      {state.message.includes("Voice couldn’t connect") && (
+      {needsReconnect(state) && (
         <Button variant="ghost" onClick={() => void voice.retry()}>
           <RefreshCw size={14} />
           Reconnect voice
@@ -62,7 +67,7 @@ export function PersistentMic({
           Enable sound
         </button>
       )}
-      {state.message.includes("Voice couldn’t connect") && (
+      {needsReconnect(state) && (
         <button onClick={() => void voice.retry()}>
           <RefreshCw size={14} />
           Reconnect voice
