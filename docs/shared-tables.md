@@ -206,3 +206,23 @@ Companion and knit color are separate presence fields. Friends starts with the c
 The single larger working clock is mounted at 66%/10% on the wall, with a straight face and soft wall shadow. The complete original oak table stays intact. The hanging-plant breeze hit area and framed-picture surprise are removed; the Doodle Art break game remains available.
 
 QA uses isolated Firebase Auth/Realtime Database emulators and synthetic microphone streams, not real account tokens or personal tasks. Chromium's test-only `--disable-audio-output` replaces the unavailable host hardware sink while retaining the audio-rendering path; normal autoplay rules remain enabled. This does not verify physical speakers or cross-network NAT traversal. A TURN relay is still required for networks where direct WebRTC cannot connect.
+
+## Reconnect recovery and Vercel relay delivery
+
+The native Vercel deployment now owns its `/api/rooms/config` route. It preserves
+upstream room availability but independently validates Todo's Firebase identity
+before attaching its own server-only `TODO_TURN_URL`, `TODO_TURN_USERNAME`, and
+`TODO_TURN_CREDENTIAL` settings. This avoids relying on the legacy host's proxied
+identity/relay lookup. The configured relay is the owner's approved Metered
+credential over TLS/TCP on port 443. Guests receive discovery servers only; both
+account and shared-room data access continue to use existing verification.
+
+Reconnect refreshes configuration, applies it to the peer connection, and performs
+an ICE restart. Manual retries are accepted even if the offerer already used its
+automatic retry. The reconnect control is based on failed/disconnected peer state,
+so a later headphones hint cannot hide it. Microphone renegotiation queues until
+the current offer completes instead of creating overlapping local offers.
+
+`tests/table-voice-recovery.spec.ts` reproduces fresh-settings ordering, repeated
+remote retries and pending-offer negotiation. The Vercel helper's tests cover guest
+credential exclusion, independently verified accounts and incomplete settings.

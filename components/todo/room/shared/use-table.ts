@@ -18,6 +18,7 @@ export function useTable(active: boolean, status: Status) {
           if (c && !abort.signal.aborted) session.configure(c as PublicConfig);
         })
         .catch(() => {});
+    session.setConfigLoader(refresh);
     void refresh();
     // Refresh expiring credentials before a long study session can outlive them.
     const timer = active ? setInterval(refresh, 30 * 60 * 1000) : null;
@@ -27,6 +28,7 @@ export function useTable(active: boolean, status: Status) {
     document.addEventListener("visibilitychange", visible);
     return () => {
       abort.abort();
+      session.setConfigLoader(null);
       if (timer) clearInterval(timer);
       document.removeEventListener("visibilitychange", visible);
     };
