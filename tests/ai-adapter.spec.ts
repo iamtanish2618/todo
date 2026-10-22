@@ -65,3 +65,46 @@ test("AI adapter surfaces provider failure without silently making up a reply (m
     ),
   ).rejects.toThrow();
 });
+
+test("tiny-step uses one short action with the same provider contract", async () => {
+  let payload: Record<string, unknown> = {};
+  const result = await askModel(
+    {
+      key: "test-only-key",
+      baseURL: "https://provider.example/v1",
+      model: "test-model",
+    },
+    {
+      mode: "tiny-step",
+      messages: [{ role: "user", content: "Current task: Read a chapter" }],
+    },
+    AbortSignal.timeout(10000),
+    async (_input, init) => {
+      payload = JSON.parse(String(init?.body));
+      return Response.json({
+        id: "tiny",
+        object: "chat.completion",
+        created: 1,
+        model: "test-model",
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: "assistant",
+              content: "Open the chapter and read its first sentence.",
+            },
+            finish_reason: "stop",
+          },
+        ],
+        usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
+      });
+    },
+  );
+  expect(result).toContain("first sentence");
+  const messages = payload.messages as { role: string; content: string }[];
+  expect(messages.find((m) => m.role === "system")?.content).toContain(
+    "Give ONE tiny first step, in one or two short sentences.",
+  );
+  expect(JSON.stringify(messages)).toContain("Read a chapter");
+  expect(payload.max_tokens).toBe(180);
+});

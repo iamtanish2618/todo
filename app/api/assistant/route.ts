@@ -14,7 +14,15 @@ import {
 } from "@/lib/todo/server";
 
 const schema = z.object({
-  mode: z.enum(["chat", "notes", "summarize", "explain", "quiz", "flashcards"]),
+  mode: z.enum([
+    "chat",
+    "notes",
+    "summarize",
+    "explain",
+    "quiz",
+    "flashcards",
+    "tiny-step",
+  ]),
   messages: z
     .array(
       z.object({

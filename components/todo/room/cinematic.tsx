@@ -289,6 +289,7 @@ export function useRoomCinema(
       clickAt = performance.now();
     };
     const effect = (event: Event) => {
+      if (latest.current.reduced) return;
       const kind = (event as CustomEvent<{ kind: string }>).detail.kind,
         now = performance.now();
       if (kind === "star" && !latest.current.focus) {
@@ -439,7 +440,12 @@ export function useRoomCinema(
           now + C.idle.min + Math.random() * (C.idle.max - C.idle.min),
         );
       }
-      if (calm || s.resting || (s.panel && art.dataset.behavior !== "nod")) {
+      if (
+        !motion ||
+        calm ||
+        s.resting ||
+        (s.panel && art.dataset.behavior !== "nod")
+      ) {
         setData(art, "behavior", "idle");
       } else if (now - lastInput > C.idle.sleep && motion) {
         setData(art, "behavior", "sleepy");
@@ -448,7 +454,7 @@ export function useRoomCinema(
       }
       if (s.celebrating && !lastCelebration) celebrationAt = now;
       lastCelebration = s.celebrating;
-      if (s.weather !== lastScene) {
+      if (s.weather !== lastScene && motion) {
         lastScene = s.weather;
         art.dataset.sceneChanging = "false";
         void import("gsap").then(({ gsap }) => {

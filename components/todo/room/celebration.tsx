@@ -66,7 +66,8 @@ export function CompletionCelebration({
   female,
   reduced,
   sound,
-  cue = "voice",
+  cue = "chime",
+  early = false,
   minutes = 0,
   tasksDone = 0,
   volume = 1,
@@ -79,6 +80,7 @@ export function CompletionCelebration({
   reduced: boolean;
   sound: boolean;
   cue?: EndCue;
+  early?: boolean;
   minutes?: number;
   tasksDone?: number;
   volume?: number;
@@ -137,9 +139,13 @@ export function CompletionCelebration({
           <span className="celebration-heart heart-right">♡</span>
         </div>
         <div className="celebration-message">
-          <DialogTitle>You did it!</DialogTitle>
+          <DialogTitle>
+            {early ? "That's okay, we showed up." : "You did it!"}
+          </DialogTitle>
           <DialogDescription>
-            You did great. Every little moment counts.
+            {early
+              ? "Every little moment counts."
+              : "You did great. Every little moment counts."}
           </DialogDescription>
         </div>
         <div
