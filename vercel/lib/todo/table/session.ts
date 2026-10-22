@@ -92,6 +92,13 @@ export class TableSession {
   configure(config: PublicConfig) {
     this.update({ config });
   }
+  private configLoader: (() => Promise<void>) | null = null;
+  setConfigLoader(loader: (() => Promise<void>) | null) {
+    this.configLoader = loader;
+  }
+  async refreshConfig() {
+    await this.configLoader?.();
+  }
   notice(message: string) {
     this.update({ message });
   }

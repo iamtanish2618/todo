@@ -3,7 +3,7 @@
 Production: https://sit-with-todo.vercel.app/
 
 Vercel project: `sit-with-todo`, owned by `iamtanish2618-3571s-projects`.
-Deployment: `dpl_BuJYyV82kdc7ad6bP1jZBQVSrczW`.
+Deployment: `dpl_BakYRuwrSHT4CLEuLpwuhD8U1gaY`.
 
 Verified: anonymous homepage 200; Google/email login UI; Firebase authorized
 domain saved; API session GET/DELETE; unauthenticated task access rejected;
@@ -18,7 +18,7 @@ fully verified. No passwords or user tokens were collected for testing.
 Native Next.js deployment of Todo's existing interface, exported from the working
 Sites source at commit `f30f955816fcc537af6a5165d0014a555820226a`.
 The original artwork, animations, audio loops, Firebase accounts, and shared
-table client are preserved. This directory is a separate deployment target; the complete Sites source is preserved at the repository root.
+table client are preserved. This directory is independent of the Sites checkout.
 
 ## Run and deploy
 
@@ -87,3 +87,26 @@ and live bidirectional synthetic audio forced through UDP TURN and TLS TURN on
 port 443. Physical microphones across unrelated networks still need a friend test.
 The selected no-card provider trial lists 500 MB; no card or automatic reload was
 configured. The provider dashboard is authoritative for remaining usage.
+
+## Voice delivery repair — 22 October 2026
+
+The native `/api/rooms/config` route now independently verifies Todo's Firebase
+identity before appending Vercel's own private, validated TURN settings. The
+legacy backend remains responsible for tasks, notes and AI; a missing relay in
+its proxied configuration no longer prevents native Vercel voice. Configure
+`TODO_TURN_URL`, `TODO_TURN_USERNAME`, and `TODO_TURN_CREDENTIAL` as production
+Secrets without any `NEXT_PUBLIC_` prefix. The currently selected route uses
+Metered TURN over TLS/TCP on port 443. Guests never receive relay credentials.
+
+Reconnect refreshes configuration first, repeated manual remote retries are no
+longer ignored, and microphone renegotiation waits for the current offer. The
+reconnect control remains available when the connection has failed even if a
+headphones hint replaces its status text. Existing tabs must refresh to load
+these changes.
+
+Validated: the owner's actual signed-in Chrome session receives the TLS relay;
+an anonymous production request receives no relay. Nine native backend/config
+tests and twelve shared protocol/relay/recovery checks passed. The prior live
+forced-TLS synthetic audio check passed again during investigation. An actual
+Chrome-to-Edge friend test is pending; do not equate these checks with confirmed
+physical microphone playback on both users' devices.
