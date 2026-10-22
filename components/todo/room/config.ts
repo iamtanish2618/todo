@@ -1,3 +1,4 @@
+import { SUPPORT } from "@/lib/todo/support";
 /** Coordinates are percentages of the uncropped 1536 × 1024 artwork. */
 export const ROOM_CONFIG = {
   image: "/art/study-room-round-v2.png",
@@ -56,6 +57,7 @@ export const ROOM_CONFIG = {
   },
   // Stage 1 visual tuning; no timer, voice, or storage behavior changes.
   visiblePolish: { enabled: true, minimumText: 13, doodleFogOpacity: 0.35 },
+  supportive: SUPPORT,
   dailyLimit: 25,
   defaultMinutes: 25,
   breakMinutes: 5,

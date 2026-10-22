@@ -18,6 +18,7 @@ import rehypeKatex from "rehype-katex";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Connection, type Note } from "@/lib/todo/client";
+import { SUPPORT } from "@/lib/todo/support";
 import { makeRoomPDF } from "./pdf";
 import { useMagneticSurface } from "../use-magnetic-surface";
 
@@ -277,7 +278,12 @@ export function RoomChat({
               {m.role === "user" ? (
                 <p>{m.content}</p>
               ) : (
-                <div className="room-chat-body">
+                <div
+                  className="room-chat-body"
+                  tabIndex={SUPPORT.enabled ? 0 : undefined}
+                  role={SUPPORT.enabled ? "region" : undefined}
+                  aria-label={SUPPORT.enabled ? "Todo’s answer" : undefined}
+                >
                   <Markdown
                     skipHtml
                     disallowedElements={["img"]}

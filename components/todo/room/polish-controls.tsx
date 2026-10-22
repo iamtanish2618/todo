@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { completionCue, SUPPORT } from "@/lib/todo/support";
 import {
   EMPTY_MIX,
   timeWeather,
@@ -13,7 +14,10 @@ export const POLISH_DEFAULTS = {
   mix: EMPTY_MIX,
   matchTime: false,
   thunder: false,
-  cue: "voice" as EndCue,
+  cue: (SUPPORT.enabled ? "chime" : "voice") as EndCue,
+  supportVersion: 1,
+  quiet: false,
+  nudges: false,
   outfit: "original",
 };
 export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
@@ -32,9 +36,14 @@ export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
         muted: false,
         matchTime: p.matchTime === true,
         thunder: false,
-        // Old defaults chose a bell behind a now-removed SFX switch. Use the
-        // requested voice alerts, preserving an explicit silent preference.
-        cue: p.cue === "silent" ? "silent" : "voice",
+        cue: SUPPORT.enabled
+          ? completionCue(p)
+          : p.cue === "silent"
+            ? "silent"
+            : "voice",
+        supportVersion: 1,
+        quiet: p.quiet === true,
+        nudges: p.nudges === true,
         outfit: ["original", "glasses", "star"].includes(p.outfit)
           ? p.outfit
           : v.outfit,

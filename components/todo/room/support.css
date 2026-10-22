@@ -1,0 +1,107 @@
+/* Stage 2 reuses the existing room, glass, type and motion preferences. */
+.cozy-room[data-support="true"] .room-stuck-button {
+  min-height: 40px;
+  border: 1px solid #9a7f6059;
+  border-radius: 999px;
+  color: #4f443b;
+  background: #fff8ed80;
+}
+.cozy-room[data-support="true"] .room-tiny-step {
+  animation: support-fade 180ms ease-out !important;
+}
+.room-tiny-step .room-panel-body {
+  line-height: 1.65;
+}
+.room-tiny-step ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.room-tiny-step li + li {
+  margin-top: 12px;
+}
+.room-tiny-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.room-tiny-actions button {
+  min-height: 44px;
+  white-space: normal;
+}
+.room-water-nudge {
+  position: absolute;
+  z-index: 26;
+  left: 3%;
+  top: 12%;
+  width: 29%;
+  padding: 12px 14px;
+  border: 1px solid #fffaf0bb;
+  border-radius: 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #2a2622;
+  background: #fff8edf0;
+  font-size: 14px;
+  line-height: 1.55;
+  animation: support-fade 200ms ease-out;
+}
+.room-water-nudge p {
+  margin: 0;
+}
+.room-water-nudge button {
+  flex: none;
+}
+/* A long assistant answer scrolls in its own bubble without filling the room. */
+.cozy-room[data-support="true"] .room-chat-message.assistant .room-chat-body {
+  max-height: min(30dvh, 250px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #887461 #fff8ed55;
+  line-height: 1.65;
+}
+.cozy-room[data-support="true"]
+  .room-chat-message.assistant
+  .room-chat-body:focus-visible {
+  outline: 2px solid #a97835;
+  outline-offset: 2px;
+}
+/* Timers, live voice and deliberate game input stay functional; decoration rests. */
+.cozy-room[data-support="true"].cozy-room-reduced *,
+.cozy-room[data-support="true"].cozy-room-reduced *::before,
+.cozy-room[data-support="true"].cozy-room-reduced *::after {
+  animation: none !important;
+  transition-property: opacity, visibility !important;
+  transition-duration: 180ms !important;
+  scroll-behavior: auto !important;
+}
+.cozy-room[data-support="true"].cozy-room-reduced
+  :is(
+    .magnetic-surface,
+    .room-chat-send > svg,
+    .room-chat-tool,
+    .room-scene-world
+  ) {
+  transform: none !important;
+}
+.cozy-room[data-support="true"][data-quiet-mode="true"] .cinema-particles {
+  visibility: hidden;
+}
+@keyframes support-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 800px), (max-aspect-ratio: 1/1) {
+  .room-water-nudge {
+    position: fixed;
+    top: auto;
+    bottom: 92px;
+    left: 12px;
+    width: calc(100vw - 24px);
+  }
+}
