@@ -3,7 +3,7 @@
 Production: https://sit-with-todo.vercel.app/
 
 Vercel project: `sit-with-todo`, owned by `iamtanish2618-3571s-projects`.
-Deployment: `dpl_5vi86ELL4NyAzc9fKZGBtRJUfNCd`.
+Deployment: `dpl_BuJYyV82kdc7ad6bP1jZBQVSrczW`.
 
 Verified: anonymous homepage 200; Google/email login UI; Firebase authorized
 domain saved; API session GET/DELETE; unauthenticated task access rejected;
@@ -72,3 +72,18 @@ Both production builds and six API-bridge tests passed. Physical speakers and
 calls across unrelated networks were not tested; TURN is not configured.
 Chat retains at most 200 entries for the current browser table session and clears
 on leaving; it does not restore a permanent history after a reload.
+
+## Voice relay update — 22 October 2026
+
+The backend now provides Open Relay / Metered ICE settings only after verifying
+a Todo account. The scoped provider API key stays in the Sites backend's private
+configuration, never in this deployment. The client sends its fresh Firebase token
+when requesting room configuration, refreshes it during long sessions, and updates
+existing peer connections. See `../docs/shared-tables.md` in the combined GitHub
+repository for setup and the owner-run forced-relay check.
+
+Validated: nine relay/protocol tests, six API bridge tests, both production builds,
+and live bidirectional synthetic audio forced through UDP TURN and TLS TURN on
+port 443. Physical microphones across unrelated networks still need a friend test.
+The selected no-card provider trial lists 500 MB; no card or automatic reload was
+configured. The provider dashboard is authoritative for remaining usage.
