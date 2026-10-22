@@ -11,6 +11,7 @@ import {
 import { ROOM_CONFIG as C } from "./config";
 import { CountUp } from "./polish-controls";
 import type { EndCue } from "./cinema-config";
+import { playTodoVoice } from "./voice-cues";
 
 /** A short, rounded two-note bell; no audio is created when sound effects are muted. */
 export function playCompletionCue(volume = 1) {
@@ -65,7 +66,7 @@ export function CompletionCelebration({
   female,
   reduced,
   sound,
-  cue = "chime",
+  cue = "voice",
   minutes = 0,
   tasksDone = 0,
   volume = 1,
@@ -88,15 +89,15 @@ export function CompletionCelebration({
   useEffect(() => {
     if (!open || !sound || cue === "silent" || volume === 0) return;
     if (cue === "voice") {
-      if (!window.speechSynthesis) return;
-      const speech = new SpeechSynthesisUtterance(
-        "You did great. One little step at a time.",
-      );
-      speech.rate = 0.95;
-      speech.pitch = 1.2;
-      speech.volume = Math.min(0.8, volume);
-      window.speechSynthesis.speak(speech);
-      return () => window.speechSynthesis.cancel();
+      const stopVoice = playTodoVoice("success", Math.min(0.85, volume));
+      let stopBell = () => {};
+      try {
+        stopBell = playCompletionCue(volume * 0.45);
+      } catch {}
+      return () => {
+        stopVoice();
+        stopBell();
+      };
     }
     try {
       return playCompletionCue(volume);

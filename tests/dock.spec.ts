@@ -798,12 +798,14 @@ test("daylight break keeps Todo awake, invites play and returns gently from bubb
     "data-leaving",
     "true",
   );
-  await page.clock.runFor(400);
+  await page.clock.runFor(500);
   await expect(page.locator(".table-game-screen")).toHaveCount(0);
   await page.clock.runFor(1200);
   await expect(play).toBeVisible();
   await expect(play).toBeFocused();
-  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sit with Todo", exact: true })
+    .click();
   await page.clock.runFor(4000);
   await expect(page.locator(".todo-dock")).toBeVisible();
   expect(errors).toEqual([]);
@@ -961,7 +963,7 @@ $x^2$
 });
 
 for (const reduced of [false, true]) {
-  test(`Bubble Pop uses a dark random field with varied speeds${reduced ? " and respects reduced motion" : ""}`, async ({
+  test(`Bubble Pop keeps room artwork with varied speeds${reduced ? " and respects reduced motion" : ""}`, async ({
     page,
   }) => {
     const errors: string[] = [];
@@ -1008,9 +1010,16 @@ for (const reduced of [false, true]) {
       expect(distance.filter((d) => d > 8).length).toBeGreaterThan(16);
       expect(Math.max(...distance) - Math.min(...distance)).toBeGreaterThan(15);
     }
-    await expect(field).toHaveCSS("background-image", /rgb\(17, 25, 37\)/);
+    await expect(field).toHaveCSS("background-image", "none");
+    await expect(field).toHaveCSS(
+      "background-color",
+      "rgba(33, 25, 18, 0.26)",
+    );
+    await expect(
+      page.getByRole("status", { name: "Bubbles popped", exact: true }),
+    ).toHaveText("0 popped");
     await page.screenshot({
-      path: `outputs/todo-dark-random-bubbles${reduced ? "-gentle" : ""}.png`,
+      path: `outputs/todo-room-bubbles${reduced ? "-gentle" : ""}.png`,
     });
     const bubble = page.getByRole("button", {
       name: "Pop bubble 4",
@@ -1019,6 +1028,9 @@ for (const reduced of [false, true]) {
     await bubble.focus();
     await page.keyboard.press("Space");
     await expect(bubble).toHaveAttribute("data-popped", "true");
+    await expect(
+      page.getByRole("status", { name: "Bubbles popped", exact: true }),
+    ).toHaveText("1 popped");
     await expect(bubble).toHaveAttribute("data-popped", "false", {
       timeout: 3500,
     });
@@ -1040,7 +1052,112 @@ for (const reduced of [false, true]) {
     expect(bounds).toBe(true);
     await page.keyboard.press("Escape");
     await expect(field).toHaveCount(0);
-    await page.getByRole("button", { name: "End break", exact: true }).click();
+    await page.waitForTimeout(350);
+    expect(
+      await page
+        .locator(".room-rest-transition")
+        .evaluate((n) => Number(getComputedStyle(n).opacity)),
+    ).toBe(0);
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await page.getByRole("button", { name: /^Bubble Pop/ }).click();
+    await expect(
+      page.getByRole("status", { name: "Bubbles popped", exact: true }),
+    ).toHaveText("0 popped");
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(field).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Sit with Todo", exact: true })
+      .click();
     expect(errors).toEqual([]);
   });
 }
+
+test("recorded Todo voices play for completion and break expiry despite the retired SFX switch", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "todo.settings.v1",
+      JSON.stringify({ sound: false, reduced: false }),
+    );
+    localStorage.setItem(
+      "todo.room.polish.v1",
+      JSON.stringify({ cue: "chime" }),
+    );
+    const played: number[] = [];
+    Object.assign(window, { __todoVoices: played });
+    const original = AudioContext.prototype.createBufferSource;
+    AudioContext.prototype.createBufferSource = function () {
+      const source = original.call(this),
+        start = source.start.bind(source);
+      source.start = (...args: Parameters<typeof source.start>) => {
+        if (source.buffer) played.push(source.buffer.duration);
+        start(...args);
+      };
+      return source;
+    };
+  });
+  await enter(page);
+  const asset = await page.request.get("/audio/todo-you-did-it-v1.mp3");
+  expect(asset.ok()).toBe(true);
+  expect((await asset.body()).byteLength).toBeGreaterThan(5000);
+  await dock(page, "focus").click();
+  await dock(page, "focus").click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "You did it!", exact: true }),
+  ).toBeVisible();
+  const voices = () =>
+    page.evaluate(
+      () => (window as unknown as { __todoVoices: number[] }).__todoVoices,
+    );
+  await expect
+    .poll(
+      async () =>
+        (await voices()).filter((duration) => duration > 0.8 && duration < 1.6)
+          .length,
+    )
+    .toBe(1);
+  await page.getByRole("button", { name: "Take a break", exact: true }).click();
+  await page
+    .getByRole("spinbutton", { name: "Break minutes", exact: true })
+    .fill("1");
+  await page.getByRole("button", { name: "Start break", exact: true }).click();
+  const controls = page.getByRole("group", {
+    name: "Break controls",
+    exact: true,
+  });
+  await expect(controls.getByRole("button")).toHaveCount(2);
+  await expect(
+    controls.getByRole("button", { name: "Sit with Todo", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Focus again", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "End break", exact: true }),
+  ).toHaveCount(0);
+  await page.clock.install();
+  await page.clock.fastForward(61000);
+  await page.clock.runFor(200);
+  await expect(
+    page.getByRole("alertdialog", { name: "Break’s over!" }),
+  ).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await voices()).filter((duration) => duration > 2 && duration < 3)
+          .length,
+    )
+    .toBe(1);
+  await page.clock.runFor(6500);
+  await expect(page.locator(".break-return")).toHaveCount(0);
+  await expect(page.locator(".cozy-room")).toHaveAttribute(
+    "data-resting",
+    "false",
+  );
+  await expect(dock(page, "focus")).toBeVisible();
+  expect(errors).toEqual([]);
+});

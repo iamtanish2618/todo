@@ -78,6 +78,7 @@ import { RoomArrival } from "./room/arrival";
 import { BreakReturn } from "./room/break-return";
 import { RoomCursor, useRoomCinema } from "./room/cinematic";
 import { useRoomSound } from "./room/sound";
+import { primeTodoVoice, releaseTodoVoice } from "./room/voice-cues";
 import {
   useRoomPolish,
   CountUp,
@@ -369,6 +370,18 @@ export function StudyRoom(p: Props) {
   currentPane.current = pane;
   latest.current = p;
   const polish = useRoomPolish(setTone);
+  useEffect(() => {
+    if (!p.active) return;
+    // Unlock notification audio during a real gesture, before a timer expires.
+    const unlock = () => primeTodoVoice();
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      releaseTodoVoice();
+    };
+  }, [p.active]);
   const panelReturn = useDockPanelMotion(
     roomRoot,
     pane,
@@ -644,6 +657,9 @@ export function StudyRoom(p: Props) {
     const entered = quietBreak && !before.resting;
     const returned = quietBreak && before.playing && !breakGameState.game;
     if (!p.active || (!entered && !returned)) return;
+    // The game overlay already dissolves into this exact room. A second
+    // light sweep / camera zoom here produces a flash on Done.
+    if (returned) return;
     const room = roomRoot.current,
       wash = room?.querySelector(".room-rest-transition"),
       art = room?.querySelector(".round-room-art");
@@ -663,7 +679,7 @@ export function StudyRoom(p: Props) {
           .fromTo(
             wash,
             { opacity: 0, xPercent: p.reduced ? 0 : -5 },
-            { opacity: 0.3, xPercent: 0, duration: 0.25, ease: "power2.out" },
+            { opacity: 0.07, xPercent: 0, duration: 0.3, ease: "power2.out" },
           )
           .to(wash, {
             opacity: 0,
@@ -674,7 +690,7 @@ export function StudyRoom(p: Props) {
         if (!p.reduced)
           timeline.fromTo(
             art,
-            { scale: 1.012, opacity: 0.94, transformOrigin: "50% 58%" },
+            { scale: 1.004, opacity: 1, transformOrigin: "50% 58%" },
             {
               scale: 1,
               opacity: 1,
@@ -907,15 +923,12 @@ export function StudyRoom(p: Props) {
     setSleeping(false);
     p.onBreak(minutes);
   };
-  const endBreak = (goHome: boolean) =>
+  const endBreak = () =>
     void work(async () => {
       if (!(await p.onFinish())) return;
       setPane(null);
-      if (goHome) p.onExit();
-      else {
-        p.onAgentMode(false);
-        p.onRestoreRoom();
-      }
+      p.onAgentMode(false);
+      p.onRestoreRoom();
     });
   const mode = (agent: boolean) => {
     closingTween.current?.kill();
@@ -1942,7 +1955,7 @@ export function StudyRoom(p: Props) {
       >
         <div className="room-rest-transition" aria-hidden="true" />
         {table.config.games && (
-          <BreakGames games={breakGames} reduced={p.reduced} sound={p.sound} />
+          <BreakGames games={breakGames} reduced={p.reduced} />
         )}
         {table.members.length > 0 && table.config.voice && (
           <PersistentMic voice={tableVoice} state={voiceState} />
@@ -2235,14 +2248,14 @@ export function StudyRoom(p: Props) {
                   disabled={busy}
                   aria-label={
                     p.phase === "break"
-                      ? "End break"
+                      ? "Sit with Todo"
                       : p.taskId
                         ? "Finish task"
                         : "Done for now"
                   }
                 >
                   {p.phase === "break"
-                    ? "End break"
+                    ? "Sit with Todo"
                     : p.taskId
                       ? "Finish task"
                       : "Done for now"}
@@ -2306,15 +2319,8 @@ export function StudyRoom(p: Props) {
                 Play
               </Button>
             )}
-            <Button onClick={() => endBreak(true)} disabled={busy}>
-              Focus again <ArrowRight size={15} />
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => endBreak(false)}
-              disabled={busy}
-            >
-              End break
+            <Button onClick={endBreak} disabled={busy}>
+              Sit with Todo <ArrowRight size={15} />
             </Button>
           </div>
         ) : null}
@@ -2539,7 +2545,11 @@ export function StudyRoom(p: Props) {
       {p.active && breakReturn ? (
         <BreakReturn
           key={breakReturn}
-          silent={polish.settings.muted || polish.settings.volume === 0}
+          silent={
+            polish.settings.muted ||
+            polish.settings.volume === 0 ||
+            polish.settings.cue === "silent"
+          }
           female={p.female}
           reduced={p.reduced}
           onCovered={restoreAfterBreak}
@@ -2550,7 +2560,7 @@ export function StudyRoom(p: Props) {
         open={celebrating}
         female={p.female}
         reduced={p.reduced}
-        sound={p.sound && !polish.settings.muted}
+        sound={!polish.settings.muted}
         cue={polish.settings.cue}
         volume={polish.settings.volume}
         minutes={completionStats.minutes}

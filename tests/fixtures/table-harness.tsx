@@ -98,7 +98,7 @@ function QAView({
             Play
           </button>
         )}
-        <BreakGames games={games} reduced={false} sound={false} />
+        <BreakGames games={games} reduced={false} />
         <RoomScene
           pose="idle"
           female={false}

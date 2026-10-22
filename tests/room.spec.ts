@@ -213,7 +213,9 @@ test("a sit persists its timer, updates the document title, saves once, then off
   await page.getByRole("button", { name: "Start break", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
   await expect(page).toHaveTitle(/04:5\d - Todo/);
-  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sit with Todo", exact: true })
+    .click();
   expect(
     (await (await page.request.get("/api/room-summary")).json()).totalSits,
   ).toBe(after.totalSits);
@@ -521,7 +523,9 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
   await page.getByRole("button", { name: "Take a break", exact: true }).click();
   await page.getByRole("button", { name: "Start break", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
-  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sit with Todo", exact: true })
+    .click();
   await page.getByRole("button", { name: "Ambience", exact: true }).click();
   await page.getByRole("button", { name: "Night", exact: true }).click();
   await expect(page.locator(".cozy-room")).toHaveAttribute(
@@ -651,7 +655,9 @@ test("morning replaces the moon; lamp leaves no hand; real writing and coffee fl
   await page.waitForTimeout(4900);
   expect(await matrix(".todo-sip-cup")).not.toBe(cup);
   await page.screenshot({ path: "outputs/todo-coffee-sip.png" });
-  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sit with Todo", exact: true })
+    .click();
   await page.getByRole("button", { name: "Tasks", exact: true }).click();
   await page
     .getByRole("button", { name: `Delete ${title}`, exact: true })
@@ -1104,7 +1110,7 @@ test("task duration aggregation uses owned task IDs across all sits, including d
     await page.request.delete("/api/tasks", { data: { id: task.id } });
 });
 
-test("completion has exactly two choices; custom breaks hide tools, survive refresh, and Focus again returns home", async ({
+test("completion has exactly two choices; custom breaks hide tools, survive refresh, and Sit with Todo restores the room", async ({
   page,
 }) => {
   await enter(page);
@@ -1151,8 +1157,8 @@ test("completion has exactly two choices; custom breaks hide tools, survive refr
   await expect(
     page
       .getByRole("group", { name: "Break controls", exact: true })
-      .getByRole("button"),
-  ).toHaveCount(2);
+      .getByRole("button", { name: "Sit with Todo", exact: true }),
+  ).toHaveCount(1);
   await expect(page).toHaveTitle(/0[67]:[0-5]\d - Todo/);
   await page.reload();
   await page
@@ -1166,14 +1172,10 @@ test("completion has exactly two choices; custom breaks hide tools, survive refr
     /0[67]:[0-5]\d/,
   );
   await page.screenshot({ path: "outputs/todo-custom-break.png" });
-  await page.getByRole("button", { name: "Focus again", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Focus with Todo", exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".cozy-room")).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Focus with Todo", exact: true })
+    .getByRole("button", { name: "Sit with Todo", exact: true })
     .click();
+  await expect(page.locator(".cozy-room")).toHaveClass(/cozy-room-active/);
   await expect(page.locator(".cozy-room")).toHaveAttribute(
     "data-resting",
     "false",
@@ -1193,7 +1195,7 @@ test("completion has exactly two choices; custom breaks hide tools, survive refr
   await page.request.delete("/api/tasks", { data: { id: task.id } });
 });
 
-test("End break restores the room early without saving focus", async ({
+test("Sit with Todo restores the room early without saving focus", async ({
   page,
 }) => {
   await page.goto("/signin-with-chatgpt?return_to=/");
@@ -1229,7 +1231,9 @@ test("End break restores the room early without saving focus", async ({
     page.getByRole("group", { name: "Break controls", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".room-pet")).toHaveAttribute("data-pose", "tea");
-  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Sit with Todo", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "What are we doing?", exact: true }),
   ).toBeVisible();

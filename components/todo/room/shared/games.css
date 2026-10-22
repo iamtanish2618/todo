@@ -256,7 +256,7 @@
   }
 }
 .table-game-screen {
-  transition: opacity 0.32s ease;
+  transition: opacity 0.45s ease;
 }
 .table-game-screen[data-leaving="true"] {
   opacity: 0;
@@ -267,7 +267,7 @@
 }
 .table-game-screen[data-leaving="true"] .table-game-toolbar {
   animation: none;
-  transform: translateX(-50%) translateY(6px) scale(0.97);
+  transform: translateX(-50%);
 }
 .table-game-screen .table-game-toolbar {
   transition: transform 0.32s ease;
@@ -284,17 +284,13 @@
   }
 }
 .table-bubbles-screen {
-  background: radial-gradient(
-    ellipse at 50% 35%,
-    #263448,
-    #111925 70%,
-    #0c111b
-  );
+  /* Retain the real room artwork, weather and lighting under the portal. */
+  background: #21191242;
   color: #f3f2fa;
 }
 .table-bubbles-screen .table-game-toolbar,
 .table-bubbles-screen .table-doodle-help {
-  background: #1c283ced;
+  background: #49382ddd;
   color: #f3f2fa;
   border: 1px solid #b7cbe04d;
   box-shadow: 0 6px 24px #0003;
@@ -309,17 +305,24 @@
 .table-bubble-field {
   position: absolute;
   inset: 0;
-  animation: table-bubbles-arrive 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: table-game-fade 0.55s ease both;
 }
-@keyframes table-bubbles-arrive {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
+.table-pop-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 9px;
+  border-radius: 12px;
+  background: #ffffff12;
+  border: 1px solid #ffffff20;
+}
+.table-pop-count strong {
+  font-size: 14px;
+}
+.cozy-room[data-break-game="bubbles"]
+  :is(.room-break-actions, .room-speech-pill, .room-shelf-keepsakes) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 .table-pop-bubble {
   position: absolute;

@@ -13,7 +13,7 @@ export const POLISH_DEFAULTS = {
   mix: EMPTY_MIX,
   matchTime: false,
   thunder: false,
-  cue: "chime" as EndCue,
+  cue: "voice" as EndCue,
   outfit: "original",
 };
 export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
@@ -32,7 +32,9 @@ export function useRoomPolish(setWeather: (value: RoomWeather) => void) {
         muted: false,
         matchTime: p.matchTime === true,
         thunder: false,
-        cue: ["chime", "voice", "silent"].includes(p.cue) ? p.cue : v.cue,
+        // Old defaults chose a bell behind a now-removed SFX switch. Use the
+        // requested voice alerts, preserving an explicit silent preference.
+        cue: p.cue === "silent" ? "silent" : "voice",
         outfit: ["original", "glasses", "star"].includes(p.outfit)
           ? p.outfit
           : v.outfit,

@@ -8,10 +8,12 @@ export function BubbleField({
   games,
   reduced,
   closing,
+  onPop,
 }: {
   games: BreakGameSession;
   reduced: boolean;
   closing: boolean;
+  onPop: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const popped = useRef<number[]>(Array(BUBBLE_COUNT).fill(0));
@@ -183,8 +185,15 @@ export function BubbleField({
             event.currentTarget.dataset.hovering = "false";
           }}
           onClick={() => {
-            if (!closing && games.now() - popped.current[i] > 1650)
+            if (
+              !closing &&
+              games.getSnapshot().active &&
+              games.getSnapshot().game === "bubbles" &&
+              games.now() - popped.current[i] > 1650
+            ) {
               games.popBubble(i);
+              onPop();
+            }
           }}
         >
           <span aria-hidden="true" />

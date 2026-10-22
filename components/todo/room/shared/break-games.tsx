@@ -38,7 +38,6 @@ export function BreakGames({
 }: {
   games: BreakGameSession;
   reduced: boolean;
-  sound: boolean;
 }) {
   const state = useSyncExternalStore(
     games.subscribe,
@@ -129,10 +128,11 @@ function GameOverlay({
   const root = useRef<HTMLElement>(null),
     exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [closing, setClosing] = useState(false);
+  const [popCount, setPopCount] = useState(0);
   const exit = useCallback(() => {
     if (exitTimer.current) return;
     setClosing(true);
-    exitTimer.current = setTimeout(() => games.stop(), reduced ? 120 : 320);
+    exitTimer.current = setTimeout(() => games.stop(), reduced ? 150 : 450);
   }, [games, reduced]);
   useEffect(
     () => () => {
@@ -200,7 +200,12 @@ function GameOverlay({
       {game === "doodle" ? (
         <DoodleCanvas games={games} reduced={reduced} />
       ) : (
-        <BubbleField games={games} reduced={reduced} closing={closing} />
+        <BubbleField
+          games={games}
+          reduced={reduced}
+          closing={closing}
+          onPop={() => setPopCount((n) => n + 1)}
+        />
       )}
       <div className="table-game-toolbar">
         <span>
@@ -211,6 +216,16 @@ function GameOverlay({
           )}
           {game === "doodle" ? "Doodle Art" : "Bubble Pop"}
         </span>
+        {game === "bubbles" && (
+          <span
+            className="table-pop-count"
+            role="status"
+            aria-label="Bubbles popped"
+            aria-live="polite"
+          >
+            <strong>{popCount}</strong> popped
+          </span>
+        )}
         {game === "doodle" && (
           <Button
             variant="ghost"

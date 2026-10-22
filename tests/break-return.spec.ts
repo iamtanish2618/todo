@@ -66,6 +66,14 @@ async function readyRoom(page: Page, before: { totalSits: number }) {
 async function mockSpeech(page: Page, finish: boolean) {
   await page.addInitScript(
     ({ finish }) => {
+      Object.defineProperty(window, "AudioContext", {
+        configurable: true,
+        value: class {
+          constructor() {
+            throw new Error("Audio unavailable for speech fallback test");
+          }
+        },
+      });
       const observations = { messages: [] as string[], cancelled: 0 };
       Object.assign(window, { __breakVoice: observations });
       Object.defineProperty(window, "SpeechSynthesisUtterance", {
@@ -109,7 +117,7 @@ test("expired break speaks once, wipes diagonally, and restores tools without re
   await mockSpeech(page, true);
   const before = await expiringBreak(page);
   await expect(
-    page.getByText("The break is over. We need to focus once again.", {
+    page.getByText("Break is over. Let us focus again.", {
       exact: true,
     }),
   ).toBeVisible();
@@ -125,7 +133,7 @@ test("expired break speaks once, wipes diagonally, and restores tools without re
         (window as unknown as { __breakVoice: { messages: string[] } })
           .__breakVoice.messages,
     ),
-  ).toEqual(["The break is over. We need to focus once again."]);
+  ).toEqual(["Break is over. Let us focus again."]);
   expect(errors).toEqual([]);
 });
 
@@ -133,6 +141,12 @@ test("reduced motion and unavailable speech still return automatically", async (
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() =>
+    Object.defineProperty(window, "AudioContext", {
+      configurable: true,
+      value: undefined,
+    }),
+  );
   await page.addInitScript(() => {
     Object.defineProperty(window, "speechSynthesis", {
       configurable: true,

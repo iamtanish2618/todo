@@ -2,10 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ROOM_CONFIG as C } from "./config";
+import { playTodoVoice, TODO_VOICE } from "./voice-cues";
 import "./break-return.css";
 
-export const BREAK_OVER_MESSAGE =
-  "The break is over. We need to focus once again.";
+export const BREAK_OVER_MESSAGE = TODO_VOICE.break.text;
 
 /** One announcement, one covered scene swap, then the same room is ready again. */
 export function BreakReturn({
@@ -37,9 +37,8 @@ export function BreakReturn({
     element.focus({ preventScroll: true });
     let disposed = false,
       sweeping = false,
-      voiceActive = false,
       voiceDone = false;
-    let speech: SpeechSynthesisUtterance | null = null;
+    let stopRecording = () => {};
     let timeline: GSAPTimeline | null = null;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const startedAt = performance.now();
@@ -47,9 +46,7 @@ export function BreakReturn({
       timers.push(setTimeout(fn, ms));
     };
     const stopVoice = () => {
-      if (speech) speech.onend = speech.onerror = null;
-      if (voiceActive) window.speechSynthesis?.cancel();
-      voiceActive = false;
+      stopRecording();
     };
     const replaceRoom = async () => {
       try {
@@ -147,7 +144,6 @@ export function BreakReturn({
     };
     start.current = () => void sweep();
     const finishVoice = () => {
-      voiceActive = false;
       if (disposed || voiceDone) return;
       voiceDone = true;
       later(
@@ -157,25 +153,8 @@ export function BreakReturn({
     };
     // Speech is an explicit break reminder, separate from optional ambient recordings/chimes.
     try {
-      if (silent || !window.speechSynthesis || !window.SpeechSynthesisUtterance)
-        throw new Error("No speech");
-      speech = new SpeechSynthesisUtterance(BREAK_OVER_MESSAGE);
-      const voices = window.speechSynthesis
-        .getVoices()
-        .filter((v) => /^en\b/i.test(v.lang));
-      const friendly = female ? /Samantha|Serena|Karen/i : /Daniel|Aaron|Alex/i;
-      speech.voice =
-        voices.find((v) => v.localService && friendly.test(v.name)) ??
-        voices.find((v) => v.localService) ??
-        voices[0] ??
-        null;
-      speech.lang = speech.voice?.lang || "en-US";
-      speech.rate = 0.96;
-      speech.pitch = female ? 1.26 : 1.2;
-      speech.volume = 0.75;
-      speech.onend = speech.onerror = finishVoice;
-      voiceActive = true;
-      window.speechSynthesis.speak(speech);
+      if (silent) throw new Error("Silent alerts");
+      stopRecording = playTodoVoice("break", 0.75, finishVoice);
     } catch {
       finishVoice();
     }
