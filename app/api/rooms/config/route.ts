@@ -1,6 +1,11 @@
-import { tableConfig } from "@/lib/todo/table/config.server";
+import { authenticatedTableConfig } from "@/lib/todo/table/config.server";
+import { getTodoUser } from "@/lib/auth/server";
 export async function GET() {
-  return Response.json(tableConfig(), {
-    headers: { "Cache-Control": "no-store" },
+  const user = await getTodoUser();
+  return Response.json(await authenticatedTableConfig(user?.id || null), {
+    headers: {
+      "Cache-Control": "private, no-store",
+      Vary: "Authorization, Cookie",
+    },
   });
 }
