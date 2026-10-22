@@ -19,6 +19,7 @@ import type {
 } from "@/lib/todo/table/session";
 import type { BreakGameSession } from "@/lib/todo/table/games";
 import "./table-chat.css";
+import { trapDockPanel } from "../dock-panels";
 
 function MessagePreview({
   message,
@@ -47,6 +48,7 @@ export function TableChat({
   games,
   available,
   active,
+  focusing = false,
   glass = 0,
   onOpenChange,
 }: {
@@ -55,6 +57,7 @@ export function TableChat({
   games: BreakGameSession;
   available: boolean;
   active: boolean;
+  focusing?: boolean;
   glass?: number;
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -74,7 +77,7 @@ export function TableChat({
   useSyncExternalStore(games.subscribe, games.getSnapshot, games.getSnapshot);
   const joined = table.state === "joined" || table.state === "reconnecting";
   const visible = table.conversation
-    .filter((m) => m.from !== table.id && now - m.at < 10000)
+    .filter((m) => m.from !== table.id && now - m.at < 10000 && !focusing)
     .slice(-3);
   useEffect(() => {
     setNow(Date.now());
@@ -131,10 +134,8 @@ export function TableChat({
         <Button
           size="sm"
           variant="ghost"
-          disabled={!games.canJoin(m)}
           onClick={() => {
-            games.joinInvitation(m);
-            setOpen(false);
+            if (games.joinInvitation(m)) setOpen(false);
           }}
         >
           {games.canJoin(m)
@@ -143,8 +144,8 @@ export function TableChat({
                 table.members.some(
                   (p) => p.id === m.from && p.playing === m.game,
                 )
-              ? "Join during your break"
-              : "Game ended"}
+              ? "Available when you take a break."
+              : "That game has ended."}
         </Button>
       )}
     </>
@@ -191,6 +192,7 @@ export function TableChat({
           role="dialog"
           aria-label="Table chat"
           onKeyDown={(e) => {
+            trapDockPanel(e);
             if (e.key === "Escape") {
               e.stopPropagation();
               close();
@@ -203,6 +205,10 @@ export function TableChat({
               <X size={17} />
             </button>
           </header>
+          <small>Messages disappear when the table closes.</small>
+          {games.getSnapshot().notice && (
+            <p role="status">{games.getSnapshot().notice}</p>
+          )}
           <div
             ref={scroller}
             className="table-chat-history"

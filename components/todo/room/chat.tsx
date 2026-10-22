@@ -18,6 +18,7 @@ import rehypeKatex from "rehype-katex";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type Connection, type Note } from "@/lib/todo/client";
+import { friendlyError } from "@/lib/todo/reliability";
 import { SUPPORT } from "@/lib/todo/support";
 import { makeRoomPDF } from "./pdf";
 import { useMagneticSurface } from "../use-magnetic-surface";
@@ -211,9 +212,7 @@ export function RoomChat({
       setError(
         request.signal.aborted
           ? "Stopped. Your words are still here."
-          : error instanceof Error
-            ? error.message
-            : "Could not reach Todo. Please try again.",
+          : friendlyError(error, "Could not reach Todo. Please try again."),
       );
     } finally {
       if (live.current) {

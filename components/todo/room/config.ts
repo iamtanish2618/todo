@@ -1,9 +1,10 @@
+import { RELIABILITY } from "@/lib/todo/reliability";
 import { SUPPORT } from "@/lib/todo/support";
 /** Coordinates are percentages of the uncropped 1536 × 1024 artwork. */
 export const ROOM_CONFIG = {
-  image: "/art/study-room-round-v2.png",
-  eveningImage: "/art/study-room-evening-v1.png",
-  dayImage: "/art/study-room-morning-v1.png",
+  image: "/art/study-room-round-v2.webp",
+  eveningImage: "/art/study-room-evening-v1.webp",
+  dayImage: "/art/study-room-morning-v1.webp",
   aspectRatio: 3 / 2,
   zones: {
     window: { x: 27, y: 8, width: 26, height: 37 },
@@ -25,13 +26,13 @@ export const ROOM_CONFIG = {
   chairFront:
     "polygon(39.2% 61%, 40.6% 60%, 41.6% 62%, 41.6% 70%, 46% 68.3%, 60% 68.3%, 65.7% 70%, 65.7% 62%, 66.6% 60%, 67.7% 61%, 67.7% 77.7%, 39.2% 77.7%)",
   poses: {
-    idle: "/art/room-todo-idle.png",
-    writing: "/art/room-todo-writing.png",
-    typing: "/art/room-todo-typing.png",
-    tea: "/art/room-todo-tea.png",
-    sleeping: "/art/room-todo-sleeping.png",
+    idle: "/art/room-todo-idle.webp",
+    writing: "/art/room-todo-writing.webp",
+    typing: "/art/room-todo-typing.webp",
+    tea: "/art/room-todo-tea.webp",
+    sleeping: "/art/room-todo-sleeping.webp",
   },
-  focusedPose: "/art/room-todo-focused-v1.png",
+  focusedPose: "/art/room-todo-focused-v1.webp",
   eyes: {
     width: 11,
     height: 11,
@@ -58,6 +59,7 @@ export const ROOM_CONFIG = {
   // Stage 1 visual tuning; no timer, voice, or storage behavior changes.
   visiblePolish: { enabled: true, minimumText: 13, doodleFogOpacity: 0.35 },
   supportive: SUPPORT,
+  reliability: RELIABILITY,
   dailyLimit: 25,
   defaultMinutes: 25,
   breakMinutes: 5,

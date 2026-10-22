@@ -308,7 +308,9 @@ function DoodleCanvas({
       pts: [number, number][],
       sparkle: boolean,
       color = games.color(),
+      strength = 1,
     ) => {
+      f.globalAlpha = strength;
       f.globalCompositeOperation = "destination-out";
       const radius = (w / 960) * 18;
       let previous: [number, number] | null = null;
@@ -340,7 +342,7 @@ function DoodleCanvas({
         }
       }
       f.globalCompositeOperation = "source-over";
-      f.globalAlpha = 0.12;
+      f.globalAlpha = 0.12 * strength;
       const tint = tints[color] || tints.blue;
       for (const p of pts)
         f.drawImage(
@@ -365,7 +367,16 @@ function DoodleCanvas({
             strokes.delete(strokes.values().next().value!);
           strokes.add(stroke.sid);
         }
-        erase(stroke.pts, true, stroke.color as ReturnType<typeof games.color>);
+        const age =
+          typeof m.data.replayAt === "number"
+            ? Math.max(0, games.now() - m.data.replayAt)
+            : 0;
+        erase(
+          stroke.pts,
+          age < 100,
+          stroke.color as ReturnType<typeof games.color>,
+          Math.pow(0.945, age / 500),
+        );
       }
     });
     const point = (e: PointerEvent): [number, number] => [

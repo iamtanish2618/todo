@@ -1,3 +1,4 @@
+import { RELIABILITY, OFFLINE_MESSAGE, requestMessage } from "./reliability";
 export type Task = {
   id: string;
   title: string;
@@ -33,6 +34,7 @@ export class RequestError extends Error {
     public status: number,
   ) {
     super(message);
+    this.name = "TodoRequestError";
   }
 }
 let authTokenGetter: (() => Promise<string | null>) | null = null;
@@ -45,20 +47,41 @@ export async function api<T>(
   data?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const token = authTokenGetter ? await authTokenGetter() : null;
-  const response = await fetch(url, {
-    method,
-    signal,
-    headers: {
-      ...(data ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: data ? JSON.stringify(data) : undefined,
-  });
-  const result = (await response.json()) as T & { error?: string };
+  let response: Response;
+  try {
+    const token = authTokenGetter ? await authTokenGetter() : null;
+    response = await fetch(url, {
+      method,
+      signal,
+      headers: {
+        ...(data ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new RequestError(
+      typeof navigator !== "undefined" && !navigator.onLine
+        ? OFFLINE_MESSAGE
+        : "Couldn't connect just now. Your work is still here. Please try again.",
+      0,
+    );
+  }
+  let result: T & { error?: string };
+  try {
+    result = await response.json();
+  } catch {
+    throw new RequestError(
+      "Todo couldn't load that just now. Please try again.",
+      response.status,
+    );
+  }
   if (!response.ok)
     throw new RequestError(
-      result.error || "Couldn’t connect. Please try again.",
+      RELIABILITY.enabled
+        ? requestMessage(response.status, result?.error)
+        : result.error || "Couldn't connect. Please try again.",
       response.status,
     );
   return result;

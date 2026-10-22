@@ -1,4 +1,5 @@
 "use client";
+import { watchRoomAudio } from "./audio-access";
 import { useEffect } from "react";
 import { Coffee, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { playTodoVoice } from "./voice-cues";
 export function playCompletionCue(volume = 1) {
   const context = new AudioContext();
   const master = context.createGain();
+  watchRoomAudio(context);
   master.gain.value = 0.035 * volume;
   master.connect(context.destination);
   let stopped = false;
@@ -127,7 +129,7 @@ export function CompletionCelebration({
             <img
               src={
                 female
-                  ? C.poses.idle.replace(".png", "-pink.png")
+                  ? C.poses.idle.replace(".webp", "-pink.webp")
                   : C.poses.idle
               }
               alt=""
@@ -152,20 +154,35 @@ export function CompletionCelebration({
           className="cinema-completion-stats"
           aria-label="Your focus this sit"
         >
-          <span>
-            {minutes < 1 ? (
-              "less than a minute focused"
-            ) : (
-              <>
-                <CountUp value={minutes} reduced={reduced} />{" "}
-                {minutes === 1 ? "minute" : "minutes"} focused
-              </>
-            )}
-          </span>
-          <span>
-            <CountUp value={tasksDone} reduced={reduced} />{" "}
-            {tasksDone === 1 ? "task" : "tasks"} finished
-          </span>
+          <div
+            className="completion-stat"
+            aria-label={
+              minutes < 1
+                ? "less than a minute focused"
+                : `${minutes} ${minutes === 1 ? "minute" : "minutes"} focused`
+            }
+          >
+            <div
+              className={`completion-value ${minutes < 1 ? "completion-value-short" : ""}`}
+            >
+              {minutes < 1 ? (
+                "Less than a minute"
+              ) : (
+                <CountUp value={minutes} reduced={reduced} />
+              )}
+            </div>
+            <span>
+              {minutes < 1
+                ? "focused"
+                : `${minutes === 1 ? "minute" : "minutes"} focused`}
+            </span>
+          </div>
+          <div className="completion-stat">
+            <div className="completion-value">
+              <CountUp value={tasksDone} reduced={reduced} />
+            </div>
+            <span>{tasksDone === 1 ? "task" : "tasks"} finished</span>
+          </div>
         </div>
         <div className="celebration-choices">
           <Button

@@ -233,3 +233,78 @@
     animation: none;
   }
 }
+/* Equal stat cells keep sub-minute wording and zero-task counts on shared baselines. */
+.todo-celebration .celebration-message h2 {
+  font-size: clamp(24px, 3.4vw, 30px);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  max-width: 22ch;
+  margin: 0 auto;
+  text-wrap: balance;
+}
+.todo-celebration .celebration-message p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4f443b;
+  margin: 12px auto 0;
+  max-width: 30ch;
+  text-wrap: balance;
+}
+.todo-celebration .cinema-completion-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 22px 0 0;
+  padding: 16px 0;
+  border-top: 1px solid #9a7f6026;
+  border-bottom: 1px solid #9a7f6026;
+  color: #4f443b;
+}
+.todo-celebration .completion-stat {
+  display: grid;
+  grid-template-rows: 48px auto;
+  align-items: center;
+  justify-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  min-width: 0;
+  text-align: center;
+}
+.todo-celebration .completion-stat + .completion-stat {
+  border-left: 1px solid #9a7f6033;
+}
+.todo-celebration .completion-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.todo-celebration .completion-value strong {
+  font-size: 30px;
+  line-height: 1;
+  color: #2a2622;
+}
+.todo-celebration .completion-value-short {
+  font-size: 17px;
+  line-height: 1.25;
+  font-weight: 750;
+  max-width: 12ch;
+  text-wrap: balance;
+  color: #2a2622;
+}
+.todo-celebration .completion-stat > span {
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.todo-celebration .celebration-choices {
+  margin-top: 22px;
+  gap: 10px;
+}
+.todo-celebration .celebration-choices button {
+  min-height: 46px;
+  justify-content: center;
+  font-size: 14px;
+}
