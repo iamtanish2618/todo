@@ -1,0 +1,6 @@
+.env*
+!.env.example
+tests/
+README.md
+*.log
+.DS_Store

@@ -1,0 +1,366 @@
+/* Fixed-camera miniature: furniture and characters share a single coordinate space. */
+.round-room-art .room-seated-anchor {
+  z-index: 3;
+  clip-path: none;
+}
+.round-table-front {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 4;
+  pointer-events: none;
+}
+.round-table-hit {
+  position: absolute;
+  left: 18%;
+  top: 53%;
+  width: 64%;
+  height: 32%;
+  pointer-events: none;
+}
+.round-desk-lamp {
+  position: absolute;
+  z-index: 6;
+  left: 57%;
+  top: 36.5%;
+  width: 11%;
+  height: 24%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  isolation: isolate;
+}
+.round-lamp-base {
+  position: absolute;
+  left: 27%;
+  bottom: 0;
+  width: 49%;
+  height: 9%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f2c16b, #b87b26);
+  box-shadow:
+    0 4px 0 #ad7124,
+    0 7px 7px #6241253d;
+}
+.round-lamp-stem {
+  position: absolute;
+  left: 48%;
+  top: 21%;
+  width: 7%;
+  height: 75%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #b17d32, #f1d18c 48%, #b68439);
+}
+.round-lamp-shade {
+  position: absolute;
+  left: 5%;
+  top: 0;
+  width: 92%;
+  height: 40%;
+  border-radius: 100% 100% 9% 9%/160% 160% 10% 10%;
+  background: radial-gradient(ellipse at 33% 25%, #ebc77e, #c2934c);
+  box-shadow:
+    inset 0 -5px 4px #97682d60,
+    2px 4px 5px #68472719;
+}
+.round-lamp-shade:after {
+  content: "";
+  position: absolute;
+  bottom: -2%;
+  left: 2%;
+  width: 96%;
+  height: 12%;
+  border-radius: 50%;
+  background: #ffe6ad;
+  opacity: 0.2;
+  transition: opacity 0.6s;
+}
+.round-lamp-button {
+  position: absolute;
+  bottom: 5%;
+  left: 58%;
+  width: 10%;
+  height: 4%;
+  border-radius: 50%;
+  background: #a97628;
+}
+.round-desk-lamp:focus-visible {
+  outline: 2px solid #f3daa4;
+  outline-offset: 6px;
+  border-radius: 30%;
+}
+.round-room-art[data-lamp-on="true"] .round-lamp-shade:after {
+  opacity: 1;
+}
+.round-lamp-pool {
+  position: absolute;
+  z-index: 5;
+  left: 46%;
+  top: 48%;
+  width: 32%;
+  height: 25%;
+  background: radial-gradient(ellipse, #ffdc8180, transparent 68%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s;
+  mix-blend-mode: screen;
+}
+.round-room-art[data-lamp-on="true"] .round-lamp-pool {
+  opacity: 1;
+}
+.round-room-art .room-table-coffee {
+  left: 34%;
+  top: 54.5%;
+  z-index: 6;
+  transform: scale(0.6) rotate(-3deg);
+  transform-origin: 50% 100%;
+}
+.round-tea-set {
+  position: absolute;
+  left: 26%;
+  top: 55.2%;
+  width: 6.5%;
+  height: 7%;
+  z-index: 6;
+  pointer-events: none;
+  filter: drop-shadow(0 5px 3px #5335233b);
+}
+.round-tea-pot {
+  position: absolute;
+  inset: 14% 9% 0 5%;
+  border-radius: 45% 45% 40% 40%;
+  background: radial-gradient(ellipse at 30% 25%, #fff6df, #d8c9ac);
+}
+.round-tea-pot:before {
+  content: "";
+  position: absolute;
+  right: -23%;
+  top: 10%;
+  width: 42%;
+  height: 52%;
+  border: 6px solid #ddd0b4;
+  border-radius: 50%;
+  z-index: -1;
+}
+.round-tea-pot:after {
+  content: "";
+  position: absolute;
+  left: -26%;
+  top: 8%;
+  width: 35%;
+  height: 36%;
+  border-radius: 10% 10% 80% 20%;
+  background: linear-gradient(130deg, #f1e5cd, #d2c1a0);
+  transform: rotate(28deg);
+}
+.round-tea-lid {
+  position: absolute;
+  left: 23%;
+  top: 6%;
+  width: 49%;
+  height: 18%;
+  border-radius: 50%;
+  background: #e5d8b9;
+  box-shadow: inset 0 2px 1px #fff6;
+}
+.round-tea-lid:before {
+  content: "";
+  position: absolute;
+  width: 25%;
+  height: 70%;
+  left: 38%;
+  top: -45%;
+  border-radius: 50%;
+  background: #e0d0ae;
+}
+.round-jars {
+  position: absolute;
+  left: 73%;
+  top: 54%;
+  width: 5.5%;
+  height: 7%;
+  z-index: 6;
+  pointer-events: none;
+}
+.round-jars span {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 43%;
+  height: 80%;
+  border-radius: 20%;
+  border: 1px solid #fff8;
+  background: linear-gradient(105deg, #d7d2bdaf, #fff7d5a6 25%, #ac9d7899);
+  box-shadow:
+    inset -3px -2px 4px #6e674a23,
+    2px 5px 4px #472e2130;
+}
+.round-jars span:before {
+  content: "";
+  position: absolute;
+  top: -8%;
+  left: -6%;
+  width: 112%;
+  height: 15%;
+  border-radius: 30%;
+  background: linear-gradient(#c9a471, #aa8050);
+}
+.round-jars span + span {
+  left: 52%;
+  height: 100%;
+  background: linear-gradient(105deg, #92b2ab9e, #d8e6d9a1 30%, #8d9a7296);
+}
+.cozy-room .round-timer {
+  min-width: 0;
+  transform: none;
+  position: absolute;
+  left: 66%;
+  top: 49%;
+  width: 9%;
+  height: 13.5%;
+  z-index: 8;
+  isolation: isolate;
+  perspective: 700px;
+}
+.round-timer-shadow {
+  position: absolute;
+  left: 2%;
+  top: 92%;
+  width: 112%;
+  height: 17%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #4433265c, transparent 70%);
+  transform: rotate(-8deg);
+  pointer-events: none;
+}
+.round-timer-feet {
+  position: absolute;
+  left: 28%;
+  bottom: -1%;
+  width: 14%;
+  height: 15%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #77766b, #c8c8b6);
+  box-shadow: 48px -5px 0 #8c8d7d;
+  transform: rotate(-8deg);
+  pointer-events: none;
+}
+.round-timer-case {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(125deg, #eeebd8, #9caa9e 74%, #76877c);
+  transform: translate3d(7px, 5px, -2px) rotate(-8deg);
+  box-shadow:
+    inset -6px -4px 9px #61726759,
+    1px 5px 5px #302c271f;
+  pointer-events: none;
+}
+.cozy-room .round-timer .round-timer-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 5px solid #eee9d6;
+  background: radial-gradient(
+    ellipse at 33% 20%,
+    #fffef5,
+    #e7ece1 70%,
+    #c9d9ce
+  );
+  box-shadow:
+    inset 0 2px 5px #939f8d38,
+    0 0 0 1px #fff9,
+    2px 4px 4px #6c786c25;
+  color: #334e4c;
+  transform: rotateY(-12deg) rotateX(7deg) rotateZ(-8deg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12%;
+  transition: transform 0.16s;
+}
+.cozy-room .round-timer .round-timer-face:active {
+  transform: translate3d(1px, 2px, 0) rotateY(-12deg) rotateX(7deg)
+    rotateZ(-8deg);
+}
+.round-timer-face strong {
+  font-family: ui-rounded, Nunito, system-ui, sans-serif;
+  font-size: clamp(20px, 2.45cqw, 36px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+}
+.round-timer-label {
+  font-size: clamp(6px, 0.55cqw, 9px);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #81948b;
+}
+.round-timer-action {
+  color: #79998e;
+  display: flex;
+}
+.round-timer-dial {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.round-timer-dial circle {
+  fill: none;
+  stroke: #d3dfd1;
+  stroke-width: 1.5;
+}
+.round-timer-dial circle:nth-child(2) {
+  stroke: #9aaea2;
+  stroke-width: 4;
+}
+.round-timer-dial circle.round-timer-progress {
+  stroke: #83a998;
+  stroke-width: 3;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.cozy-room .room-home-card {
+  padding: 12px 20px;
+}
+.cozy-room .room-home-card h1 {
+  font-size: clamp(18px, 1.65cqw, 24px);
+  margin: 2px 0 7px;
+}
+.cozy-room .room-home-card .room-eyebrow {
+  font-size: 9px;
+}
+.cozy-room .room-intention-form .room-helper {
+  font-size: 12px;
+}
+.cozy-room .room-home-card .room-dark-button {
+  font-size: 12px;
+  height: 34px;
+  padding: 0 12px;
+}
+.cozy-room .room-shelf-keepsakes {
+  top: 47%;
+  right: 5.5%;
+}
+
+.cozy-room .round-timer .round-timer-face:hover {
+  background: radial-gradient(
+    ellipse at 33% 20%,
+    #fffef5,
+    #e7ece1 70%,
+    #c9d9ce
+  );
+}
+.cozy-room .round-timer .round-timer-adjust:hover {
+  background: linear-gradient(#fff9e9, #c6d1bb);
+}

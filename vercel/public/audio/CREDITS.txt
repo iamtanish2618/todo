@@ -1,0 +1,6 @@
+quiet-rain.ogg — real rainfall recording by ジダネ, 4 April 2007.
+Original: https://commons.wikimedia.org/wiki/File:Rain.ogg
+Direct source: https://upload.wikimedia.org/wikipedia/commons/3/3d/Rain.ogg
+License: released into the public domain by the author (PD-self).
+https://commons.wikimedia.org/wiki/File:Rain.ogg#Licensing
+The original Ogg is unmodified; quiet-rain.mp3 is a 128kbps MP3 transcode. Todo applies quiet playback gain, gentle filtering, and overlapping fades at runtime.

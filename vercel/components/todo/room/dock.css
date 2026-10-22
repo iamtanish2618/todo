@@ -1,0 +1,232 @@
+/* All dimensions follow the uncropped 3:2 stage, not the browser viewport. */
+.todo-dock {
+  --dock-unit: calc(100cqw / 960);
+  position: absolute;
+  z-index: 24;
+  left: 21%;
+  bottom: 3.5%;
+  width: 58%;
+  height: 10.5%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  color: #2a2622;
+  isolation: isolate;
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s ease,
+    visibility 0s;
+}
+.todo-dock-glass {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.56),
+    rgba(255, 255, 255, 0.3)
+  );
+  border: 1px solid #ffffff99;
+  backdrop-filter: blur(24px) saturate(1.7);
+  -webkit-backdrop-filter: blur(24px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 #ffffffd9,
+    0 12px 32px #1e143c35;
+}
+.todo-dock-slot {
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.todo-dock-wave {
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+.todo-dock-hop {
+  position: relative;
+}
+.todo-dock-button {
+  width: calc(70 * var(--dock-unit));
+  height: calc(60 * var(--dock-unit));
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(5 * var(--dock-unit));
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 999px;
+  color: #2a2622;
+  position: relative;
+  transition:
+    background 0.2s,
+    opacity 0.2s;
+}
+.todo-dock-button > svg {
+  width: calc(24 * var(--dock-unit));
+  height: calc(24 * var(--dock-unit));
+  min-width: 18px;
+  min-height: 18px;
+}
+.todo-dock-button > span {
+  font-size: clamp(10px, calc(12 * var(--dock-unit)), 15px);
+  line-height: 1.2;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.todo-dock-button[data-active="true"] {
+  background: #ffffff85;
+  border-color: #ffffff90;
+}
+.todo-dock-button[data-resting="true"] {
+  opacity: 0.45;
+}
+.todo-dock-button:active {
+  scale: 0.98;
+  transition: scale 90ms;
+}
+.todo-dock-button:focus-visible,
+.todo-dock-end:focus-visible {
+  outline: 2px solid #e6c56b;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 5px #3e2a1c66;
+}
+.todo-dock-center {
+  width: calc(76 * var(--dock-unit));
+  height: calc(76 * var(--dock-unit));
+  margin-top: calc(-39 * var(--dock-unit));
+  background: linear-gradient(145deg, #f0d88c, #d8af51);
+  border: calc(3 * var(--dock-unit)) solid #fff0ba;
+  box-shadow:
+    0 0 0 calc(4 * var(--dock-unit)) #e6c56b40,
+    0 5px 22px #d2a7455c,
+    inset 0 1px 0 #fff8d5;
+}
+.todo-dock-center[data-active="true"] {
+  background: linear-gradient(145deg, #f0d88c, #d8af51);
+  border-color: #fff0ba;
+}
+.todo-dock-center > svg {
+  width: calc(29 * var(--dock-unit));
+  height: calc(29 * var(--dock-unit));
+}
+.todo-dock-center > span {
+  display: none;
+}
+.todo-dock[data-expanded="true"] .todo-dock-center {
+  width: calc(144 * var(--dock-unit));
+  flex-direction: row;
+  gap: calc(6 * var(--dock-unit));
+}
+.todo-dock[data-expanded="true"] .todo-dock-center > svg {
+  width: calc(20 * var(--dock-unit));
+  height: calc(20 * var(--dock-unit));
+}
+.todo-dock[data-expanded="true"] .todo-dock-center > span {
+  display: inline;
+  font-size: clamp(10px, calc(12 * var(--dock-unit)), 15px);
+}
+.todo-dock-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 14px);
+  translate: -50% 0;
+  pointer-events: none;
+  padding: 7px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  background: #f7ecdbf2;
+  border: 1px solid #fff9eb;
+  color: #382b23;
+  box-shadow: 0 4px 14px #281b2326;
+  animation: dock-tooltip-in 0.15s ease both;
+}
+@keyframes dock-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.todo-dock-pulse {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #fff3c8;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+.todo-dock[data-focus="true"] {
+  bottom: 9%;
+  height: 8%;
+}
+.todo-dock[data-focus="true"] .todo-dock-glass {
+  opacity: 0.4;
+}
+.todo-dock[data-focus="true"] .todo-dock-slot:not(:nth-child(3)) {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.todo-dock[data-focus="true"] .todo-dock-center {
+  visibility: visible;
+}
+.todo-dock-end {
+  position: absolute;
+  right: 5%;
+  top: -24px;
+  color: #fff2d9;
+  text-shadow: 0 1px 5px #21140c;
+  font-size: 11px;
+}
+.todo-dock[data-hidden="true"] {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.98);
+  transition:
+    opacity 0.4s ease,
+    transform 0.45s ease,
+    visibility 0s 0.45s;
+}
+.cozy-room[data-dock="true"] .cinema-focus-pill {
+  bottom: 4%;
+  z-index: 26;
+}
+.cozy-room[data-dock="true"][data-quality="low"] .todo-dock-glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: #f2e8daeb;
+}
+@media (hover: hover) and (pointer: fine) {
+  .todo-dock:has(.todo-dock-button:hover)
+    .todo-dock-button:not(.todo-dock-center)
+    > span {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .todo-dock-tooltip {
+    animation: none;
+  }
+  .todo-dock-button:active {
+    scale: 1;
+  }
+}
+.cozy-room-reduced .todo-dock-tooltip {
+  animation: none;
+}
+/* The painted rug is already soft. Avoid re-blurring it underneath five moving GPU layers. */
+.todo-dock[data-waving="true"] .todo-dock-glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: linear-gradient(135deg, #f5ecdfc2, #e5d9e5b3);
+}

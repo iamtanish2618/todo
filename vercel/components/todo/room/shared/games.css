@@ -1,0 +1,403 @@
+.table-game-panel {
+  position: absolute;
+  right: 2%;
+  top: 17%;
+  width: 23%;
+  z-index: 38;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 25px;
+  background: linear-gradient(135deg, #fff8e9c9, #e7d5c5a8);
+  border: 1px solid #fffc;
+  backdrop-filter: blur(25px);
+  box-shadow: 0 10px 35px #32251d25;
+  color: #3b302a;
+  animation: table-game-enter 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.table-game-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.table-game-panel h2 {
+  font-size: 16px;
+  font-weight: 750;
+  margin: 0;
+}
+.table-game-choice {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  border-radius: 16px;
+  padding: 14px;
+  background: #fff8;
+  border: 1px solid #fffa;
+  transition: transform 0.2s;
+}
+.table-game-choice:hover {
+  transform: translateY(-2px);
+}
+.table-game-choice > span {
+  font-size: 13px;
+  font-weight: 650;
+}
+.table-game-choice small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.75;
+  margin-top: 3px;
+}
+.table-doodle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  touch-action: none;
+  cursor: crosshair;
+  pointer-events: auto;
+}
+.table-game-toolbar {
+  position: absolute;
+  top: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 38;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 22px;
+  background: #f8eee0d9;
+  border: 1px solid #fff9;
+  backdrop-filter: blur(20px);
+  color: #42372e;
+  font-size: 12px;
+}
+.table-game-toolbar > span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.table-game-toolbar button {
+  font-size: 12px;
+}
+.table-game-invite {
+  position: absolute;
+  left: 3%;
+  top: 8%;
+  z-index: 42;
+  max-width: 35%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 22px;
+  background: #fff8ebe6;
+  border: 1px solid #fff9;
+  backdrop-filter: blur(18px);
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #3f352c;
+}
+.table-game-end {
+  position: absolute;
+  z-index: 40;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 20px;
+  background: #fff8ece6;
+  padding: 8px 14px;
+  color: #514337;
+  font-size: 12px;
+  pointer-events: none;
+  animation: table-end-notice 4s both;
+}
+.table-game-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.table-game-panel :focus-visible,
+.table-game-toolbar :focus-visible {
+  outline: 2px solid #79533b;
+  outline-offset: 3px;
+}
+@keyframes table-game-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes table-end-notice {
+  0%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-game-panel {
+    animation: table-game-fade 0.2s linear;
+  }
+  .table-game-choice:hover {
+    transform: none;
+  }
+}
+@keyframes table-game-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.cozy-room[data-break-game="doodle"] .room-seated-anchor .room-pet {
+  transform: rotate(-3deg);
+  transform-origin: 50% 90%;
+  transition: transform 0.5s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cozy-room[data-break-game="doodle"] .room-seated-anchor .room-pet {
+    transform: none;
+  }
+}
+/* Full viewport drawing surface, outside the room's transformed stage. */
+.table-doodle-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  font-family: var(--font-nunito), "Nunito", system-ui, sans-serif;
+  animation: table-game-fade 0.25s ease both;
+}
+.table-doodle-screen .table-doodle {
+  z-index: 1;
+}
+.table-doodle-screen .table-game-toolbar {
+  position: absolute;
+  top: max(24px, env(safe-area-inset-top));
+  z-index: 2;
+  padding: 7px 10px 7px 18px;
+  gap: 12px;
+  font-size: 14px;
+  background: #fbf4e8ed;
+  box-shadow: 0 5px 25px #30251918;
+}
+.table-doodle-screen .table-game-toolbar button {
+  font-size: 13px;
+}
+.table-doodle-help {
+  position: absolute;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #483e34;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: #faf4e2c9;
+}
+
+/* Play is a clear invitation, with a gentle zoom rather than a springy bounce. */
+.cozy-room .room-break-actions .table-game-play {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(135deg, #946837, #6b482b);
+  color: #fff8e5;
+  border: 1px solid #e4bf7a;
+  font-weight: 750;
+  min-width: 104px;
+  box-shadow:
+    0 3px 12px #5a3a2529,
+    inset 0 1px #ffebbd66;
+  transition:
+    transform 0.25s ease,
+    background 0.25s ease;
+}
+.cozy-room .room-break-actions .table-game-play:hover {
+  transform: translateY(-2px) scale(1.045);
+}
+.table-game-play::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 1px solid #c69449;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: table-play-invite 2.8s ease-out 3;
+}
+@keyframes table-play-invite {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.98);
+  }
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+.table-game-screen {
+  transition: opacity 0.45s ease;
+}
+.table-game-screen[data-leaving="true"] {
+  opacity: 0;
+  animation: none;
+}
+.table-game-screen[data-leaving="true"] :is(button, canvas) {
+  pointer-events: none;
+}
+.table-game-screen[data-leaving="true"] .table-game-toolbar {
+  animation: none;
+  transform: translateX(-50%);
+}
+.table-game-screen .table-game-toolbar {
+  transition: transform 0.32s ease;
+  animation: table-toolbar-arrive 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes table-toolbar-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+.table-bubbles-screen {
+  /* Retain the real room artwork, weather and lighting under the portal. */
+  background: #21191242;
+  color: #f3f2fa;
+}
+.table-bubbles-screen .table-game-toolbar,
+.table-bubbles-screen .table-doodle-help {
+  background: #49382ddd;
+  color: #f3f2fa;
+  border: 1px solid #b7cbe04d;
+  box-shadow: 0 6px 24px #0003;
+}
+.table-bubbles-screen .table-game-toolbar button:hover {
+  background: #ffffff15;
+  color: #fff;
+}
+.table-bubbles-screen :focus-visible {
+  outline-color: #f2cc88;
+}
+.table-bubble-field {
+  position: absolute;
+  inset: 0;
+  animation: table-game-fade 0.55s ease both;
+}
+.table-pop-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 9px;
+  border-radius: 12px;
+  background: #ffffff12;
+  border: 1px solid #ffffff20;
+}
+.table-pop-count strong {
+  font-size: 14px;
+}
+.cozy-room[data-break-game="bubbles"]
+  :is(.room-break-actions, .room-speech-pill, .room-shelf-keepsakes) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.table-pop-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  width: 72px;
+  aspect-ratio: 1;
+  opacity: 0;
+  border-radius: 50%;
+  border: 1px solid #ffffffd9;
+  background:
+    radial-gradient(
+      ellipse at 27% 22%,
+      #fffffff2 0%,
+      #ffffff26 16%,
+      transparent 38%
+    ),
+    radial-gradient(ellipse at 70% 82%, #e4bad855, transparent 55%),
+    radial-gradient(circle, #e5f2f01a 40%, #b0d0d566 75%, #ffffffcc);
+  box-shadow:
+    inset 1px 2px 7px #fff,
+    inset -4px -7px 14px #b6a9c329,
+    0 9px 25px #0003;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  filter: hue-rotate(var(--bubble-hue));
+  will-change: transform, opacity;
+}
+.table-pop-bubble > span {
+  position: absolute;
+  left: 18%;
+  top: 13%;
+  width: 31%;
+  height: 17%;
+  border-radius: 50%;
+  background: #fff9;
+  transform: rotate(-32deg);
+}
+.table-pop-bubble:focus-visible {
+  outline: 3px solid #f2cc88;
+  outline-offset: 6px;
+}
+.table-pop-bubble[data-popped="true"] {
+  pointer-events: none;
+}
+.table-pop-bubble[data-popped="true"]::after {
+  content: "✦";
+  position: absolute;
+  inset: -16px;
+  display: grid;
+  place-items: center;
+  color: #f2cc88;
+  font-size: 30px;
+  animation: table-pop-spark 0.28s ease-out both;
+}
+@keyframes table-pop-spark {
+  from {
+    opacity: 0.9;
+    transform: scale(0.65) rotate(-20deg);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.3) rotate(15deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-game-play::after,
+  .table-game-screen .table-game-toolbar,
+  .table-bubble-field,
+  .table-pop-bubble::after {
+    animation: none !important;
+  }
+  .cozy-room .room-break-actions .table-game-play:hover {
+    transform: none;
+  }
+}

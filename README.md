@@ -1,5 +1,43 @@
 # Todo
 
+A cozy penguin companion for focused work, notes, AI assistance, shared tables,
+voice chat, and break games. Owned by Tanish.
+
+**Live website:** https://sit-with-todo.vercel.app/
+
+## Which version should I use?
+
+| Location | Purpose |
+| --- | --- |
+| Repository root | Complete original app: Vinext/Vite UI, Cloudflare Worker API, D1 schema and migrations, Firebase rules, tests, artwork and audio. |
+| [`vercel/`](vercel/README.md) | Current native Next.js deployment for Vercel, including its API bridge and deployment instructions. |
+
+For the current Vercel website, start in `vercel/`, use Node.js 24, run
+`npm ci`, copy `.env.example` to `.env.local`, supply your own configuration,
+and run `npm run dev`. On Vercel, set **Root Directory** to `vercel` and use
+its own package and lock files. The original root app has a different runtime;
+its setup is documented below.
+
+The Vercel version still uses the existing Sites backend for saved account data
+and AI. Keep that backend running. This repository does not contain a database
+backup or the private runtime credentials. Both versions use the same Firebase
+project for accounts and shared tables; see [`docs/shared-tables.md`](docs/shared-tables.md).
+
+## Development history
+
+This repository preserves all **37 original saved commits from October 18–22,
+2026**, including their original dates and authors. The owner reports work
+starting October 15; no October 15–17 commits were available in the source
+checkout. Those dates have not been recreated or backdated. This latest import
+adds the matching Vercel deployment source without changing the original history.
+
+Private `.env.local` files, credentials, dependencies, generated builds and
+local test artifacts are excluded. Blank configuration examples are included.
+
+---
+
+## Original full-stack app documentation
+
 A penguin companion for focus, notes, and a little help. This is the first working version, built around the full-screen character and frosted shadcn interface we designed together.
 
 ## Start here
