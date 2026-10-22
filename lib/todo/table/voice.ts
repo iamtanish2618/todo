@@ -56,6 +56,7 @@ export class TableVoice {
   private gestureReady = false;
   private pending: Envelope[] = [];
   private signaling = new Map<string, Promise<void>>();
+  private iceConfig: RTCIceServer[] | null = null;
   getSnapshot = () => this.snapshot;
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -152,6 +153,12 @@ export class TableVoice {
   private sync() {
     const table = this.session?.getSnapshot();
     if (!table) return;
+    if (this.iceConfig !== table.config.iceServers) {
+      this.iceConfig = table.config.iceServers;
+      for (const p of this.peers.values()) {
+        try { p.pc.setConfiguration({ iceServers: this.iceConfig }); } catch {}
+      }
+    }
     if (table.state !== "joined" || !table.config.voice) {
       [...this.peers.keys()].forEach((id) => this.remove(id));
       if (table.state === "idle") this.stopMic();
@@ -587,6 +594,7 @@ export class TableVoice {
     this.stopMic();
     [...this.peers.keys()].forEach((id) => this.remove(id));
     this.session = null;
+    this.iceConfig = null;
     gsap.ticker.remove(this.tick);
     const ctx = this.context;
     this.context = null;

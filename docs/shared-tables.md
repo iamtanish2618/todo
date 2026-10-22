@@ -42,15 +42,64 @@ Remote audio plays through one native, unmuted, playsinline audio element per pe
 
 The bottom-left microphone button is the single mic control. Starting focus or a break leaves the user’s manual mic choice unchanged. Friends retains Mute everyone for incoming audio; there is no automatic quiet-table mode. Host requests can only mute, never enable another person's mic. Host migration follows current member order.
 
-Default ICE server: `stun:stun.l.google.com:19302`. Some networks cannot establish direct peer-to-peer audio. Optional configuration:
+Default discovery uses `stun:stun.l.google.com:19302`. Direct calls remain the first
+choice; a configured TURN service supplies UDP, TCP and TLS relay fallback.
+
+### No-card relay setup (Open Relay / Metered)
+
+Create the free relay app in Metered, select its no-card plan, and create a
+credential for Todo. Use the credential's **API Key**, not the account's secret
+key. Keep these in private server configuration:
 
 ```
-TODO_TURN_URL=turns:YOUR_TURN_HOST:5349
-TODO_TURN_USERNAME=YOUR_USERNAME
-TODO_TURN_CREDENTIAL=YOUR_CREDENTIAL
+TODO_TURN_METERED_HOST=YOUR_APP.metered.live
+TODO_TURN_METERED_API_KEY=YOUR_CREDENTIAL_SCOPED_API_KEY
 ```
 
-Use short-lived TURN credentials for a larger deployment. These connection credentials necessarily reach voice clients. No TURN service has been provisioned and no paid relay is assumed. A managed SFU such as LiveKit can later replace `voice.ts` behind its existing UI interface; it is not a drop-in ICE URL.
+Confirm the allowance shown in the actual provider dashboard; free limits can
+change. No paid plan or overage authorization is required by Todo. The server
+fetches only this fixed provider's credential endpoint and caches its ICE settings
+for five minutes. Credential expiry/revocation is controlled in Metered; refreshing
+ICE does not extend an expired credential. Rotate it in the dashboard and replace
+the scoped key if revoked/expired. Never commit credentials or paste them in chat.
+
+### Optional Cloudflare alternative
+
+Cloudflare requires activating a usage-billed Realtime subscription even with its
+free allowance. It has not been activated for this setup. If deliberately enabled
+later, configure `TODO_TURN_KEY_ID` and `TODO_TURN_API_TOKEN` on the server. Todo
+requests four-hour ICE credentials, reuses them for one hour per signed-in user,
+and never sends the master token to a browser. Metered takes precedence if both
+providers are configured. Legacy `TODO_TURN_URL`, `TODO_TURN_USERNAME`, and
+`TODO_TURN_CREDENTIAL` remain supported for an existing custom relay.
+
+### Access, renewal and verification
+
+`GET /api/rooms/config` returns STUN-only availability settings to guests. Relay
+settings are returned only after Todo independently verifies the Firebase account.
+Responses are private/no-store and vary by identity. The Vercel bridge forwards
+Todo's Firebase identity, not hosting-platform identity. No account secret/API key
+appears in the returned ICE array. Browser connection credentials necessarily
+reach the caller and must be treated as usable within their provider's lifetime.
+
+The room sends its fresh identity token, refreshes configuration every 30 minutes
+while active and on return to the tab, and updates existing peer connections with
+`setConfiguration`. Provider outages leave direct voice and table chat available;
+they do not establish that a relay is working. No microphone permission or automatic
+unmute is introduced. Audio remains encrypted between browser peers.
+
+Run `npx playwright test tests/turn-relay.spec.ts` for provider boundary/cache tests.
+After configuring private `.env.local`, run the owner check:
+
+```
+node --env-file-if-exists=.env.local scripts/verify-turn.mjs
+```
+
+That check forces both peers to use TURN and verifies incoming audio packets and
+decoded audio energy in both directions using generated tones. It prints no keys,
+credentials or IP addresses and captures no physical microphone. A successful
+local relay check is not a guarantee that every institution's firewall permits
+calls; test friends on separate networks as well.
 
 ## Behavior
 
