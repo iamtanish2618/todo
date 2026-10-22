@@ -137,8 +137,8 @@ export function TableSeats({
                   className="table-join-wave"
                   src={
                     m.companion === "female"
-                      ? "/art/room-todo-idle-pink.png"
-                      : "/art/room-todo-idle.png"
+                      ? "/art/room-todo-idle-pink.webp"
+                      : "/art/room-todo-idle.webp"
                   }
                   alt=""
                   aria-hidden="true"

@@ -1,0 +1,132 @@
+@font-face {
+  font-family: Nunito;
+  src: url("/fonts/nunito.ttf") format("truetype");
+  font-weight: 200 900;
+  font-display: swap;
+}
+.todo-help-launch {
+  position: fixed;
+  z-index: 45;
+  left: 24px;
+  bottom: 18px;
+  min-height: 44px;
+  gap: 8px;
+  color: #2a2622;
+  background: #fff8eddb;
+  border: 1px solid #fff8edb0;
+  border-radius: 999px;
+}
+.todo-help-sheet {
+  width: min(560px, calc(100vw - 28px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  background: #fff8ed;
+  color: #2a2622;
+  border-radius: 28px;
+  border-color: #e3d7c7;
+  line-height: 1.7;
+}
+.todo-help-copy {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #2a2622;
+}
+.todo-help-copy h3 {
+  font-weight: 750;
+  font-size: 16px;
+  margin: 22px 0 8px;
+}
+.todo-help-copy ol {
+  list-style: decimal;
+  padding-left: 22px;
+  display: grid;
+  gap: 8px;
+}
+.todo-help-copy p {
+  margin: 0 0 14px;
+}
+.todo-help-copy summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 10px 0;
+}
+.todo-help-copy a {
+  color: #68431b;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+:is(
+    .todo-root,
+    .cozy-room,
+    .todo-help-sheet,
+    .table-conversation,
+    .table-game-screen,
+    .todo-not-found
+  )
+  :is(button, a, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 3px solid #b77a2f !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 6px #fff8edcc !important;
+}
+.todo-not-found {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(ellipse at 50% 25%, #edf0ef, #fff8ed 65%);
+  color: #2a2622;
+  font-family: Nunito, system-ui, sans-serif;
+  text-align: center;
+}
+.todo-not-found article {
+  max-width: 460px;
+  padding: 46px 32px;
+  border: 1px solid #fff;
+  border-radius: 36px;
+  background: #fffaf0bb;
+  box-shadow: 0 18px 70px #57463216;
+}
+.todo-not-found img {
+  margin: 0 auto 22px;
+  width: 80px;
+  height: 80px;
+}
+.todo-not-found h1 {
+  font-size: 30px;
+  line-height: 1.25;
+  font-weight: 800;
+  margin: 0 0 16px;
+}
+.todo-not-found p {
+  line-height: 1.7;
+  margin: 0 0 26px;
+}
+.todo-not-found a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 12px 24px;
+  border-radius: 999px;
+  background: #2b2622;
+  color: #fff8ed;
+  font-weight: 650;
+}
+.todo-dock-tooltip[data-first-hint="true"]::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 6px);
+  bottom: -5px;
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  background: #fff8ed;
+}
+@media (max-width: 600px) {
+  .todo-help-launch {
+    left: 14px;
+    bottom: 12px;
+    font-size: 13px;
+  }
+}

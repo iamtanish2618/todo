@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import type { TableVoice, VoiceSnapshot } from "@/lib/todo/table/voice";
 const needsReconnect = (state: VoiceSnapshot) =>
   state.message.includes("Voice couldn’t connect") ||
+  state.message.includes("Having trouble connecting") ||
   Object.values(state.peers).some(
     (s) => s === "failed" || s === "disconnected",
   );
@@ -61,10 +62,11 @@ export function PersistentMic({
         {state.muted ? <MicOff size={14} /> : <Mic size={14} />}
         <span>{state.muted ? "Mic off" : "Mic on"}</span>
       </button>
+      {state.message && <small role="status">{state.message}</small>}
       {state.blocked && (
         <button onClick={() => void voice.unlock()}>
           <VolumeX size={14} />
-          Enable sound
+          Tap to enable sound
         </button>
       )}
       {needsReconnect(state) && (

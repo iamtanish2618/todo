@@ -63,6 +63,7 @@ export class TableSession {
   private gate = new RateGate();
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private pulse: ReturnType<typeof setInterval> | null = null;
+  private recovering = false;
   private lastTrack = 0;
   private trackPending = false;
   private status: Status = "idle";
@@ -130,7 +131,9 @@ export class TableSession {
       return;
     }
     if (!code) {
-      this.notice("Check the code — it looks like PENG-ABC234.");
+      this.notice(
+        "We couldn't find a table with that code. Check the code and try again.",
+      );
       return;
     }
     await this.leave();
@@ -326,9 +329,29 @@ export class TableSession {
     this.lastTrack = Date.now();
     void this.transport
       .track({ ...this.local })
-      .catch(() =>
-        this.update({ state: "reconnecting", message: "Reconnecting…" }),
-      );
+      .catch(() => this.recoverTrack());
+  }
+  private recoverTrack(attempt = 0) {
+    this.update({ state: "reconnecting", message: "Reconnecting…" });
+    if (this.recovering || !this.transport || !this.local) return;
+    this.recovering = true;
+    const gen = this.generation;
+    this.later(
+      () => {
+        this.recovering = false;
+        if (gen !== this.generation || !this.transport || !this.local) return;
+        void this.transport
+          .track({ ...this.local })
+          .then(() => {
+            if (gen === this.generation)
+              this.update({ state: "joined", message: "Back at your table." });
+          })
+          .catch(() => {
+            if (gen === this.generation) this.recoverTrack(attempt + 1);
+          });
+      },
+      Math.min(15000, 1000 * 2 ** Math.min(attempt, 4)),
+    );
   }
   setStatus(status: Status) {
     this.status = status;
@@ -605,6 +628,7 @@ export class TableSession {
     if (this.pulse) clearInterval(this.pulse);
     this.pulse = null;
     this.local = null;
+    this.recovering = false;
     this.trackPending = false;
     this.gate.clear();
     this.pendingMessages = [];

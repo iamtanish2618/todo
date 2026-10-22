@@ -254,7 +254,7 @@ export class TableVoice {
       this.session?.getSnapshot().members.find((m) => m.id === id)?.name ||
       "your friend";
     this.update({
-      message: `Voice couldn’t connect to ${name}. Try reconnecting voice.${this.session?.getSnapshot().config.iceServers.some((s) => [s.urls].flat().some((u) => /^turns?:/.test(u))) ? "" : " This network may need a voice relay; table chat still works."}`,
+      message: `Having trouble connecting to ${name}… You can try reconnecting voice or use table chat.`,
     });
   }
   private peerState(id: string, state: string) {

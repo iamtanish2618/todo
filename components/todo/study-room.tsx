@@ -1,4 +1,7 @@
 "use client";
+import { AudioAccess } from "./room/audio-access";
+import { ConnectionNotice } from "./room/reliability";
+import { friendlyError } from "@/lib/todo/reliability";
 
 import {
   useCallback,
@@ -105,6 +108,9 @@ import {
 } from "./room/support";
 import "./room/support.css";
 
+import { AboutContent } from "./about-help";
+import { PRESENTATION } from "@/lib/todo/presentation";
+
 type Pane =
   | "focus"
   | "finished"
@@ -113,6 +119,7 @@ type Pane =
   | "notes"
   | "agent"
   | "settings"
+  | "help"
   | "month"
   | "corner"
   | "friends"
@@ -229,6 +236,19 @@ export function StudyRoom(p: Props) {
     );
   }, []);
   const [focusTime, setFocusTime] = useState("25");
+  const [focusLaunching, setFocusLaunching] = useState(false);
+  const focusLaunchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelFocusLaunch = () => {
+    if (focusLaunchTimer.current) clearTimeout(focusLaunchTimer.current);
+    focusLaunchTimer.current = null;
+    setFocusLaunching(false);
+  };
+  useEffect(
+    () => () => {
+      if (focusLaunchTimer.current) clearTimeout(focusLaunchTimer.current);
+    },
+    [],
+  );
   const [breakTime, setBreakTime] = useState("5");
   const [celebrating, setCelebrating] = useState(false);
   const handledCompletions = useRef(0);
@@ -551,10 +571,10 @@ export function StudyRoom(p: Props) {
     day.src = C.dayImage;
     evening.src = C.eveningImage;
     idle.src = p.female
-      ? C.poses.idle.replace(".png", "-pink.png")
+      ? C.poses.idle.replace(".webp", "-pink.webp")
       : C.poses.idle;
     focused.src = p.female
-      ? C.focusedPose.replace(".png", "-pink.png")
+      ? C.focusedPose.replace(".webp", "-pink.webp")
       : C.focusedPose;
     let decoded = 0;
     const assets = [room, idle, day, evening, focused];
@@ -734,6 +754,7 @@ export function StudyRoom(p: Props) {
     };
   }, [quietBreak, breakGameState.game, p.active, motionReduced]);
   const show = (next: Pane) => {
+    cancelFocusLaunch();
     setError("");
     if (currentPane.current === next) closePanel.current();
     else {
@@ -765,9 +786,7 @@ export function StudyRoom(p: Props) {
       await action();
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "That did not save. Your words are still here.",
+        friendlyError(e, "That did not save. Your words are still here."),
       );
     } finally {
       setBusy(false);
@@ -889,12 +908,26 @@ export function StudyRoom(p: Props) {
     const task = chosen
       .map((id) => p.tasks.find((t) => t.id === id && !t.done))
       .find(Boolean);
-    closingTween.current?.kill();
-    setPane(null);
-    tinyStep.dismiss();
-    p.onDuration(minutes);
-    p.onTask(task?.title || "Quiet focus", true, task?.id);
-    baseline.current = p.tasks.filter((t) => t.done).length;
+    if (focusLaunchTimer.current) return;
+    const begin = () => {
+      if (!latest.current.active || currentPane.current !== "focus") {
+        cancelFocusLaunch();
+        return;
+      }
+      focusLaunchTimer.current = null;
+      setFocusLaunching(false);
+      closingTween.current?.kill();
+      setPane(null);
+      tinyStep.dismiss();
+      p.onDuration(minutes);
+      p.onTask(task?.title || "Quiet focus", true, task?.id);
+      baseline.current = p.tasks.filter((t) => t.done).length;
+    };
+    if (motionReduced) begin();
+    else {
+      setFocusLaunching(true);
+      focusLaunchTimer.current = setTimeout(begin, 300);
+    }
   };
   const sit = (e: FormEvent) => {
     e.preventDefault();
@@ -1062,6 +1095,7 @@ export function StudyRoom(p: Props) {
     },
   ].filter((k) => totalSits >= k.at);
   const close = () => {
+    cancelFocusLaunch();
     if (pane === "agent") p.onAgentMode(false);
     setError("");
     const node = roomRoot.current?.querySelector(
@@ -1097,6 +1131,7 @@ export function StudyRoom(p: Props) {
     notes: dockEnabled ? "Notes" : "Your little notebook.",
     agent: "Talk with Todo",
     settings: "Make yourself comfortable.",
+    help: "About Todo",
     month: "This month",
     corner: "Your corner",
     friends: dockEnabled ? "Friends" : "Bring friends to the table.",
@@ -1112,6 +1147,7 @@ export function StudyRoom(p: Props) {
               id="dock-focus-form"
               className="dock-focus-setup"
               onSubmit={launchFocus}
+              aria-busy={focusLaunching}
             >
               <div className="dock-focus-row">
                 <strong>TASK</strong>
@@ -1156,22 +1192,22 @@ export function StudyRoom(p: Props) {
                       {minutes === 5 ? "Just 5 minutes" : minutes}
                     </button>
                   ))}
-                  <label className="dock-custom-time">
-                    Custom{" "}
-                    <Input
-                      id="focus-minutes"
-                      aria-label="Focus minutes"
-                      type="number"
-                      required
-                      min={1}
-                      max={120}
-                      step={1}
-                      value={focusTime}
-                      onChange={(e) => setFocusTime(e.target.value)}
-                    />{" "}
-                    min
-                  </label>
                 </div>
+                <label className="dock-custom-time">
+                  Custom{" "}
+                  <Input
+                    id="focus-minutes"
+                    aria-label="Focus minutes"
+                    type="number"
+                    required
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={focusTime}
+                    onChange={(e) => setFocusTime(e.target.value)}
+                  />{" "}
+                  min
+                </label>
               </div>
               <button
                 type="button"
@@ -1180,19 +1216,7 @@ export function StudyRoom(p: Props) {
               >
                 Edit tasks &amp; finished tasks
               </button>
-              {C.supportive.enabled && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="room-stuck-button"
-                  onClick={askForStep}
-                >
-                  I’m stuck
-                </Button>
-              )}
-              <button type="submit" className="room-focus-launch sr-only">
-                Focus
-              </button>
+
             </form>
           );
         return (
@@ -1748,6 +1772,8 @@ export function StudyRoom(p: Props) {
             )}
           </>
         );
+      case "help":
+        return <AboutContent />;
       case "settings":
         return (
           <>
@@ -1824,6 +1850,11 @@ export function StudyRoom(p: Props) {
                 onCheckedChange={p.onSound}
               />
             </label>
+            {PRESENTATION.enabled && (
+              <Button variant="ghost" onClick={() => show("help")}>
+                About &amp; help
+              </Button>
+            )}
             <label className="room-field">
               Room light
               <select
@@ -2105,6 +2136,8 @@ export function StudyRoom(p: Props) {
         style={{ backgroundImage: `url(${C.image})` }}
         aria-hidden="true"
       />
+      <AudioAccess muted={roomMuted || !p.active} />
+      <ConnectionNotice reconnecting={table.state === "reconnecting"} />
       <TableChat
         glass={polish.settings.glass}
         onOpenChange={setChatOpen}
@@ -2112,6 +2145,7 @@ export function StudyRoom(p: Props) {
         table={table}
         games={breakGames}
         active={p.active && arrived}
+        focusing={quietFocus}
         available={
           !tinyStep.idea &&
           !pane &&
@@ -2464,6 +2498,7 @@ export function StudyRoom(p: Props) {
         ) : null}
         {dockEnabled ? (
           <RoomDock
+            ready={p.active && arrived}
             active={pane === "tasks" || pane === "finished" ? "focus" : pane}
             reduced={motionReduced}
             focus={quietFocus}
@@ -2586,6 +2621,7 @@ export function StudyRoom(p: Props) {
             <DialogPrimitive.Content
               key={pane}
               data-dock-pane={dockEnabled ? pane : undefined}
+              data-focus-launching={focusLaunching && pane === "focus"}
               onKeyDown={dockEnabled ? trapDockPanel : undefined}
               className={
                 (dockEnabled ? "dock-panel " : "") +
@@ -2699,6 +2735,15 @@ export function StudyRoom(p: Props) {
               >
                 A quiet tool for your sit. Close it to return to the full room.
               </DialogPrimitive.Description>
+              {focusLaunching && pane === "focus" && (
+                <span className="focus-panel-sparkles" aria-hidden="true">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <i key={i} style={{ "--spark": i } as CSSProperties}>
+                      ✦
+                    </i>
+                  ))}
+                </span>
+              )}
               {pane === "agent" ? (
                 <RoomChat
                   connection={connection}
@@ -2727,6 +2772,10 @@ export function StudyRoom(p: Props) {
                     </Button>
                   </header>
                   <div className="room-panel-body">{panelContent()}</div>
+                  {dockEnabled && pane === "focus" && <div className="dock-focus-actions">
+                    {C.supportive.enabled && <Button type="button" variant="ghost" className="room-stuck-button" disabled={focusLaunching} onClick={askForStep}>I’m stuck</Button>}
+                    <button type="submit" form="dock-focus-form" className="room-focus-launch" disabled={focusLaunching}><span>Focus</span><ArrowRight size={18} aria-hidden="true" /></button>
+                  </div>}
                 </>
               )}
               {error ? (

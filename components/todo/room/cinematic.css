@@ -1760,12 +1760,12 @@
 .cinema-sunset-sky {
   background:
     linear-gradient(#d39aab55, #edb48a66),
-    url("/art/study-room-evening-v1.png") center/100% 100% no-repeat;
+    url("/art/study-room-evening-v1.webp") center/100% 100% no-repeat;
 }
 .cinema-snow-sky {
   background:
     linear-gradient(#b8d6e2c9, #dbeaf0b3),
-    url("/art/study-room-evening-v1.png") center/100% 100% no-repeat;
+    url("/art/study-room-evening-v1.webp") center/100% 100% no-repeat;
 }
 /* A software renderer must keep the timer/UI responsive, even when full-screen blends are costly. */
 .cozy-room[data-quality="low"]

@@ -11,7 +11,7 @@ export function WorkingFlippers({
 }) {
   const id = useId().replace(/:/g, "");
   const furSource = female
-    ? C.focusedPose.replace(".png", "-pink.png")
+    ? C.focusedPose.replace(".webp", "-pink.webp")
     : C.focusedPose;
   return (
     <svg
@@ -76,7 +76,7 @@ export function WorkingFlippers({
           patternUnits="userSpaceOnUse"
         >
           <image
-            href="/art/room-todo-idle.png"
+            href="/art/room-todo-idle.webp"
             x="-180"
             y="-525"
             width="768"

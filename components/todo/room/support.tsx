@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { trapDockPanel } from "./dock-panels";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/todo/client";
@@ -79,13 +80,40 @@ export function TinyStepBubble({
   onStart: (task: StepTask) => void;
 }) {
   const idea = helper.idea;
+  const root = useRef<HTMLElement>(null);
+  const open = Boolean(idea);
+  useEffect(() => {
+    if (!open) return;
+    const before =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    root.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (before?.isConnected && !before.closest("[inert]")) before.focus();
+      else
+        document
+          .querySelector<HTMLButtonElement>(
+            ".cozy-room-active .round-timer-face",
+          )
+          ?.focus();
+    };
+  }, [open]);
   if (!idea) return null;
   return (
     <aside
+      ref={root}
       className="room-tiny-step dock-panel room-tool-panel"
       data-dock-pane="tiny-step"
       aria-label="One small step"
       aria-busy={helper.busy}
+      onKeyDown={(event) => {
+        trapDockPanel(event);
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          helper.dismiss();
+        }
+      }}
     >
       <header className="room-panel-heading">
         <h2>One small step</h2>

@@ -105,3 +105,117 @@
     width: calc(100vw - 24px);
   }
 }
+/* Focus setup: clear rows, a separate custom field and one centered primary action. */
+.cozy-room[data-support="true"] .dock-focus-setup {
+  gap: 18px;
+  padding: 2px 3px 4px;
+}
+.cozy-room[data-support="true"] .dock-focus-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.cozy-room[data-support="true"] .dock-focus-row > strong {
+  flex: auto;
+  letter-spacing: 0.08em;
+}
+.cozy-room[data-support="true"] .dock-time-chips {
+  gap: 8px;
+}
+.cozy-room[data-support="true"] .dock-time-chips button {
+  min-height: 38px;
+  padding: 8px 13px;
+}
+.cozy-room[data-support="true"] .dock-custom-time {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-top: 8px;
+  margin-top: 2px;
+  border-top: 1px solid #9a7f6026;
+  color: #4f443b;
+  flex-wrap: nowrap;
+}
+.cozy-room[data-support="true"] .dock-custom-time input {
+  width: 90px;
+  height: 42px;
+  border-radius: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cozy-room[data-support="true"] .dock-focus-manage {
+  align-self: flex-start;
+  text-align: left;
+  min-height: 28px;
+}
+.cozy-room[data-support="true"] .dock-focus-setup > .room-stuck-button {
+  width: 100%;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 0;
+}
+.cozy-room[data-support="true"] :is(.dock-focus-setup,.dock-focus-actions) > .room-focus-launch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  width: 100%;
+  padding: 14px 20px;
+  text-align: center;
+  font-size: 16px !important;
+  font-weight: 750;
+  line-height: 1.25;
+  transition:
+    transform 240ms ease,
+    opacity 180ms ease;
+  transform-origin: center;
+  position: relative;
+}
+.cozy-room[data-support="true"] :is(.dock-focus-setup,.dock-focus-actions) > .room-focus-launch:hover {
+  transform: translateY(-1px) scale(1.025);
+}
+.cozy-room[data-support="true"] :is(.dock-focus-setup,.dock-focus-actions) > .room-focus-launch:active {
+  transform: scale(0.99);
+}
+.cozy-room[data-support="true"]
+  :is(.dock-focus-setup,.dock-focus-actions)
+  > .room-focus-launch:disabled {
+  opacity: 1;
+}
+.focus-panel-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.focus-panel-sparkles i {
+  position: absolute;
+  left: calc(9% + mod(var(--spark), 4) * 25%);
+  top: calc(15% + mod(var(--spark) * 3, 5) * 17%);
+  font-style: normal;
+  color: #b98032;
+  font-size: 17px;
+  animation: focus-panel-twinkle 300ms ease-out both;
+  animation-delay: calc(mod(var(--spark), 3) * 15ms);
+}
+@keyframes focus-panel-twinkle {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.65);
+  }
+  40% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-9px) scale(1.1);
+  }
+}
+
+.cozy-room[data-support="true"] .dock-focus-actions {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr);gap:10px;flex:0 0 auto;padding:12px 3px 3px;border-top:1px solid #9a7f6026}
+.cozy-room[data-support="true"] .dock-focus-actions > .room-stuck-button {width:100%;min-height:52px;justify-content:center;font-size:14px!important}

@@ -193,3 +193,38 @@ test("game invitations stay in table chat, including when a teammate is busy, an
     await Promise.all([a.leave(), b.leave()]);
   }
 });
+
+test("transient presence failure retries automatically without discarding the table", async () => {
+  let sync: (v: Record<string, unknown[]>) => void = () => {},
+    attempts = 0;
+  const session = new TableSession(async () => ({
+    connect: async (_code, _id, updated, _message, state) => {
+      sync = updated;
+      state(true);
+      sync({});
+    },
+    track: async (member) => {
+      attempts++;
+      if (attempts === 2) throw new Error("transient");
+      sync({ [member.id]: [member] });
+    },
+    send: () => {},
+    close: async () => {},
+  }));
+  session.configure({ ...EMPTY_CONFIG, configured: true });
+  try {
+    await session.join(true, "", "Tester", "blue");
+    const code = session.getSnapshot().code;
+    session.setMic(true, true);
+    await expect
+      .poll(() => session.getSnapshot().state, { timeout: 3000 })
+      .toBe("reconnecting");
+    await expect
+      .poll(() => session.getSnapshot().state, { timeout: 5000 })
+      .toBe("joined");
+    expect(attempts).toBeGreaterThanOrEqual(3);
+    expect(session.getSnapshot().code).toBe(code);
+  } finally {
+    await session.leave();
+  }
+});
