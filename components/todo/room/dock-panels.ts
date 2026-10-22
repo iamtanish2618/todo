@@ -55,9 +55,10 @@ export function useDockPanelMotion(
           clearProps: "transform,opacity",
         },
       );
-      if (!calm)
+      const children = panel.querySelectorAll(".room-panel-body > *");
+      if (!calm && children.length)
         gsap.fromTo(
-          panel.querySelectorAll(".room-panel-body > *"),
+          children,
           { opacity: 0, y: 4 },
           {
             opacity: 1,

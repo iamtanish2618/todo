@@ -52,3 +52,56 @@ The three assets are stereo 44.1 kHz PCM WAV. Using lossless files avoids compre
 Dock hover now peaks at 1.25x (center 1.06x), with 7px hops and a much smaller second follow. Panels open from 0.96 scale over 360ms with a smooth ease-out and no overshoot. The warm shooting-star cursor remains available on the light rendering path; OS reduced motion still uses the native cursor.
 
 Follow-up verification: mid-blink stop, legacy Quiet recovery, OS reduced motion, independent local recording selection, decoded wrap boundaries, load errors, no weather/location request, softer panel scale, and shooting-star visibility all passed targeted browser tests. With rain playing and the pointer moving across the dock, the final Chrome sample averaged 16.67 ms per frame (95th percentile 16.8 ms). TypeScript and the production build are also checked before publication.
+
+## Stage 1 visible polish — 23 October 2026
+
+Only Stage 1 of the polish brief is included. Existing tasks/storage, timers,
+voice/signalling, AI, break/game rules and artwork remain in place. The visual
+switch and two tuning values live in `ROOM_CONFIG.visiblePolish` (`enabled`,
+`minimumText`, `doodleFogOpacity`). The saved Glass preference still varies tint
+and blur; its lightest setting now has enough cream behind dark text.
+
+Changed application files (the native Vercel port uses identical copies):
+
+- `components/todo/study-room.tsx`: dismiss setup before focus, settings/icon
+  labels, remove duplicate Friends entry, plural labels, viewport layout state.
+- `components/todo/room/config.ts`: the bounded Stage 1 visual config.
+- `components/todo/room/dock-panels.ts`: skip child animation when the Agent
+  panel has no generic panel-body children, avoiding an empty-target GSAP warning.
+- `components/todo/room/visible-polish.css`: panel rails, viewport sheets,
+  internal scrolling, minimum text size, stronger ink/glass, larger break actions,
+  softened backdrop, portrait clock fit and removal of the completed arrival clip.
+- `components/todo/room/celebration.tsx`: singular counts and sub-minute wording.
+- `components/todo/room/shared/table-chat.tsx`: shared tint and sheet-open state;
+  chat yields space to another open tool. No message or transport changes.
+- `components/todo/room/shared/break-games.tsx`: composite fog at 35%, preventing
+  repeated fog regeneration from turning the screen white. Game logic unchanged.
+
+Manual checks for each Stage 1 item:
+
+| Item | Short manual check |
+| --- | --- |
+| 1. Clipping | At 1366×768, 1280×720, 1440×900, 1920×1080, 768×1024 and 390×844, open Ambience, Notes, Friends, Settings, focus setup and Take a break. Scroll each long body to its last control; the dock stays separate. |
+| 2. Glass text | Read Notes tabs, Friends, Settings, chat and tooltips. Text is at least 13px. Move Glass from Clear to Tinted; the cream strengthens without disappearing text. Main ink is #2A2622, muted #4F443B. |
+| 3. Grammar | Complete a sub-minute sit: “less than a minute focused”. A one-minute sit / one finished task uses “minute” / “task”; larger counts use plurals. This month and sit invitations use singular labels too. |
+| 4. Icons | Hover or keyboard-focus the shelf keepsakes and scene discoveries to read their hints; inspect their existing aria-labels. The top-right cog is “Settings”. |
+| 5. Duplicate entry | Open Settings: Friends appears only in the dock, opening the existing Friends panel. |
+| 6. Overlap | With one through four companions, open Friends and chat: neither covers a companion, the wall clock or Settings. Only one tool and chat are open at a time. |
+| 7. Focus transition | Open Start focusing and click Focus: there are zero setup panels in the focus DOM; no faded card remains over the table. Pause/resume still uses the clock. |
+| 8. Doodle | Enter a break, Play → Doodle Art, draw/clear and let fog regenerate: the room remains visible. Press Esc to return. |
+| 9. Side areas | Resize to a wide landscape viewport: the blurred continuation is lighter and blends into the scene edges. |
+| 10. Break pills | During a break, Play and Sit with Todo have 44px minimum height and cream text on a dark brown surface. |
+
+Verification used disposable local React fixtures with the actual room/panel,
+four-seat, chat and game components; no production account, room or microphone
+was used for layout tests. The fixture routes are removed before packaging.
+All six viewport layouts were measured, along with four-seat Friends/chat
+clearance, font minima, absence of the focus ghost, short-session wording and
+Doodle/Esc behavior. Browser warnings/errors were empty for these checks.
+
+The production builds and type-checks pass. Full-project lint was run against
+both untouched v38 and Stage 1: both report **47 errors and 34 warnings**, with
+no additional errors or warnings from this pass. These pre-existing React
+compiler/ref/effect, legacy link, test typing and image warnings are retained
+rather than disabling rules or refactoring unrelated behavior in a visual-only
+stage. Full lint is therefore **not clean**; Stages 2–4 have not been started.

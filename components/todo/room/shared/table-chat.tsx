@@ -5,7 +5,9 @@ import {
   useState,
   useSyncExternalStore,
   type ReactNode,
+  type CSSProperties,
 } from "react";
+import { ROOM_CONFIG as C } from "../config";
 import { createPortal } from "react-dom";
 import { MessageCircle, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,16 +47,24 @@ export function TableChat({
   games,
   available,
   active,
+  glass = 0,
+  onOpenChange,
 }: {
   session: TableSession;
   table: TableSnapshot;
   games: BreakGameSession;
   available: boolean;
   active: boolean;
+  glass?: number;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false),
     [draft, setDraft] = useState(""),
     [error, setError] = useState("");
+  useEffect(() => {
+    onOpenChange?.(open);
+    return () => onOpenChange?.(false);
+  }, [open, onOpenChange]);
   const [now, setNow] = useState(() => Date.now());
   const end = useRef<HTMLDivElement>(null),
     scroller = useRef<HTMLDivElement>(null);
@@ -141,7 +151,13 @@ export function TableChat({
   );
   if (!active || !joined || typeof document === "undefined") return null;
   return createPortal(
-    <aside className="table-conversation" aria-label="Table conversation">
+    <aside
+      className="table-conversation"
+      aria-label="Table conversation"
+      data-visible-polish={C.visiblePolish.enabled}
+      data-many-seats={table.members.length > 2}
+      style={{ "--glass-tint": glass } as CSSProperties}
+    >
       {!open && (
         <div
           className="table-message-previews"
