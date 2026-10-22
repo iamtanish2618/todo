@@ -238,21 +238,6 @@
   animation: table-wave 0.7s ease-in-out 3;
   transform-origin: 75% 75%;
 }
-.table-seat[data-self="true"] .table-character:after,
-.table-seat[data-speaking="true"] .table-character:before {
-  content: "";
-  position: absolute;
-  inset: 19% 15% 6%;
-  border: 1px solid #dfb85e75;
-  border-radius: 48%;
-  box-shadow: 0 0 16px #eac75c20;
-  pointer-events: none;
-}
-.table-seat[data-speaking="true"] .table-character:before {
-  inset: 17% 13% 4%;
-  border-color: #efc96b9c;
-  animation: table-speaking 1.4s ease-in-out infinite;
-}
 .table-speaking-beak {
   position: absolute;
   left: 45%;
