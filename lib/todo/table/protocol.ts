@@ -3,7 +3,7 @@ export const TABLE = {
   maxMembers: 4,
   alphabet: "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
   arrivalMs: 3000,
-  syncTimeoutMs: 3000,
+  syncTimeoutMs: 10000,
   presenceMs: 500,
   signalPerSecond: 40,
 } as const;
@@ -22,6 +22,7 @@ export type Member = {
   id: string;
   name: string;
   color: Color;
+  companion: "male" | "female";
   joinedAt: number;
   status: Status;
   mic: "muted" | "live";
@@ -97,6 +98,9 @@ export function readMember(value: unknown, key: string): Member | null {
     nickname(value.name) !== value.name ||
     typeof value.color !== "string" ||
     !Object.hasOwn(COLORS, value.color) ||
+    (value.companion !== undefined &&
+      value.companion !== "male" &&
+      value.companion !== "female") ||
     typeof value.joinedAt !== "number" ||
     !Number.isFinite(value.joinedAt) ||
     value.joinedAt < 0 ||
@@ -112,6 +116,11 @@ export function readMember(value: unknown, key: string): Member | null {
     id: value.id,
     name: value.name,
     color: value.color as Color,
+    companion:
+      value.companion === "female" ||
+      (!value.companion && value.color === "pink")
+        ? "female"
+        : "male",
     joinedAt: value.joinedAt,
     status: value.status as Status,
     mic: value.mic as Member["mic"],
@@ -142,6 +151,7 @@ export function readEnvelope(value: unknown): Envelope | null {
       "doodle",
       "doodle_clear",
       "bubble_pop",
+      "chat",
     ].includes(value.event) ||
     !object(value.data)
   )

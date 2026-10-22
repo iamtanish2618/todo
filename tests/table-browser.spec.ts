@@ -10,6 +10,7 @@ async function peer(
   mount = true,
   invite = "",
   login?: { email: string; password: string },
+  reducedMotion = false,
 ) {
   const email = login?.email || `table-${index}-${Date.now()}@example.test`,
     password = login?.password || "OnlyEmulatorTest123!";
@@ -35,7 +36,10 @@ async function peer(
       },
     );
   }
-  const context = await browser.newContext({ permissions: ["microphone"] });
+  const context = await browser.newContext({
+    permissions: ["microphone"],
+    ...(reducedMotion ? { reducedMotion: "reduce" as const } : {}),
+  });
   contexts.push(context);
   const page = await context.newPage();
   if (!mount)
@@ -111,13 +115,19 @@ const act = (page: Page, code: string) => page.evaluate(code);
 test("Firebase presence, real audio WebRTC with a listen-only peer, manual microphone control and cleanup", async ({
   browser,
 }) => {
+  test.setTimeout(90000);
   const a = await peer(browser, 1),
     b = await peer(browser, 2);
-  await act(a, "qa.voice.unlock()");
-  await act(b, "qa.voice.unlock()");
-  await act(a, "qa.session.join(true,'','Mia','blue')");
+  await a.getByRole("textbox", { name: "Nickname", exact: true }).fill("Mia");
+  await a.getByRole("button", { name: "Create table", exact: true }).click();
+  await expect.poll(async () => (await state(a)).table.state).toBe("joined");
   const code = (await state(a)).table.code;
-  await act(b, `qa.session.join(false,${JSON.stringify(code)},'Mia','pink')`);
+  await b.getByRole("textbox", { name: "Nickname", exact: true }).fill("Mia");
+  await b
+    .getByRole("textbox", { name: "Join with a code", exact: true })
+    .fill(code);
+  await b.getByRole("button", { name: "pink beanie", exact: true }).click();
+  await b.getByRole("button", { name: "Join table", exact: true }).click();
   await expect.poll(async () => (await state(a)).table.members.length).toBe(2);
   await expect(a.locator(".table-name-tag")).toHaveCount(2);
   await expect(
@@ -133,6 +143,26 @@ test("Firebase presence, real audio WebRTC with a listen-only peer, manual micro
     })
     .toEqual(["connected"]);
   expect((await state(b)).voice.permission).toBe(false);
+  // Deterministic synthetic microphone; negotiation, RTP, playback and gain
+  // remain real browser WebRTC/Web Audio, with ordinary autoplay rules.
+  for (const page of [a, b])
+    await page.evaluate(() => {
+      navigator.mediaDevices.getUserMedia = async () => {
+        const context = (window as any).qa.voice.context as AudioContext;
+        const microphone = context.createMediaStreamDestination();
+        const tone = context.createOscillator(),
+          level = context.createGain();
+        tone.frequency.value = 440;
+        level.gain.value = 0.12;
+        tone.connect(level);
+        level.connect(microphone);
+        tone.start();
+        microphone.stream
+          .getAudioTracks()[0]
+          .addEventListener("ended", () => tone.stop(), { once: true });
+        return microphone.stream;
+      };
+    });
   await act(a, "qa.voice.setMuted(false)");
   expect((await state(a)).voice.muted).toBe(false);
   await expect
@@ -144,6 +174,38 @@ test("Firebase presence, real audio WebRTC with a listen-only peer, manual micro
       { timeout: 10000 },
     )
     .toBe(true);
+  await act(b, "qa.voice.setMuted(false)");
+  await expect
+    .poll(
+      async () => (await state(a)).voice.speaking[(await state(b)).table.id],
+      { timeout: 10000 },
+    )
+    .toBe(true);
+  for (const page of [a, b]) {
+    const output = await page.evaluate(async () => {
+      const voice = (window as any).qa.voice;
+      const peer = [...voice.peers.values()][0] as {
+        pc: RTCPeerConnection;
+        audio: HTMLAudioElement;
+      };
+      const stats = await peer.pc.getStats();
+      let energy = 0;
+      stats.forEach((stat) => {
+        if (stat.type === "inbound-rtp")
+          energy += Number(stat.totalAudioEnergy) || 0;
+      });
+      return {
+        playing: !peer.audio.paused,
+        muted: peer.audio.muted,
+        volume: peer.audio.volume,
+        energy,
+      };
+    });
+    expect(output.playing).toBe(true);
+    expect(output.muted).toBe(false);
+    expect(output.volume).toBe(1);
+    expect(output.energy).toBeGreaterThan(0);
+  }
   await act(a, "qa.session.setStatus('focusing')");
   expect((await state(a)).voice.muted).toBe(false);
   await act(a, "qa.session.setStatus('break')");
@@ -304,8 +366,10 @@ test("shared doodles, late bubble invitation and immediate break-end cleanup", a
   await a.waitForTimeout(3200);
   await a.getByRole("button", { name: "Play", exact: true }).click();
   await a.getByRole("button", { name: /^Doodle Art/ }).click();
-  await expect(b.getByText("Ink started Doodle Art")).toBeVisible();
-  await b.getByRole("button", { name: "Join", exact: true }).click();
+  await expect(
+    b.getByText("started Doodle Art", { exact: true }),
+  ).toBeVisible();
+  await b.getByRole("button", { name: "Join game", exact: true }).click();
   await expect(b.locator(".table-doodle")).toBeVisible();
   await a.waitForTimeout(600);
   await act(
@@ -348,22 +412,27 @@ test("shared doodles, late bubble invitation and immediate break-end cleanup", a
   await a.screenshot({ path: "outputs/todo-fullscreen-doodle.png" });
   await a.keyboard.press("Escape");
   await expect(a.locator(".table-doodle-screen")).toHaveCount(0);
-  await b.getByRole("button", { name: "Done", exact: true }).click();
+  // B stays in Doodle Art: the invitation must appear above an active game.
   await a.getByRole("button", { name: "Play", exact: true }).click();
   await a.getByRole("button", { name: /^Bubble Pop/ }).click();
+  await expect(
+    b.getByText("started Bubble Pop", { exact: true }),
+  ).toBeVisible();
+  await b.getByRole("button", { name: "Join game", exact: true }).click();
+  await expect(
+    b.getByRole("dialog", { name: "Bubble Pop", exact: true }),
+  ).toBeVisible();
   await act(b, "qa.games.setBreak(false);qa.session.setStatus('idle')");
   await b.waitForTimeout(600);
   await act(b, "qa.session.setStatus('break');qa.games.setBreak(true)");
-  await expect(b.getByText("Ink started Bubble Pop")).toBeVisible();
-  await b.getByRole("button", { name: "Join", exact: true }).click();
-  await expect(b.getByRole("dialog", { name: "Bubble Pop" })).toBeVisible();
-  const target = await a
-    .getByRole("button", { name: "Pop bubble 1", exact: true })
-    .boundingBox();
-  await a.mouse.click(
-    target!.x + target!.width / 2,
-    target!.y + target!.height / 2,
-  );
+  // A later join uses the saved, non-fading conversation, not an expired toast.
+  await b.getByRole("button", {name:"Table chat",exact:true}).click();
+  await expect(b.locator('.table-chat-history')).toContainText('started Bubble Pop');
+  await b.locator('.table-chat-history').getByRole("button", {name:"Join game",exact:true}).click();
+  await expect(b.getByRole("dialog", {name:"Bubble Pop",exact:true})).toBeVisible();
+  const bubble = a.getByRole("button", {name:"Pop bubble 1", exact:true});
+  await bubble.focus(); // A real keyboard focus pauses this moving target.
+  await bubble.press("Space");
   await expect(
     b.getByRole("button", { name: "Pop bubble 1", exact: true }),
   ).toHaveAttribute("data-popped", "true");
@@ -562,7 +631,7 @@ test("solo break Play closes back to the existing room; keyboard and reduced mot
   await expect(bubble).toHaveAttribute("data-popped", "true");
   await page.getByRole("button", { name: "Done", exact: true }).click();
   await expect(page.locator(".table-bubbles-screen")).toHaveCount(0);
-  await page.getByRole("button", { name: "End break", exact: true }).click();
+  await page.getByRole("button", { name: "Sit with Todo", exact: true }).click();
   await expect(page.locator(".table-bubbles-screen")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
@@ -640,4 +709,81 @@ test("two tabs using one account leave no room or ownership residue", async ({
   await Promise.all(
     [a, b].map((p) => act(p, "qa.games.dispose();qa.voice.leave()")),
   );
+});
+
+test("female companion survives joining; table chat goes both ways and previews expire without losing history", async ({
+  browser,
+}) => {
+  test.setTimeout(120000);
+  const a = await peer(browser, 91),
+    b = await peer(browser, 92, false, "", undefined, true);
+  await b.getByRole("button", { name: "Choose her", exact: true }).click();
+  await b.locator(".intro-cards-female .intro-primary").click();
+  await expect(b.locator(".cozy-room")).toHaveAttribute(
+    "data-arriving",
+    "false",
+    { timeout: 45000 },
+  );
+  await expect(b.locator(".cozy-room")).toHaveAttribute(
+    "data-character",
+    "female",
+  );
+  const wall = await b.locator(".room-wall-clock").boundingBox();
+  const stage = await b.locator(".cozy-room-stage").boundingBox();
+  expect(wall!.y + wall!.height).toBeLessThan(stage!.y + stage!.height * 0.4);
+  await expect(
+    b.getByRole("button", { name: "Touch the hanging plant" }),
+  ).toHaveCount(0);
+  await expect(
+    b.getByRole("button", { name: "Peek at the picture" }),
+  ).toHaveCount(0);
+  await b.locator('[data-dock-item="friends"]').click();
+  await expect(
+    b.getByRole("button", { name: "pink beanie", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await b.getByRole("textbox", { name: "Nickname", exact: true }).fill("Rose");
+  await b.getByRole("button", { name: "Create table", exact: true }).click();
+  await expect(b.locator(".table-code strong")).toBeVisible();
+  const code = await b.locator(".table-code strong").innerText();
+  await act(
+    a,
+    `qa.session.join(false,${JSON.stringify(code)},'Tanish','blue')`,
+  );
+  await expect(a.locator(".table-name-tag")).toHaveCount(2);
+  await expect(
+    a.locator(
+      '.table-seat img[data-pose-layer="idle"][src="/art/room-todo-idle-pink.png"]',
+    ),
+  ).toHaveCount(1);
+  await b.getByRole("button", { name: "Close panel", exact: true }).click();
+  await a.getByRole("button", { name: "Table chat", exact: true }).click();
+  await a
+    .getByRole("textbox", { name: "Message your table" })
+    .fill("Ready to focus together?");
+  await a.getByRole("button", { name: "Send table message" }).click();
+  await expect(b.locator(".table-message-previews")).toContainText(
+    "Ready to focus together?",
+  );
+  await expect(b.locator(".table-message-previews")).toContainText("Tanish");
+  await b.waitForTimeout(10400);
+  await expect(b.locator(".table-message-previews")).not.toContainText(
+    "Ready to focus together?",
+  );
+  await b.getByRole("button", { name: "Table chat", exact: true }).click();
+  await expect(b.locator(".table-chat-history")).toContainText(
+    "Ready to focus together?",
+  );
+  await b
+    .getByRole("textbox", { name: "Message your table" })
+    .fill("Yes, let’s start!");
+  await b.getByRole("button", { name: "Send table message" }).click();
+  await expect(a.locator(".table-chat-history")).toContainText(
+    "Yes, let’s start!",
+  );
+  await expect(a.locator(".table-chat-history")).toContainText("Rose");
+  await b.screenshot({ path: "outputs/todo-wall-clock-table-chat.png" });
+  await b.getByRole("button", { name: "Close table chat" }).click();
+  await b.locator('[data-dock-item="friends"]').click();
+  await b.getByRole("button", { name: "Leave table", exact: true }).click();
+  await act(a, "qa.session.leave();qa.voice.leave()");
 });

@@ -157,28 +157,12 @@ export function RoomScene({
         <span>Make a wish ✦</span>
       </button>
       <button
-        className="cinema-object-hit cinema-plant-hit"
-        aria-label="Touch the hanging plant"
-        onClick={() => react("plant")}
-        disabled={focusing || !interactive}
-      >
-        <span>A little breeze</span>
-      </button>
-      <button
         className="cinema-object-hit cinema-lights-hit"
         aria-label="Twinkle the string lights"
         onClick={() => react("lights")}
         disabled={focusing || !interactive}
       >
         <span>A little glow</span>
-      </button>
-      <button
-        className="cinema-object-hit cinema-picture-hit"
-        aria-label="Peek at the picture"
-        onClick={() => react("picture")}
-        disabled={focusing || !interactive}
-      >
-        <span>A tiny daydream</span>
       </button>
       <button
         className="cinema-object-hit cinema-rug-hit"
@@ -188,9 +172,6 @@ export function RoomScene({
       >
         <span>Soft landing</span>
       </button>
-      <div className="cinema-picture-surprise" aria-hidden="true">
-        ☾<span>little dreams</span>
-      </div>
       {clock ? (
         <div className="room-back-countdown" aria-hidden="true">
           {clock}

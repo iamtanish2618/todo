@@ -59,6 +59,7 @@ import { RoomScene } from "../../components/todo/room/scene";
 import { TableSeats } from "../../components/todo/room/shared/seating";
 import { FriendsPanel } from "../../components/todo/room/shared/friends";
 import { VoiceControls } from "../../components/todo/room/shared/voice-controls";
+import { TableChat } from "../../components/todo/room/shared/table-chat";
 import "../../components/todo/room/room.css";
 import "../../components/todo/room/scene.css";
 import "../../components/todo/room/calm.css";
@@ -83,6 +84,13 @@ function QAView({
       data-loaded="true"
       data-dock="true"
     >
+      <TableChat
+        session={session}
+        table={table}
+        games={games}
+        active
+        available
+      />
       <div className="cozy-room-stage">
         {game.active && (
           <button

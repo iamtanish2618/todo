@@ -126,7 +126,7 @@ export function TableSeats({
             <div className="table-character">
               <RoomPenguin
                 pose={pose}
-                female={m.color === "pink"}
+                female={m.companion === "female"}
                 reduced={reduced}
                 active={index >= 0}
                 calm={m.status === "focusing"}
@@ -136,7 +136,7 @@ export function TableSeats({
                 <img
                   className="table-join-wave"
                   src={
-                    m.color === "pink"
+                    m.companion === "female"
                       ? "/art/room-todo-idle-pink.png"
                       : "/art/room-todo-idle.png"
                   }
@@ -181,7 +181,7 @@ export function TableSeats({
                     ? "tea"
                     : "idle"
               }
-              female={m.color === "pink"}
+              female={m.companion === "female"}
             />
           </div>
         ))}

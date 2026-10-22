@@ -93,6 +93,7 @@ import { VoiceControls, PersistentMic } from "./room/shared/voice-controls";
 import { useBreakGames, BreakGames } from "./room/shared/break-games";
 import { TableSeats } from "./room/shared/seating";
 import { FriendsPanel } from "./room/shared/friends";
+import { TableChat } from "./room/shared/table-chat";
 import "./room/shared/shared.css";
 
 type Pane =
@@ -1802,6 +1803,7 @@ export function StudyRoom(p: Props) {
           <FriendsPanel
             session={tableSession}
             table={table}
+            female={p.female}
             initialCode={inviteCode}
             onSit={() =>
               setAcceptedSit(tableSession.getSnapshot().sit?.startAt || null)
@@ -1948,6 +1950,13 @@ export function StudyRoom(p: Props) {
         style={{ backgroundImage: `url(${C.image})` }}
         aria-hidden="true"
       />
+      <TableChat
+        session={tableSession}
+        table={table}
+        games={breakGames}
+        active={p.active && arrived}
+        available={!quietFocus && !agentView && !celebrating && !breakReturn}
+      />
       <div
         className="cozy-room-stage"
         inert={!arrived || Boolean(breakReturn)}
@@ -2002,11 +2011,11 @@ export function StudyRoom(p: Props) {
             arrived={arrived}
             focusing={quietFocus}
             interactive={!agentView}
-            clock={p.started ? p.clock : null}
+            clock={null}
           />
           <div
-            className="room-table-clock round-timer"
-            aria-label={`Table timer ${p.clock}`}
+            className="room-table-clock room-wall-clock round-timer"
+            aria-label={`Wall focus clock ${p.clock}`}
             inert={agentView}
             aria-hidden={agentView}
           >
@@ -2019,10 +2028,10 @@ export function StudyRoom(p: Props) {
                 p.phase === "break" && p.remaining === 0
                   ? "Break complete"
                   : p.running
-                    ? "Pause table timer"
+                    ? "Pause wall timer"
                     : p.started
-                      ? "Resume table timer"
-                      : "Start table timer"
+                      ? "Resume wall timer"
+                      : "Start wall timer"
               }
               disabled={p.phase === "break" && p.remaining === 0}
               onClick={() => {

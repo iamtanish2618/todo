@@ -1,5 +1,6 @@
 import { object, type Envelope, type Game } from "./protocol";
 import type { TableSession } from "./session";
+import type { TableMessage } from "./session";
 export type Stroke = { sid: string; color: string; pts: [number, number][] };
 export function readStroke(data: Record<string, unknown>): Stroke | null {
   if (
@@ -65,6 +66,7 @@ export class BreakGameSession {
   private off: () => void = () => {};
   private presenceOff: () => void = () => {};
   private queried = false;
+  private invitations = new Map<string, { game: Game; startAt: number }>();
   constructor(private table: TableSession) {}
   connect() {
     this.off();
@@ -127,6 +129,23 @@ export class BreakGameSession {
     if (startAt === undefined)
       this.table.send("game_invite", { game, startAt: at });
   }
+  canJoin(message: TableMessage) {
+    const member = this.table
+      .getSnapshot()
+      .members.find((m) => m.id === message.from);
+    const invitation = this.invitations.get(message.from);
+    return (
+      this.snapshot.active &&
+      member?.status === "break" &&
+      member.playing === message.game &&
+      invitation?.game === message.game &&
+      invitation.startAt === message.startAt
+    );
+  }
+  joinInvitation(message: TableMessage) {
+    if (!this.canJoin(message) || !message.game) return;
+    this.start(message.game, message.startAt);
+  }
   stop() {
     this.update({ game: null, menu: false, startAt: 0 });
     this.table.setPlaying(null);
@@ -173,10 +192,9 @@ export class BreakGameSession {
     return Date.now() + this.table.getSnapshot().offset;
   }
   onRemoteEvent(m: Envelope) {
-    if (!this.snapshot.active) return;
     const table = this.table.getSnapshot(),
       member = table.members.find((p) => p.id === m.from);
-    if (!member || member.status !== "break") return;
+    if (!member) return;
     if (m.event === "game_query" && this.snapshot.game) {
       this.table.send("game_state", {
         to: m.from,
@@ -196,6 +214,7 @@ export class BreakGameSession {
         startAt < this.now() - 5400000
       )
         return;
+      this.invitations.set(m.from, { game: game as Game, startAt });
       if (!this.snapshot.game)
         this.update({
           invite: {
@@ -207,6 +226,7 @@ export class BreakGameSession {
         });
       return;
     }
+    if (!this.snapshot.active || member.status !== "break") return;
     if (
       m.event === "bubble_pop" &&
       this.snapshot.game === "bubbles" &&
@@ -231,5 +251,6 @@ export class BreakGameSession {
     this.off();
     this.presenceOff();
     this.remote.clear();
+    this.invitations.clear();
   }
 }

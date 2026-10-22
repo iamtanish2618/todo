@@ -21,6 +21,7 @@ export function FriendsPanel({
   initialCode = "",
   onGesture,
   onSit,
+  female = false,
   children,
 }: {
   session: TableSession;
@@ -28,11 +29,12 @@ export function FriendsPanel({
   initialCode?: string;
   onGesture?: () => void;
   onSit?: () => void;
+  female?: boolean;
   children?: React.ReactNode;
 }) {
   const [name, setName] = useState(""),
     [code, setCode] = useState(initialCode),
-    [color, setColor] = useState<Color>("blue"),
+    [color, setColor] = useState<Color>(female ? "pink" : "blue"),
     [minutes, setMinutes] = useState("25"),
     [copied, setCopied] = useState<{ label: string; id: number } | null>(null),
     [copyError, setCopyError] = useState("");
@@ -99,7 +101,13 @@ export function FriendsPanel({
             disabled={table.state === "connecting" || !table.config.configured}
             onClick={() => {
               onGesture?.();
-              void session.join(true, "", name, color);
+              void session.join(
+                true,
+                "",
+                name,
+                color,
+                female ? "female" : "male",
+              );
             }}
           >
             <Users size={16} />
@@ -109,7 +117,13 @@ export function FriendsPanel({
             onSubmit={(e) => {
               e.preventDefault();
               onGesture?.();
-              void session.join(false, code, name, color);
+              void session.join(
+                false,
+                code,
+                name,
+                color,
+                female ? "female" : "male",
+              );
             }}
           >
             <label className="room-field">

@@ -52,27 +52,6 @@ export function BreakGames({
     ) : null;
   return (
     <>
-      {state.invite && !state.game && (
-        <div className="table-game-invite" role="status">
-          <span>
-            {state.invite.name} started{" "}
-            {state.invite.game === "bubbles" ? "Bubble Pop" : "Doodle Art"}
-          </span>
-          <Button
-            onClick={() =>
-              games.start(state.invite!.game, state.invite!.startAt)
-            }
-          >
-            Join
-          </Button>
-          <button
-            aria-label="Dismiss game invite"
-            onClick={() => games.dismissInvite()}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
       {state.menu && (
         <section className="table-game-panel" aria-label="Break games">
           <header>
@@ -149,6 +128,7 @@ function GameOverlay({
       ?.querySelector<HTMLButtonElement>("[data-doodle-done]")
       ?.focus();
     const keys = (event: KeyboardEvent) => {
+      if ((event.target as Element)?.closest?.(".table-conversation")) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();

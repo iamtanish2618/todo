@@ -19,6 +19,16 @@ import {
 } from "./protocol";
 import { firebaseTransport, type Transport } from "./transport";
 export type Sit = { startAt: number; minutes: number; host: string };
+export type TableMessage = {
+  id: string;
+  from: string;
+  name: string;
+  text: string;
+  at: number;
+  kind: "message" | "activity" | "game";
+  game?: "bubbles" | "doodle";
+  startAt?: number;
+};
 export type TableSnapshot = {
   config: PublicConfig;
   state: "idle" | "connecting" | "joined" | "reconnecting";
@@ -30,6 +40,7 @@ export type TableSnapshot = {
   sit: Sit | null;
   offset: number;
   reactions: { id: string; kind: Reaction; at: number }[];
+  conversation: TableMessage[];
 };
 export class TableSession {
   private snapshot: TableSnapshot = {
@@ -43,6 +54,7 @@ export class TableSession {
     sit: null,
     offset: 0,
     reactions: [],
+    conversation: [],
   };
   private listeners = new Set<() => void>();
   private messages = new Set<(m: Envelope) => void>();
@@ -91,7 +103,13 @@ export class TableSession {
     this.timers.add(t);
     return t;
   }
-  async join(create: boolean, rawCode: string, rawName: string, color: Color) {
+  async join(
+    create: boolean,
+    rawCode: string,
+    rawName: string,
+    color: Color,
+    companion: Member["companion"] = color === "pink" ? "female" : "male",
+  ) {
     if (!this.snapshot.config.enabled || !this.snapshot.config.configured) {
       this.notice(
         "Shared tables need a connection first. Solo focus is ready to use.",
@@ -145,6 +163,7 @@ export class TableSession {
           id,
           name: uniqueName(name, members),
           color,
+          companion,
           joinedAt: Math.max(Date.now(), ...members.map((m) => m.joinedAt + 1)),
           status: "arriving",
           mic: "muted",
@@ -158,6 +177,14 @@ export class TableSession {
         await transport.track(this.local);
         if (gen !== this.generation) return;
         this.update({ state: "joined" });
+        this.appendMessage({
+          id: `${id}:arrival`,
+          from: id,
+          name: this.local.name,
+          text: "joined the table",
+          at: Date.now(),
+          kind: "activity",
+        });
         this.lastTrack = Date.now();
         this.later(() => {
           if (this.local) {
@@ -208,8 +235,57 @@ export class TableSession {
       return;
     }
     const previousHost = this.snapshot.host;
+    const previous = this.snapshot.members;
     const admitted = members.slice(0, TABLE.maxMembers);
     this.update({ members: admitted, host: admitted[0]?.id || "" });
+    for (const member of admitted) {
+      const before = previous.find((m) => m.id === member.id);
+      if (
+        !previous.some((m) => m.id === member.id) &&
+        member.id !== this.snapshot.id
+      )
+        this.appendMessage({
+          id: `${member.id}:arrival`,
+          from: member.id,
+          name: member.name,
+          text: "joined the table",
+          at: Date.now(),
+          kind: "activity",
+        });
+      if (
+        before &&
+        before.status !== member.status &&
+        member.status !== "arriving" &&
+        before.status !== "arriving"
+      )
+        this.appendMessage({
+          id: crypto.randomUUID(),
+          from: member.id,
+          name: member.name,
+          text:
+            member.status === "focusing"
+              ? "started focusing"
+              : member.status === "break"
+                ? "is taking a break"
+                : "returned to the table",
+          at: Date.now(),
+          kind: "activity",
+        });
+    }
+    for (const member of previous) {
+      if (
+        !admitted.some((m) => m.id === member.id) &&
+        member.id !== this.snapshot.id
+      )
+        this.appendMessage({
+          id: crypto.randomUUID(),
+          from: member.id,
+          name: member.name,
+          text: "left the table",
+          at: Date.now(),
+          kind: "activity",
+        });
+    }
     const queued = this.pendingMessages.splice(0);
     for (const item of queued)
       if (
@@ -283,6 +359,21 @@ export class TableSession {
     if (!this.gate.allow(`out:${event}:${String(data.to || "")}`, max)) return;
     const msg = { from: this.local.id, event, data };
     this.transport?.send(msg);
+    if (
+      event === "game_invite" &&
+      (data.game === "bubbles" || data.game === "doodle") &&
+      typeof data.startAt === "number"
+    )
+      this.appendMessage({
+        id: `${this.local.id}:game:${data.startAt}`,
+        from: this.local.id,
+        name: this.local.name,
+        text: `started ${data.game === "bubbles" ? "Bubble Pop" : "Doodle Art"}`,
+        at: Date.now(),
+        kind: "game",
+        game: data.game,
+        startAt: data.startAt,
+      });
     if (event === "reaction") this.react(this.local.id, data.kind as Reaction);
   }
   private react(id: string, kind: Reaction) {
@@ -303,6 +394,36 @@ export class TableSession {
   }
   reaction(kind: Reaction) {
     this.send("reaction", { kind });
+  }
+  private appendMessage(message: TableMessage) {
+    if (this.snapshot.conversation.some((m) => m.id === message.id)) return;
+    // Text stays inside this table session. No voice recording or account-wide chat history.
+    this.update({
+      conversation: [...this.snapshot.conversation, message].slice(-200),
+    });
+  }
+  chat(value: string) {
+    const text = value.trim();
+    if (
+      this.snapshot.state !== "joined" ||
+      !this.local ||
+      !text ||
+      text.length > 1000 ||
+      /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text) ||
+      !this.gate.allow("out:chat-message", 6, 10000)
+    )
+      return false;
+    const id = crypto.randomUUID();
+    this.send("chat", { id, text });
+    this.appendMessage({
+      id,
+      from: this.local.id,
+      name: this.local.name,
+      text,
+      at: Date.now(),
+      kind: "message",
+    });
+    return true;
   }
   hostAction(
     event: "kick" | "close_room" | "host_mute_request",
@@ -344,7 +465,10 @@ export class TableSession {
     const msg = readEnvelope(value);
     if (!msg || msg.from === this.snapshot.id) return;
     if (!this.snapshot.members.some((m) => m.id === msg.from)) {
-      if (msg.event === "signal" && this.pendingMessages.length < 80)
+      if (
+        ["signal", "chat", "game_invite", "game_state"].includes(msg.event) &&
+        this.pendingMessages.length < 80
+      )
         this.pendingMessages.push({ msg, at: Date.now() });
       return;
     }
@@ -358,6 +482,46 @@ export class TableSession {
             : 10;
     if (!this.gate.allow(`${msg.from}:${msg.event}`, max)) return;
     const { event, data, from } = msg;
+    const sender = this.snapshot.members.find((m) => m.id === from)!;
+    if (event === "chat") {
+      if (
+        !validId(data.id) ||
+        typeof data.text !== "string" ||
+        !data.text.trim() ||
+        data.text.length > 1000 ||
+        /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(data.text) ||
+        !this.gate.allow(`${from}:chat-message`, 6, 10000)
+      )
+        return;
+      this.appendMessage({
+        id: `${from}:${data.id}`,
+        from,
+        name: sender.name,
+        text: data.text.trim(),
+        at: Date.now(),
+        kind: "message",
+      });
+    }
+    if (
+      (event === "game_invite" ||
+        (event === "game_state" && data.to === this.snapshot.id)) &&
+      (data.game === "bubbles" || data.game === "doodle") &&
+      typeof data.startAt === "number" &&
+      Number.isFinite(data.startAt) &&
+      data.startAt <= Date.now() + this.snapshot.offset + 5000 &&
+      data.startAt >= Date.now() + this.snapshot.offset - 5400000
+    ) {
+      this.appendMessage({
+        id: `${from}:game:${data.startAt}`,
+        from,
+        name: sender.name,
+        text: `started ${data.game === "bubbles" ? "Bubble Pop" : "Doodle Art"}`,
+        at: Date.now(),
+        kind: "game",
+        game: data.game,
+        startAt: data.startAt,
+      });
+    }
     if (
       ["kick", "close_room", "host_mute_request", "sit_start"].includes(
         event,
@@ -449,6 +613,7 @@ export class TableSession {
       sit: null,
       offset: 0,
       reactions: [],
+      conversation: [],
     });
     await old?.close();
   }

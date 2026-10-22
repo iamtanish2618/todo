@@ -26,6 +26,9 @@
             "color": {
               ".validate": "newData.val() == 'blue' || newData.val() == 'pink' || newData.val() == 'sage' || newData.val() == 'honey' || newData.val() == 'lavender' || newData.val() == 'rust'"
             },
+            "companion": {
+              ".validate": "newData.val() == 'male' || newData.val() == 'female'"
+            },
             "joinedAt": {
               ".validate": "newData.isNumber() && ((!data.exists() && newData.val() == now) || (data.exists() && newData.val() == data.val()))"
             },

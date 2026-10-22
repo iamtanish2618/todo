@@ -171,6 +171,7 @@ export async function firebaseTransport(
         await sdk.update(sdk.ref(db, `tables/${code}/members/${id}`), {
           name: value.name,
           color: value.color,
+          companion: value.companion,
           status: value.status,
           mic: value.mic,
           hasMicPermission: value.hasMicPermission,

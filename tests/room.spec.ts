@@ -175,7 +175,7 @@ test("a sit persists its timer, updates the document title, saves once, then off
     .click();
   await page.getByRole("button", { name: "Close panel", exact: true }).click();
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await page.getByRole("button", { name: "Focus", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute(
@@ -184,7 +184,7 @@ test("a sit persists its timer, updates the document title, saves once, then off
   );
   await expect(page).toHaveTitle(/24:5\d - Todo/);
   await page
-    .getByRole("button", { name: "Pause table timer", exact: true })
+    .getByRole("button", { name: "Pause wall timer", exact: true })
     .click();
   const paused = await page.locator(".round-timer-face strong").innerText();
   await page.waitForTimeout(1100);
@@ -196,7 +196,7 @@ test("a sit persists its timer, updates the document title, saves once, then off
     .getByRole("button", { name: "Focus with Todo", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Resume table timer", exact: true }),
+    page.getByRole("button", { name: "Resume wall timer", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Finish focus session", exact: true })
@@ -489,7 +489,7 @@ test("table flow requires chosen tasks; task completion leads to coffee, ambienc
     page.getByLabel("Your wooden study table", { exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo.");
   await expect(page.getByLabel("New task", { exact: true })).toHaveCount(0);
@@ -642,7 +642,7 @@ test("morning replaces the moon; lamp leaves no hand; real writing and coffee fl
   expect(await matrix(".todo-write-right")).not.toBe(right);
   await page.screenshot({ path: "outputs/todo-writing-flippers.png" });
   await page
-    .getByRole("button", { name: "Pause table timer", exact: true })
+    .getByRole("button", { name: "Pause wall timer", exact: true })
     .click();
   await expect(page.locator(".todo-writing-rig")).toHaveCSS("opacity", "0");
   await page
@@ -786,14 +786,14 @@ test("custom focus setup darkens selected tasks, hides controls, prepares Todo a
   await page.waitForTimeout(1200);
   await expect(page.locator(".round-timer-face strong")).toHaveText(paused);
   await page
-    .getByRole("button", { name: "Resume table timer", exact: true })
+    .getByRole("button", { name: "Resume wall timer", exact: true })
     .click();
   await expect(page.locator(".cozy-room")).toHaveAttribute(
     "data-quiet",
     "true",
   );
   await page
-    .getByRole("button", { name: "Pause table timer", exact: true })
+    .getByRole("button", { name: "Pause wall timer", exact: true })
     .click();
   await expect(page.locator(".cozy-room")).toHaveAttribute(
     "data-quiet",
@@ -878,7 +878,7 @@ for (const variant of [
       path: `outputs/todo-natural-writing-${variant.female ? "pink" : "blue"}${variant.reduced ? "-gentle" : ""}.png`,
     });
     await page
-      .getByRole("button", { name: "Pause table timer", exact: true })
+      .getByRole("button", { name: "Pause wall timer", exact: true })
       .click();
     await expect(pet).toHaveAttribute("data-attention", "room");
     await expect(page.locator(".room-pose.pose-visible")).toHaveAttribute(
@@ -907,7 +907,7 @@ test("ambience uses five weather cards and independent recording choices; timer 
     page.locator(".room-home-card .room-helper,.room-choose-time"),
   ).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toHaveAccessibleName("Todo.");
   await expect(page.getByLabel("New task", { exact: true })).toHaveCount(0);
@@ -958,7 +958,7 @@ test("ambience uses five weather cards and independent recording choices; timer 
   );
   await page.getByRole("button", { name: "Close panel", exact: true }).click();
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await page.getByRole("button", { name: "15 min", exact: true }).click();
   await page.getByRole("button", { name: "Focus", exact: true }).click();
@@ -990,7 +990,7 @@ test("Finish task saves linked focus time, celebrates, and preserves finished hi
     "Choose timer",
   );
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await page.getByRole("button", { name: "Focus", exact: true }).click();
   await expect(page.locator(".room-pet")).toHaveAttribute(
@@ -1355,7 +1355,7 @@ test("Agent is a single bottom composer, hides tools, frames Todo on laptops, an
     "Notes",
     "Open room settings",
     "Choose companion",
-    "Start table timer",
+    "Start wall timer",
   ])
     await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
       0,

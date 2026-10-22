@@ -112,7 +112,7 @@ test("focus keeps props calm, has a smooth ring and usable pause and +5 controls
 }) => {
   await enter(page);
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await page.getByRole("button", { name: "15 min", exact: true }).click();
   await page.getByRole("button", { name: "Focus", exact: true }).click();
@@ -239,7 +239,7 @@ test("reduced motion and low-power devices simplify decoration without breaking 
   await expect(page.locator(".cinema-cursor")).toBeHidden();
   await expect(page.locator(".cinema-grain")).toBeHidden();
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await expect(
     page.getByRole("spinbutton", { name: "Focus minutes", exact: true }),

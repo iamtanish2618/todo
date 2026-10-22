@@ -257,7 +257,7 @@ test("legacy feature flag preserves the old room controls", async ({
   ).toBeVisible();
   await expect(page.locator(".room-home-card")).toBeVisible();
   await page
-    .getByRole("button", { name: "Start table timer", exact: true })
+    .getByRole("button", { name: "Start wall timer", exact: true })
     .click();
   await expect(
     page.getByRole("spinbutton", { name: "Focus minutes" }),

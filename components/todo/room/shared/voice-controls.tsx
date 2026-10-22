@@ -1,5 +1,5 @@
 "use client";
-import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import type { TableVoice, VoiceSnapshot } from "@/lib/todo/table/voice";
@@ -31,6 +31,12 @@ export function VoiceControls({
           Tap to enable sound
         </Button>
       )}
+      {state.message.includes("Voice couldn’t connect") && (
+        <Button variant="ghost" onClick={() => void voice.retry()}>
+          <RefreshCw size={14} />
+          Reconnect voice
+        </Button>
+      )}
     </div>
   );
 }
@@ -54,6 +60,12 @@ export function PersistentMic({
         <button onClick={() => void voice.unlock()}>
           <VolumeX size={14} />
           Enable sound
+        </button>
+      )}
+      {state.message.includes("Voice couldn’t connect") && (
+        <button onClick={() => void voice.retry()}>
+          <RefreshCw size={14} />
+          Reconnect voice
         </button>
       )}
     </div>

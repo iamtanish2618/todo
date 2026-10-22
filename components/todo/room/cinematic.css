@@ -373,25 +373,12 @@
   height: 32%;
   z-index: 3;
 }
-.cinema-plant-hit {
-  left: 3%;
-  top: 4%;
-  width: 13%;
-  height: 30%;
-  z-index: 3;
-}
 .cinema-lights-hit {
   left: 18%;
   top: 1%;
   width: 32%;
   height: 6%;
   z-index: 3;
-}
-.cinema-picture-hit {
-  left: 91%;
-  top: 5%;
-  width: 8%;
-  height: 16%;
 }
 .cinema-rug-hit {
   left: 20%;
@@ -405,55 +392,6 @@
   width: 17%;
   height: 9%;
   z-index: 8;
-}
-.round-room-art[data-prop-action="plant"] .cinema-furniture-layer {
-  animation: cinema-leaf-sway 4s ease-in-out infinite;
-}
-@keyframes cinema-leaf-sway {
-  0%,
-  100% {
-    rotate: -0.5deg;
-  }
-  50% {
-    rotate: 0.5deg;
-  }
-}
-.cinema-picture-surprise {
-  position: absolute;
-  left: 92%;
-  top: 7%;
-  width: 7%;
-  height: 12%;
-  border: 5px solid #b28b60;
-  border-radius: 2px;
-  background: #263f51;
-  color: #ffe0a0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  font-size: 30px;
-  z-index: 10;
-  opacity: 0;
-  pointer-events: none;
-}
-.cinema-picture-surprise span {
-  font-size: 7px;
-}
-.round-room-art[data-prop-action="picture"] .cinema-picture-surprise {
-  animation: cinema-picture 1.8s ease both;
-}
-@keyframes cinema-picture {
-  0%,
-  100% {
-    opacity: 0;
-    transform: rotate(0);
-  }
-  20%,
-  80% {
-    opacity: 1;
-    transform: rotate(-4deg);
-  }
 }
 .round-room-art[data-prop-action="rug"] .cinema-foreground-layer {
   animation: cinema-rug 0.9s ease;

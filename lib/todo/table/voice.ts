@@ -4,15 +4,15 @@ import type { TableSession } from "./session";
 type Peer = {
   pc: RTCPeerConnection;
   audio: HTMLAudioElement;
+  blocked: boolean;
   ice: RTCIceCandidateInit[];
   retries: number;
   stream?: MediaStream;
-  source?: MediaStreamAudioSourceNode;
-  gain?: GainNode;
-  analyser?: AnalyserNode;
-  samples?: Float32Array<ArrayBuffer>;
+  readingStats: boolean;
+  nextStats: number;
   held: number;
   volume: number;
+  watchdog?: ReturnType<typeof setTimeout>;
 };
 export type VoiceSnapshot = {
   muted: boolean;
@@ -55,6 +55,7 @@ export class TableVoice {
   private permissionStatus: PermissionStatus | null = null;
   private gestureReady = false;
   private pending: Envelope[] = [];
+  private signaling = new Map<string, Promise<void>>();
   getSnapshot = () => this.snapshot;
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);
@@ -67,27 +68,40 @@ export class TableVoice {
     this.listeners.forEach((fn) => fn());
   }
   private audioContext() {
-    if (!this.context || this.context.state === "closed")
+    if (!this.context || this.context.state === "closed") {
       this.context = new AudioContext();
+    }
     return this.context;
   }
   /** Must be called directly from Create/Join/Enable sound/Unmute user actions. */
   async unlock() {
     this.gestureReady = true;
+    for (const peer of this.peers.values())
+      if (peer.audio.srcObject) this.play(peer);
     try {
-      await this.audioContext().resume();
-      let blocked = false;
-      await Promise.all(
-        [...this.peers.values()].map((p) =>
-          p.audio.play().catch(() => {
-            blocked = true;
-          }),
-        ),
-      );
-      this.update({ blocked });
+      // Resume synchronously in the gesture. Browsers may leave resume()
+      // pending while blocked; that must never stall microphone permission.
+      const context = this.audioContext();
+      void context.resume().catch(() => {});
     } catch {
-      this.update({ blocked: true });
+      // Metering is optional; native call playback does not depend on Web Audio.
     }
+  }
+  private play(peer: Peer) {
+    void peer.audio
+      .play()
+      .then(() => {
+        peer.blocked = false;
+      })
+      .catch(() => {
+        peer.blocked = true;
+      })
+      .finally(() => {
+        if ([...this.peers.values()].includes(peer))
+          this.update({
+            blocked: [...this.peers.values()].some((p) => p.blocked),
+          });
+      });
   }
   join(session: TableSession) {
     if (this.session === session) return;
@@ -95,11 +109,45 @@ export class TableVoice {
     this.unsub = [
       session.subscribe(() => this.sync()),
       session.onMessage((m) => {
-        void this.receive(m);
+        this.dispatch(m);
       }),
     ];
+    window.addEventListener("pointerdown", this.resumeOnGesture, {
+      passive: true,
+    });
+    window.addEventListener("keydown", this.resumeOnGesture);
+    document.addEventListener("visibilitychange", this.resumeOnVisible);
     gsap.ticker.add(this.tick);
     this.sync();
+  }
+  private resumeOnGesture = () => {
+    if (
+      this.snapshot.blocked ||
+      (this.context?.state === "suspended" && this.peers.size)
+    )
+      void this.unlock();
+  };
+  private resumeOnVisible = () => {
+    if (
+      !document.hidden &&
+      this.gestureReady &&
+      this.context?.state === "suspended"
+    )
+      void this.unlock();
+  };
+  private dispatch(m: Envelope) {
+    if (!["signal", "voice_retry", "host_mute_request"].includes(m.event))
+      return;
+    // ICE, offers and answers arrive independently through Firebase. Serialize
+    // them per sender so a fast answer cannot race a pending remote description.
+    const prior = this.signaling.get(m.from) || Promise.resolve();
+    const next = prior.catch(() => {}).then(() => this.receive(m));
+    this.signaling.set(m.from, next);
+    void next
+      .finally(() => {
+        if (this.signaling.get(m.from) === next) this.signaling.delete(m.from);
+      })
+      .catch(() => {});
   }
   private sync() {
     const table = this.session?.getSnapshot();
@@ -111,7 +159,7 @@ export class TableVoice {
     }
     const queued = this.pending.splice(0);
     queued.forEach((m) => {
-      void this.receive(m);
+      this.dispatch(m);
     });
     const ids = table.members.filter((m) => m.id !== table.id).map((m) => m.id);
     [...this.peers.keys()]
@@ -130,11 +178,13 @@ export class TableVoice {
     audio.autoplay = true;
     audio.setAttribute("playsinline", "");
     audio.hidden = true;
-    audio.muted = true;
     document.body.appendChild(audio);
     const peer: Peer = {
       pc,
       audio,
+      blocked: false,
+      readingStats: false,
+      nextStats: 0,
       ice: [],
       retries: 0,
       held: 0,
@@ -154,26 +204,18 @@ export class TableVoice {
       const stream = e.streams[0] || new MediaStream([e.track]);
       peer.stream = stream;
       audio.srcObject = stream;
-      peer.source?.disconnect();
-      peer.analyser?.disconnect();
-      peer.gain?.disconnect();
-      const ctx = this.audioContext();
-      peer.source = ctx.createMediaStreamSource(stream);
-      peer.analyser = ctx.createAnalyser();
-      peer.analyser.fftSize = 512;
-      peer.samples = new Float32Array(512);
-      peer.gain = ctx.createGain();
-      peer.source.connect(peer.analyser);
-      peer.analyser.connect(peer.gain);
-      peer.gain.connect(ctx.destination);
       this.applyVolume(peer);
-      void audio.play().catch(() => this.update({ blocked: true }));
-      if (!this.gestureReady || ctx.state !== "running")
-        this.update({ blocked: true });
+      // Native playout drives the receiver's decoder. A second muted sink or
+      // Web Audio-only graph can leave its playout path silent in Chromium.
+      this.play(peer);
     };
     pc.onconnectionstatechange = () => {
       this.peerState(id, pc.connectionState);
-      if (pc.connectionState === "connected") void this.attach(peer);
+      if (pc.connectionState === "connected") {
+        if (peer.watchdog) clearTimeout(peer.watchdog);
+        void this.attach(peer).catch(() => this.trouble(id));
+        this.update({ message: "" });
+      }
       if (pc.connectionState === "failed") {
         if (peer.retries++ === 0) {
           if (table.id < id) void this.offer(id, peer, true);
@@ -182,6 +224,10 @@ export class TableVoice {
       }
     };
     this.peerState(id, "connecting");
+    peer.watchdog = setTimeout(() => {
+      if (this.peers.get(id) === peer && pc.connectionState !== "connected")
+        this.trouble(id);
+    }, 18000);
     return peer;
   }
   private trouble(id: string) {
@@ -189,7 +235,7 @@ export class TableVoice {
       this.session?.getSnapshot().members.find((m) => m.id === id)?.name ||
       "your friend";
     this.update({
-      message: `Having trouble connecting to ${name}. Try headphones, a different network, or rejoining.`,
+      message: `Voice couldn’t connect to ${name}. Try reconnecting voice.${this.session?.getSnapshot().config.iceServers.some((s) => [s.urls].flat().some((u) => /^turns?:/.test(u))) ? "" : " This network may need a voice relay; table chat still works."}`,
     });
   }
   private peerState(id: string, state: string) {
@@ -197,6 +243,7 @@ export class TableVoice {
     this.update({ peers: { ...this.snapshot.peers, [id]: state } });
   }
   private async attach(peer: Peer) {
+    if (peer.pc.signalingState === "closed") return;
     const transceiver = peer.pc
       .getTransceivers()
       .find((t) => t.receiver.track.kind === "audio");
@@ -204,6 +251,7 @@ export class TableVoice {
     transceiver.direction = "sendrecv";
     if (this.stream)
       await transceiver.sender.replaceTrack(this.stream.getAudioTracks()[0]);
+    if (this.stream) transceiver.sender.setStreams(this.stream);
     const params = transceiver.sender.getParameters();
     if (!params.encodings?.length) params.encodings = [{}];
     params.encodings[0].maxBitrate = 32000;
@@ -246,6 +294,10 @@ export class TableVoice {
     if (m.data.to !== table.id) return;
     if (m.event === "voice_retry" && table.id < m.from) {
       const p = this.peers.get(m.from);
+      if (m.data.renegotiate === true) {
+        if (p && p.pc.signalingState === "stable") await this.offer(m.from, p);
+        return;
+      }
       if (p && p.retries === 0) {
         p.retries++;
         await this.offer(m.from, p, true);
@@ -318,7 +370,7 @@ export class TableVoice {
     const epoch = this.epoch;
     try {
       if (!muted && !this.stream) {
-        await this.unlock();
+        void this.unlock();
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
@@ -350,6 +402,16 @@ export class TableVoice {
         this.localAnalyser.fftSize = 512;
         this.localSource.connect(this.localAnalyser);
         await Promise.all([...this.peers.values()].map((p) => this.attach(p)));
+        // A table is initially listen-only. Announce the first real microphone
+        // track in SDP as well as replaceTrack, so stream-less receivers in
+        // different browsers don't remain stuck on their initial silent track.
+        const table = this.session.getSnapshot();
+        for (const [id, peer] of this.peers) {
+          if (table.id < id && peer.pc.signalingState === "stable")
+            void this.offer(id, peer);
+          else if (table.id > id)
+            this.session.send("voice_retry", { to: id, renegotiate: true });
+        }
         if (navigator.permissions?.query)
           void navigator.permissions
             .query({ name: "microphone" as PermissionName })
@@ -380,6 +442,7 @@ export class TableVoice {
       this.session?.setMic(!!track && !this.desiredMuted, !!track);
     } catch (e) {
       const name = e instanceof DOMException ? e.name : "";
+      this.stopMic();
       this.update({
         muted: true,
         message:
@@ -392,6 +455,17 @@ export class TableVoice {
       this.session?.setMic(false, false);
     } finally {
       this.busy = false;
+    }
+  }
+  async retry() {
+    await this.unlock();
+    const table = this.session?.getSnapshot();
+    if (!table || table.state !== "joined") return;
+    this.update({ message: "Reconnecting voice…" });
+    for (const [id, peer] of this.peers) {
+      peer.retries = 0;
+      if (table.id < id) void this.offer(id, peer, true);
+      else this.session?.send("voice_retry", { to: id });
     }
   }
   setPeerVolume(id: string, value: number) {
@@ -408,12 +482,8 @@ export class TableVoice {
     this.peers.forEach((p) => this.applyVolume(p));
   }
   private applyVolume(p: Peer) {
-    if (p.gain && this.context)
-      p.gain.gain.setTargetAtTime(
-        this.snapshot.incomingMuted ? 0 : p.volume,
-        this.context.currentTime,
-        0.04,
-      );
+    p.audio.muted = this.snapshot.incomingMuted;
+    p.audio.volume = p.volume;
   }
   private tick = (time: number) => {
     if (time - this.lastSample < 1 / 15 || document.hidden) return;
@@ -430,8 +500,27 @@ export class TableVoice {
       return Math.sqrt(sum / data.length) > 0.02;
     };
     for (const [id, peer] of this.peers) {
-      if (peer.analyser && peer.samples && sample(peer.analyser, peer.samples))
-        peer.held = now + 150;
+      if (!peer.readingStats && now >= peer.nextStats) {
+        peer.readingStats = true;
+        peer.nextStats = now + 180;
+        void peer.pc
+          .getStats()
+          .then((report) => {
+            if (this.peers.get(id) !== peer) return;
+            report.forEach((stat) => {
+              if (
+                stat.type === "inbound-rtp" &&
+                (stat.kind === "audio" || stat.mediaType === "audio") &&
+                Number(stat.audioLevel) > 0.015
+              )
+                peer.held = performance.now() + 320;
+            });
+          })
+          .catch(() => {})
+          .finally(() => {
+            peer.readingStats = false;
+          });
+      }
       speaking[id] = peer.held > now;
     }
     const id = this.session?.getSnapshot().id;
@@ -458,9 +547,7 @@ export class TableVoice {
     p.pc.ontrack = null;
     p.pc.onconnectionstatechange = null;
     p.pc.close();
-    p.source?.disconnect();
-    p.analyser?.disconnect();
-    p.gain?.disconnect();
+    if (p.watchdog) clearTimeout(p.watchdog);
     p.audio.pause();
     p.audio.srcObject = null;
     p.audio.remove();
@@ -469,7 +556,11 @@ export class TableVoice {
       speaking = { ...this.snapshot.speaking };
     delete peers[id];
     delete speaking[id];
-    this.update({ peers, speaking });
+    this.update({
+      peers,
+      speaking,
+      blocked: [...this.peers.values()].some((peer) => peer.blocked),
+    });
   }
   private stopMic() {
     this.epoch++;
@@ -488,6 +579,9 @@ export class TableVoice {
     this.session?.setMic(false, false);
   }
   leave() {
+    window.removeEventListener("pointerdown", this.resumeOnGesture);
+    window.removeEventListener("keydown", this.resumeOnGesture);
+    document.removeEventListener("visibilitychange", this.resumeOnVisible);
     this.unsub.forEach((fn) => fn());
     this.unsub = [];
     this.stopMic();
@@ -499,6 +593,7 @@ export class TableVoice {
     void ctx?.close().catch(() => {});
     this.gestureReady = false;
     this.pending = [];
+    this.signaling.clear();
     this.update({
       message: "",
       blocked: false,
