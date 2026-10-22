@@ -1,5 +1,8 @@
 "use client";
 
+import { watchRoomAudio } from "./audio-access";
+let unwatch: (() => void) | null = null;
+
 export const TODO_VOICE = {
   success: {
     url: "/audio/todo-you-did-it-v1.mp3",
@@ -17,7 +20,9 @@ let activeStop: (() => void) | null = null;
 
 function engine() {
   if (!context || context.state === "closed") {
+    unwatch?.();
     context = new AudioContext();
+    unwatch = watchRoomAudio(context);
     buffers.clear();
   }
   return context;
@@ -120,6 +125,8 @@ export function playTodoVoice(cue: Cue, volume = 0.75, onEnd?: () => void) {
 
 export function releaseTodoVoice() {
   activeStop?.();
+  unwatch?.();
+  unwatch = null;
   const old = context;
   context = null;
   buffers.clear();

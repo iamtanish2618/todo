@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { watchRoomAudio } from "./audio-access";
 import { SOUND_RECORDINGS, type Recording } from "./ambience";
 
 /** Decode once, then let the audio thread loop sample-accurately. No media player,
@@ -23,12 +24,19 @@ export function RoomSoundPlayer({
   const [status, setStatus] = useState("loading");
   const [frames, setFrames] = useState(0);
   useEffect(() => {
-    const ctx = new AudioContext({ sampleRate: 44100 });
+    let ctx: AudioContext;
+    try {
+      ctx = new AudioContext({ sampleRate: 44100 });
+    } catch {
+      const failed = setTimeout(() => setStatus("error"), 0);
+      return () => clearTimeout(failed);
+    }
+    const unwatch = watchRoomAudio(ctx);
     context.current = ctx;
     void ctx.resume().catch(() => setStatus("blocked"));
     return () => {
+      unwatch();
       context.current = null;
-      // Give the source cleanup its short fade before releasing the audio device.
       setTimeout(() => {
         void ctx.close().catch(() => {});
       }, 200);
@@ -55,7 +63,9 @@ export function RoomSoundPlayer({
       }
       if (disposed) return;
       if (ctx.state !== "running") setStatus("blocked");
-      await ctx.resume();
+      void ctx.resume().catch(() => {
+        if (!disposed) setStatus("blocked");
+      });
       if (disposed) return;
       source = ctx.createBufferSource();
       level = ctx.createGain();
@@ -102,11 +112,12 @@ export function RoomSoundPlayer({
     level.gain.cancelScheduledValues(ctx.currentTime);
     level.gain.setTargetAtTime(paused ? 0 : volume, ctx.currentTime, 0.08);
   }, [paused, volume]);
+  if (paused) return null;
   if (status === "error" || status === "blocked")
     return (
       <p className="room-audio-notice" role="status">
         {status === "blocked"
-          ? "Tap to play your sound."
+          ? "Tap to enable sound"
           : "That recording could not load."}
         {status === "blocked" ? (
           <button
@@ -117,7 +128,7 @@ export function RoomSoundPlayer({
                 .catch(() => setStatus("error"))
             }
           >
-            Play sound
+            Enable sound
           </button>
         ) : null}
         <button onClick={onStop}>Sound off</button>

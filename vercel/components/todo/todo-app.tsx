@@ -61,6 +61,11 @@ import {
   type Connection,
 } from "@/lib/todo/client";
 
+import { RELIABILITY, validTimer, friendlyError } from "@/lib/todo/reliability";
+
+import { AboutHelp } from "./about-help";
+import { PRESENTATION } from "@/lib/todo/presentation";
+
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -134,12 +139,7 @@ export default function TodoApp({
   const settling = useRef(false),
     completed = useRef(new Set<string>()),
     hydrated = useRef(false);
-  const onError = (e: unknown) =>
-    toast.error(
-      e instanceof Error
-        ? e.message
-        : "Something went wrong. Please try again.",
-    );
+  const onError = (e: unknown) => toast.error(friendlyError(e));
   const load = useCallback(async () => {
     const results = await Promise.allSettled([
       api<Task[]>("/api/tasks"),
@@ -228,18 +228,10 @@ export default function TodoApp({
       const saved = identity
         ? JSON.parse(localStorage.getItem(timerStorageKey) || "null")
         : null;
-      if (
-        saved &&
-        typeof saved.remaining === "number" &&
-        typeof saved.task === "string" &&
-        saved.task.length <= 180 &&
-        ["focus", "break"].includes(saved.phase) &&
-        saved.duration > 0 &&
-        saved.duration <= 7200 &&
-        (!saved.deadline || Number.isFinite(saved.deadline))
-      ) {
+      if (validTimer(saved)) {
         setTimer(saved);
         if (saved.phase === "focus") setMinutes(saved.duration / 60);
+        if (saved.started) setInRoom(true);
       }
     } catch {}
     hydrated.current = true;
@@ -277,6 +269,40 @@ export default function TodoApp({
         current.taskId ? current : { ...current, taskId: matches[0].id },
       );
   }, [tasks, timer.started, timer.phase, timer.taskId, timer.task]);
+  useEffect(() => {
+    if (!RELIABILITY.enabled || !timer.started || timer.phase !== "focus")
+      return;
+    const guard = (event: BeforeUnloadEvent) => {
+      // Persist synchronously before the browser's own leave confirmation.
+      try {
+        localStorage.setItem(timerStorageKey, JSON.stringify(timerRef.current));
+      } catch {}
+      event.preventDefault();
+      event.returnValue = "Leave this focus session?";
+    };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [timer.started, timer.phase, timerStorageKey]);
+  useEffect(() => {
+    if (!identity || !RELIABILITY.enabled) return;
+    const back = () => void load();
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [identity, load]);
+  useEffect(() => {
+    if (
+      !PRESENTATION.enabled ||
+      !identity ||
+      !timerReady ||
+      new URLSearchParams(location.search).get("enter") !== "room"
+    )
+      return;
+    const enter = setTimeout(() => {
+      setInRoom(true);
+      setPanel(null);
+    }, 0);
+    return () => clearTimeout(enter);
+  }, [identity, timerReady]);
   const chime = useCallback(() => {
     if (!sound) return;
     try {
@@ -331,6 +357,31 @@ export default function TodoApp({
       return false;
     }
   }, []);
+  useEffect(() => {
+    const recoverFinished = async () => {
+      const value = timerRef.current;
+      if (
+        !timerReady ||
+        !value.started ||
+        value.phase !== "focus" ||
+        value.remaining !== 0 ||
+        value.deadline ||
+        settling.current
+      )
+        return;
+      settling.current = true;
+      const saved = await saveSession(value);
+      settling.current = false;
+      if (saved && timerRef.current.id === value.id) {
+        setFocusCompletions((n) => n + 1);
+        setTimer({ ...freshTimer, task: value.task });
+        setInRoom(true);
+        setPanel(null);
+      }
+    };
+    window.addEventListener("online", recoverFinished);
+    return () => window.removeEventListener("online", recoverFinished);
+  }, [timerReady, saveSession]);
   useEffect(() => {
     if (!timerReady) return;
     const id = setInterval(async () => {
@@ -494,6 +545,7 @@ export default function TodoApp({
       data-ready={timerReady}
       className={`todo-root ${(inRoom ? reduced || systemReduced : systemReduced) ? "reduce-motion" : ""} ${inRoom ? "room-active" : ""}`}
     >
+      {PRESENTATION.enabled && !inRoom && <AboutHelp />}
       <Welcome
         ref={introRef}
         reduced={systemReduced}

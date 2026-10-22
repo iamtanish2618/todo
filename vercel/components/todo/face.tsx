@@ -73,7 +73,7 @@ function FaceTexture({
       y = 0.5,
       power = 0;
     const image = new Image();
-    image.src = "/art/todo-face.png";
+    image.src = "/art/todo-face.webp";
     function draw() {
       if (stopped || !node || !gl) return;
       const rect = node.getBoundingClientRect(),

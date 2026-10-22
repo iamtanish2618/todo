@@ -1,4 +1,5 @@
 "use client";
+import { watchRoomAudio } from "./audio-access";
 import { useEffect, useRef, type RefObject } from "react";
 import type { RoomMix } from "./cinema-config";
 
@@ -34,6 +35,7 @@ export function useRoomSound(
       try {
         const context = new AudioContext(),
           master = context.createGain();
+        watchRoomAudio(context);
         master.gain.value = latest.current.volume;
         master.connect(context.destination);
         const length = context.sampleRate * 8,

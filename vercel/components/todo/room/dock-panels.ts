@@ -14,7 +14,7 @@ export function dockOrigin(pane: string | null) {
     pane === "friends" ||
     pane === "agent"
     ? pane
-    : pane === "settings"
+    : pane === "settings" || pane === "help"
       ? "settings"
       : "focus";
 }
@@ -91,7 +91,7 @@ export function trapDockPanel(event: KeyboardEvent<HTMLElement>) {
   if (event.key !== "Tab") return;
   const nodes = Array.from(
     event.currentTarget.querySelectorAll<HTMLElement>(
-      'button:not([disabled]):not([aria-disabled="true"]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),summary,[tabindex="0"]',
+      'a[href],button:not([disabled]):not([aria-disabled="true"]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),summary,[tabindex="0"]',
     ),
   ).filter((n) => n.getClientRects().length && !n.closest("[inert]"));
   if (!nodes.length) {

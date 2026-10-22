@@ -29,6 +29,7 @@ const ITEMS = [
 /** The GSAP ticker is shared with the scene. This listener sleeps after its spring settles. */
 export function RoomDock({
   active,
+  ready = true,
   reduced,
   focus,
   hidden,
@@ -39,6 +40,7 @@ export function RoomDock({
   onEnd,
 }: {
   active: string | null;
+  ready?: boolean;
   reduced: boolean;
   focus: boolean;
   hidden: boolean;
@@ -57,6 +59,7 @@ export function RoomDock({
   const [hover, setHover] = useState<number | null>(null);
   const [intro, setIntro] = useState(false);
   useEffect(() => {
+    if (!ready || hidden) return;
     try {
       if (!localStorage.getItem("todo.dock.welcome.v1")) {
         setIntro(true);
@@ -65,7 +68,7 @@ export function RoomDock({
         return () => clearTimeout(timeout);
       }
     } catch {}
-  }, []);
+  }, [ready, hidden]);
   useEffect(() => {
     const nav = root.current;
     if (!nav) return;
@@ -252,6 +255,11 @@ export function RoomDock({
                 data-dock-item={id}
                 data-active={active === id || (id === "agent" && agent)}
                 data-resting={id === "agent" && resting}
+                aria-describedby={
+                  hover === i || (intro && i === 2)
+                    ? `todo-dock-hint-${id}`
+                    : undefined
+                }
                 aria-label={focus && id === "focus" ? "Pause session" : label}
                 aria-pressed={id === "agent" ? agent : undefined}
                 aria-expanded={id !== "agent" ? active === id : undefined}
@@ -291,7 +299,12 @@ export function RoomDock({
               </button>
               {(hover === i || (intro && i === 2)) &&
               !(id === "focus" && active === "focus") ? (
-                <span className="todo-dock-tooltip" role="tooltip">
+                <span
+                  id={`todo-dock-hint-${id}`}
+                  className="todo-dock-tooltip"
+                  data-first-hint={intro && i === 2}
+                  role="tooltip"
+                >
                   {id === "agent" && resting
                     ? "A little rest. Back tomorrow."
                     : label}

@@ -145,14 +145,14 @@ export function RoomPenguin({
   const poseSource = (p: RoomPose) => {
     const base =
       p === "writing" ? C.focusedPose : C.poses[p === "tea" ? "idle" : p];
-    return female ? base.replace(".png", "-pink.png") : base;
+    return female ? base.replace(".webp", "-pink.webp") : base;
   };
   const source = (p: RoomPose) =>
     !missing.includes(poseSource(p))
       ? poseSource(p)
       : !missing.includes(poseSource("idle"))
         ? poseSource("idle")
-        : "/art/todo-seated.png";
+        : "/art/todo-seated.webp";
   const eyeMap = C.eyes.idle;
   return (
     <button

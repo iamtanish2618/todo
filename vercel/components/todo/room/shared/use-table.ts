@@ -44,10 +44,10 @@ export function useTable(active: boolean, status: Status) {
       void session.leave();
     };
     window.addEventListener("pagehide", leave);
-    window.addEventListener("beforeunload", leave);
+    // pagehide fires only after a leave is confirmed; beforeunload may be cancelled.
     return () => {
       window.removeEventListener("pagehide", leave);
-      window.removeEventListener("beforeunload", leave);
+
       leave();
     };
   }, [session]);

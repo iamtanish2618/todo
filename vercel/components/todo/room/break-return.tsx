@@ -29,7 +29,7 @@ export function BreakReturn({
   const [error, setError] = useState(false);
   const [stage, setStage] = useState("announce");
   const image = female
-    ? C.poses.idle.replace(".png", "-pink.png")
+    ? C.poses.idle.replace(".webp", "-pink.webp")
     : C.poses.idle;
 
   useEffect(() => {
