@@ -147,12 +147,18 @@ export function CompletionCelebration({
           aria-label="Your focus this sit"
         >
           <span>
-            <CountUp value={minutes} reduced={reduced} />
-            minutes focused
+            {minutes < 1 ? (
+              "less than a minute focused"
+            ) : (
+              <>
+                <CountUp value={minutes} reduced={reduced} />{" "}
+                {minutes === 1 ? "minute" : "minutes"} focused
+              </>
+            )}
           </span>
           <span>
-            <CountUp value={tasksDone} reduced={reduced} />
-            tasks finished
+            <CountUp value={tasksDone} reduced={reduced} />{" "}
+            {tasksDone === 1 ? "task" : "tasks"} finished
           </span>
         </div>
         <div className="celebration-choices">

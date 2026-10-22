@@ -1,0 +1,393 @@
+/* Stage 1 only. Disable with ROOM_CONFIG.visiblePolish.enabled; existing Glass
+   preference still controls the tint. Artwork and scene coordinates stay intact. */
+.cozy-room[data-visible-polish="true"] {
+  --room-ink: #2a2622;
+  --room-muted: #4f443b;
+  --glass-alpha: calc(0.84 + var(--glass-tint, 0) * 0.12);
+}
+.cozy-room[data-visible-polish="true"] .cozy-room-backdrop {
+  filter: blur(32px) brightness(0.85);
+}
+.cozy-room[data-visible-polish="true"] .cozy-room-stage::before {
+  content: "";
+  position: absolute;
+  inset: -2%;
+  z-index: -1;
+  pointer-events: none;
+  background: #8b7d8850;
+  filter: blur(28px);
+}
+/* Side rails leave the center companion and the upper wall clock unobstructed. */
+.cozy-room[data-visible-polish="true"][data-dock="true"] .dock-panel {
+  left: 2%;
+  top: 12%;
+  bottom: auto;
+  width: 30%;
+  height: auto;
+  max-height: min(70%, calc(100dvh - 150px));
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: clamp(14px, 1.5cqw, 22px);
+  gap: 12px;
+  color: var(--room-ink);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 250, 244, var(--glass-alpha)),
+    rgba(246, 237, 226, calc(var(--glass-alpha) - 0.04))
+  );
+}
+.cozy-room[data-visible-polish="true"][data-dock="true"]
+  .dock-panel:is(
+    [data-dock-pane="friends"],
+    [data-dock-pane="settings"],
+    [data-dock-pane="month"],
+    [data-dock-pane="corner"],
+    [data-dock-pane="home"],
+    [data-dock-pane="focus"],
+    [data-dock-pane="break"],
+    [data-dock-pane="agent"]
+  ) {
+  left: 68%;
+  top: 32%;
+  bottom: auto;
+  width: 30%;
+  max-height: min(50%, calc(100dvh - 150px));
+}
+.cozy-room[data-visible-polish="true"][data-dock="true"]
+  .dock-panel[data-dock-pane="agent"] {
+  height: 50%;
+  padding: 0;
+}
+/* Four seats extend farther sideways. Keep tools outside the full ensemble. */
+.cozy-room[data-visible-polish="true"][data-dock="true"]:is(
+    [data-table-size="3"],
+    [data-table-size="4"]
+  )
+  .dock-panel {
+  left: 77%;
+  top: 32%;
+  width: 21%;
+  max-height: min(50%, calc(100dvh - 150px));
+}
+.cozy-room[data-visible-polish="true"] .dock-panel .room-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cozy-room[data-visible-polish="true"] .dock-panel .room-panel-body > * {
+  flex-shrink: 0;
+}
+.cozy-room[data-visible-polish="true"] .room-panel-heading h2 {
+  overflow-wrap: anywhere;
+}
+.cozy-room[data-visible-polish="true"] .dock-panel .room-panel-heading button {
+  flex-shrink: 0;
+}
+.cozy-room[data-visible-polish="true"] .dock-focus-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.cozy-room[data-visible-polish="true"] .dock-task-chips {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.cozy-room[data-visible-polish="true"] .dock-custom-time {
+  flex-wrap: wrap;
+}
+.cozy-room[data-visible-polish="true"] .dock-focus-setup > .room-focus-launch {
+  position: static;
+  width: auto;
+  height: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 18px;
+  clip: auto;
+  clip-path: none;
+  overflow: visible;
+  white-space: normal;
+  background: #3d3029;
+  color: #fff7e9;
+  border-radius: 999px;
+}
+/* Small glass labels remain readable even when the 3:2 room scales down. */
+.cozy-room[data-visible-polish="true"]
+  :is(.dock-panel, .room-agent-panel, .table-game-panel, .room-break-actions)
+  :is(button, input, textarea, select, label, small, p, time, summary),
+.cozy-room[data-visible-polish="true"]
+  :is(
+    .dock-focus-row > strong,
+    .todo-dock-button > span,
+    .todo-dock-tooltip,
+    .room-note-tabs button,
+    .room-audio-notice,
+    .table-notice,
+    .table-hint
+  ) {
+  font-size: max(var(--room-min-text, 13px), 1em) !important;
+}
+.cozy-room[data-visible-polish="true"]
+  :is(
+    .room-helper,
+    .room-empty,
+    .room-field,
+    .room-setting,
+    .room-soft-notice,
+    .room-eyebrow,
+    .dock-glass-setting small,
+    .cinema-time-match,
+    .table-hint,
+    .table-notice,
+    .room-finished-task p
+  ) {
+  color: var(--room-muted);
+  opacity: 1;
+}
+.cozy-room[data-visible-polish="true"]
+  .dock-panel
+  :is(input, textarea)::placeholder {
+  color: #4f443b;
+}
+.cozy-room[data-visible-polish="true"] .dock-panel .room-sound-choices button {
+  color: #2a2622;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cozy-room[data-visible-polish="true"] .table-friends {
+  min-width: 0;
+}
+.cozy-room[data-visible-polish="true"] .table-friends :is(button, input) {
+  max-width: 100%;
+}
+.cozy-room[data-visible-polish="true"] .table-code {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+.cozy-room[data-visible-polish="true"] .table-game-panel {
+  top: 32%;
+  max-height: min(50%, calc(100dvh - 150px));
+  overflow: auto;
+  background: #f5ede2ed;
+  color: #2a2622;
+}
+.cozy-room[data-visible-polish="true"] .room-break-actions > button {
+  min-height: 44px;
+  padding: 11px 20px;
+  font-size: 14px;
+  font-weight: 750;
+  background: #49352b;
+  color: #fff8ed;
+  border: 1px solid #c7a27e;
+}
+/* No partially visible setup dialog may linger over a running focus scene. */
+.cozy-room[data-visible-polish="true"][data-working="true"] .room-tool-panel {
+  display: none;
+}
+.cozy-room[data-visible-polish="true"]
+  :is(.room-panel-body, .room-chat-transcript, .table-game-panel) {
+  scrollbar-width: thin;
+  scrollbar-color: #887461 #fff8ed55;
+}
+/* Chat is portalled outside the stage. Its cap starts below the wall clock,
+   and its own controls/history scroll rather than extending beyond the screen. */
+.table-conversation[data-visible-polish="true"] {
+  bottom: max(
+    112px,
+    calc(
+      (100dvh - min(100dvh, 66.666667vw)) / 2 + min(100dvh, 66.666667vw) * 0.18
+    )
+  );
+  width: min(320px, 27vw);
+  color: #2a2622;
+  --glass-alpha: calc(0.84 + var(--glass-tint, 0) * 0.12);
+}
+.table-conversation[data-visible-polish="true"][data-many-seats="true"] {
+  width: min(300px, 21vw);
+}
+.table-conversation[data-visible-polish="true"] .table-chat-panel {
+  max-height: min(46dvh, calc(100dvh - 240px));
+  overflow: hidden;
+  min-height: 0;
+}
+.table-conversation[data-visible-polish="true"]
+  :is(.table-chat-panel, .table-chat-launch, .table-message-preview) {
+  background: rgba(250, 243, 233, var(--glass-alpha));
+}
+.table-conversation[data-visible-polish="true"] .table-chat-history {
+  min-height: 60px;
+  flex: 1 1 auto;
+}
+.table-conversation[data-visible-polish="true"]
+  .table-chat-panel
+  > :not(.table-chat-history) {
+  flex-shrink: 0;
+}
+.table-conversation[data-visible-polish="true"]
+  :is(p, small, time, button, textarea, .table-chat-byline) {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.table-conversation[data-visible-polish="true"] :is(time, small) {
+  color: #4f443b;
+}
+.table-conversation[data-visible-polish="true"] .table-message-preview {
+  color: #2a2622;
+}
+.table-conversation[data-visible-polish="true"] .table-message-previews {
+  max-height: 38dvh;
+  overflow: auto;
+}
+/* Portrait keeps the scene above the sheet: no panel hides Todo or the clock.
+   This is a fit correction only, not a redesign of the deferred mobile app. */
+@media (max-width: 800px), (max-aspect-ratio: 1/1) {
+  .cozy-room[data-visible-polish="true"][data-dock="true"]:is(
+      [data-panel-open="true"],
+      [data-game-menu="true"],
+      [data-agent="true"]
+    )
+    .cozy-room-stage {
+    position: absolute;
+    top: 72px;
+    width: min(100vw, calc((100dvh - 420px) * 1.5));
+    height: auto;
+  }
+  .cozy-room[data-visible-polish="true"][data-dock="true"] .dock-panel {
+    position: fixed;
+    left: 12px !important;
+    right: 12px !important;
+    top: calc(84px + min(66.666667vw, calc(100dvh - 420px))) !important;
+    bottom: max(112px, calc(env(safe-area-inset-bottom) + 104px)) !important;
+    width: calc(100vw - 24px) !important;
+    height: auto !important;
+    max-height: calc(
+      100dvh - 196px - min(66.666667vw, calc(100dvh - 420px))
+    ) !important;
+    padding: 16px;
+    margin: 0;
+  }
+  .cozy-room[data-visible-polish="true"][data-dock="true"]
+    .dock-panel[data-dock-pane="agent"] {
+    padding: 0;
+  }
+  .cozy-room[data-visible-polish="true"][data-dock="true"] .todo-dock {
+    position: fixed;
+    left: 12px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    width: calc(100vw - 24px);
+    height: 72px;
+    --dock-unit: 1px;
+  }
+  .cozy-room[data-visible-polish="true"]:has(.room-tool-panel)
+    :is(.cozy-room-art, .room-shelf-keepsakes) {
+    transform: none;
+  }
+  .cozy-room[data-visible-polish="true"] .room-break-actions {
+    position: fixed;
+    bottom: 28px;
+  }
+  .table-conversation[data-visible-polish="true"] {
+    right: 12px;
+    bottom: 112px;
+    width: min(340px, calc(100vw - 24px));
+  }
+  .table-conversation[data-visible-polish="true"][data-many-seats="true"] {
+    width: min(340px, calc(100vw - 24px));
+  }
+  .table-conversation[data-visible-polish="true"] .table-chat-panel {
+    max-height: 35dvh;
+  }
+}
+/* The arrival reveal leaves a large circular clip on the stage. Clear it once
+   arrival is complete: fixed portrait sheets/dock extend beyond the artwork. */
+.cozy-room[data-visible-polish="true"][data-arriving="false"] .cozy-room-stage {
+  clip-path: none !important;
+}
+.cozy-room[data-visible-polish="true"]
+  .dock-panel
+  .room-weather-choices
+  > button:last-child {
+  min-height: 44px;
+  height: 44px;
+}
+.cozy-room[data-visible-polish="true"] .dock-panel :is(span, legend) {
+  font-size: max(var(--room-min-text, 13px), 1em);
+}
+@media (max-width: 800px), (max-aspect-ratio: 1/1) {
+  .cozy-room[data-visible-polish="true"][data-dock="true"] .dock-panel {
+    max-width: none;
+  }
+}
+.cozy-room[data-visible-polish="true"] .cinema-object-hit > span {
+  font-size: 13px;
+  color: #2a2622;
+  background: #fff8edef;
+}
+.cozy-room[data-visible-polish="true"]
+  :is(
+    .room-mini-tabs button,
+    .room-settings-links button,
+    .room-agent-heading button,
+    .room-message-actions button,
+    .room-finished-link,
+    .dock-focus-manage
+  ) {
+  color: #2a2622;
+}
+.cozy-room[data-visible-polish="true"]
+  .dock-panel
+  :is(.table-friends small, .table-colors legend, .room-chat-body code) {
+  font-size: 13px;
+  color: #4f443b;
+}
+.cozy-room[data-visible-polish="true"] .table-game-choice small {
+  opacity: 1;
+  color: #4f443b;
+}
+@media (max-width: 800px), (max-aspect-ratio: 1/1) {
+  .cozy-room[data-visible-polish="true"] .table-game-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: calc(84px + min(66.666667vw, calc(100dvh - 420px)));
+    width: auto;
+    max-height: calc(100dvh - 196px - min(66.666667vw, calc(100dvh - 420px)));
+  }
+}
+@media (max-width: 800px), (max-aspect-ratio: 1/1) {
+  /* Keep all five timer characters inside a real dial on the small art crop. */
+  .cozy-room[data-visible-polish="true"] .room-wall-clock.round-timer {
+    left: auto;
+    right: 12px;
+    top: 12px;
+    width: 80px;
+    height: 80px;
+  }
+  .cozy-room[data-visible-polish="true"]
+    .room-wall-clock
+    .round-timer-face
+    strong {
+    font-size: 18px;
+    letter-spacing: -0.04em;
+  }
+  .cozy-room[data-visible-polish="true"] .room-wall-clock .round-timer-label {
+    display: none;
+  }
+}
+.cozy-room[data-visible-polish="true"][data-dock="true"][data-table-size="2"]
+  .dock-panel {
+  left: 73%;
+  top: 32%;
+  width: 25%;
+  max-height: min(50%, calc(100dvh - 150px));
+}
+.table-game-screen[data-visible-polish="true"]
+  :is(.table-doodle-help, .table-pop-count),
+.cozy-room[data-visible-polish="true"]
+  :is(.table-name-tag, .table-arrival-name) {
+  font-size: 13px;
+}

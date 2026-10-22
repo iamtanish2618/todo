@@ -110,3 +110,17 @@ tests and twelve shared protocol/relay/recovery checks passed. The prior live
 forced-TLS synthetic audio check passed again during investigation. The owner confirmed actual two-way microphone playback after both users refreshed,
 rejoined and unmuted: Chrome on the owner’s Mac and Microsoft Edge on the
 friend’s Lenovo laptop. This confirms that live test, not universal network compatibility.
+
+## Stage 1 visual polish (23 October 2026)
+
+The existing room now has viewport-bounded scrolling panels, stronger glass ink,
+clear settings labels, singular/plural focus statistics, no lingering focus setup,
+35% Doodle fog, softer outer scenery and larger break buttons. The application
+changes are mirrored from Sites in the same seven component/style paths; runtime
+settings remain in `ROOM_CONFIG.visiblePolish`. Stages 2–4 are not included.
+
+The six requested viewport sizes were checked with real UI components and local
+fixtures, including four-seat Friends/chat clearance. Builds/type-checks pass.
+The canonical full-project lint still has its unchanged v38 baseline of 47
+errors/34 warnings; no rules were weakened to hide them. The full file list and
+ten short manual checks are in the repository's `docs/room-dock.md`.
