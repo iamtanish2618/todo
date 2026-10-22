@@ -96,6 +96,14 @@ import { FriendsPanel } from "./room/shared/friends";
 import { TableChat } from "./room/shared/table-chat";
 import "./room/shared/shared.css";
 import "./room/visible-polish.css";
+import { elapsedFocusSeconds } from "@/lib/todo/support";
+import {
+  useTinyStep,
+  TinyStepBubble,
+  FocusNudge,
+  type StepTask,
+} from "./room/support";
+import "./room/support.css";
 
 type Pane =
   | "focus"
@@ -134,6 +142,7 @@ type Props = {
   duration: number;
   focusMinutes: number;
   startedAt?: number;
+  deadline?: number | null;
   timerId: string;
   focusCompletions: number;
   onBreak: (minutes: number) => void;
@@ -275,6 +284,10 @@ export function StudyRoom(p: Props) {
           : "night",
     );
   }, []);
+  const polish = useRoomPolish(setTone);
+  const quietMode = C.supportive.enabled && polish.settings.quiet;
+  const motionReduced = p.reduced || quietMode;
+  const roomMuted = polish.settings.muted || quietMode;
   const rain = tone === "rain";
   useEffect(() => {
     if (!p.active) setSoundscape("off");
@@ -295,7 +308,7 @@ export function StudyRoom(p: Props) {
   useLayoutEffect(() => {
     const before = taskRects.current;
     taskRects.current = null;
-    if (!before || p.reduced) return;
+    if (!before || motionReduced) return;
     const moves = Array.from(
       roomRoot.current?.querySelectorAll<HTMLElement>("[data-task-id]") || [],
     ).map((node) => ({
@@ -326,7 +339,7 @@ export function StudyRoom(p: Props) {
     return () => {
       disposed = true;
     };
-  }, [taskOrder, p.reduced]);
+  }, [taskOrder, motionReduced]);
   const rememberTaskOrder = (ids: string[]) => {
     taskRects.current = new Map(
       Array.from(
@@ -372,10 +385,13 @@ export function StudyRoom(p: Props) {
   const currentPane = useRef(pane);
   currentPane.current = pane;
   latest.current = p;
-  const polish = useRoomPolish(setTone);
   useEffect(() => {
     if (!p.active) return;
     // Unlock notification audio during a real gesture, before a timer expires.
+    if (roomMuted) {
+      releaseTodoVoice();
+      return;
+    }
     const unlock = () => primeTodoVoice();
     window.addEventListener("pointerdown", unlock, { passive: true });
     window.addEventListener("keydown", unlock);
@@ -384,20 +400,21 @@ export function StudyRoom(p: Props) {
       window.removeEventListener("keydown", unlock);
       releaseTodoVoice();
     };
-  }, [p.active]);
+  }, [p.active, roomMuted]);
   const panelReturn = useDockPanelMotion(
     roomRoot,
     pane,
     dockEnabled,
-    p.reduced,
+    motionReduced,
   );
   const [completionStats, setCompletionStats] = useState({
     minutes: 0,
     tasks: 0,
+    early: false,
   });
   useRoomCinema(roomRoot, {
     active: p.active && arrived,
-    reduced: p.reduced,
+    reduced: motionReduced,
     focus: quietFocus,
     resting: quietBreak,
     running: p.running,
@@ -412,8 +429,8 @@ export function StudyRoom(p: Props) {
   useRoomSound(
     roomRoot,
     p.active && arrived,
-    p.sound && !polish.settings.muted && !celebrating && !breakReturn,
-    polish.settings.muted ? 0 : polish.settings.volume,
+    p.sound && !roomMuted && !celebrating && !breakReturn,
+    roomMuted ? 0 : polish.settings.volume,
     EMPTY_MIX,
   );
   useEffect(
@@ -623,6 +640,7 @@ export function StudyRoom(p: Props) {
     setCompletionStats({
       minutes: Math.max(0, Math.floor((p.sessions[0]?.seconds || 0) / 60)),
       tasks: p.tasks.filter((t) => t.done).length - baseline.current,
+      early: false,
     });
     setCelebrating(true);
     roomEffect(roomRoot.current, "celebrate");
@@ -652,7 +670,7 @@ export function StudyRoom(p: Props) {
       setPane(null);
     }, 0);
     return () => clearTimeout(dismiss);
-  }, [quietFocus, quietBreak, p.reduced]);
+  }, [quietFocus, quietBreak, motionReduced]);
   const restHistory = useRef({ resting: false, playing: false });
   useEffect(() => {
     const before = restHistory.current;
@@ -684,16 +702,16 @@ export function StudyRoom(p: Props) {
         timeline
           .fromTo(
             wash,
-            { opacity: 0, xPercent: p.reduced ? 0 : -5 },
+            { opacity: 0, xPercent: motionReduced ? 0 : -5 },
             { opacity: 0.07, xPercent: 0, duration: 0.3, ease: "power2.out" },
           )
           .to(wash, {
             opacity: 0,
-            xPercent: p.reduced ? 0 : 5,
-            duration: p.reduced ? 0.15 : 0.8,
+            xPercent: motionReduced ? 0 : 5,
+            duration: motionReduced ? 0.15 : 0.8,
             ease: "power2.out",
           });
-        if (!p.reduced)
+        if (!motionReduced)
           timeline.fromTo(
             art,
             { scale: 1.004, opacity: 1, transformOrigin: "50% 58%" },
@@ -714,14 +732,14 @@ export function StudyRoom(p: Props) {
       cleanup();
       room.dataset.breakTransition = "settled";
     };
-  }, [quietBreak, breakGameState.game, p.active, p.reduced]);
+  }, [quietBreak, breakGameState.game, p.active, motionReduced]);
   const show = (next: Pane) => {
     setError("");
     if (currentPane.current === next) closePanel.current();
     else {
       closingTween.current?.kill();
       const node = roomRoot.current?.querySelector(".dock-panel");
-      if (dockEnabled && node && !p.reduced) {
+      if (dockEnabled && node && !motionReduced) {
         const previous = currentPane.current;
         void import("gsap").then(({ gsap }) => {
           if (currentPane.current !== previous || !node.isConnected) return;
@@ -771,6 +789,9 @@ export function StudyRoom(p: Props) {
       // Save the active sit before completing its task, so the finished record includes it.
       const finishSit =
         !task.done && p.started && p.phase === "focus" && p.taskId === task.id;
+      const focused = p.started
+        ? elapsedFocusSeconds(p.duration, p.remaining, p.deadline)
+        : task.focusedSeconds || 0;
       if (finishSit && !(await p.onFinish())) return;
       const next = await api<Task>("/api/tasks", "PATCH", {
         id: task.id,
@@ -782,11 +803,9 @@ export function StudyRoom(p: Props) {
         if (!finishSit && p.running) p.onStart();
         setPane(null);
         setCompletionStats({
-          minutes: Math.floor(
-            (p.started ? p.duration - p.remaining : task.focusedSeconds || 0) /
-              60,
-          ),
+          minutes: Math.floor(focused / 60),
           tasks: 1,
+          early: false,
         });
         setCelebrating(true);
         roomEffect(roomRoot.current, "celebrate");
@@ -872,6 +891,7 @@ export function StudyRoom(p: Props) {
       .find(Boolean);
     closingTween.current?.kill();
     setPane(null);
+    tinyStep.dismiss();
     p.onDuration(minutes);
     p.onTask(task?.title || "Quiet focus", true, task?.id);
     baseline.current = p.tasks.filter((t) => t.done).length;
@@ -882,12 +902,14 @@ export function StudyRoom(p: Props) {
   };
   const done = () =>
     void work(async () => {
+      const focused = elapsedFocusSeconds(p.duration, p.remaining, p.deadline);
       if (await p.onFinish()) {
         setPane(null);
         if (p.phase === "focus") {
           setCompletionStats({
-            minutes: Math.floor((p.duration - p.remaining) / 60),
+            minutes: Math.floor(focused / 60),
             tasks: 0,
+            early: C.supportive.enabled && focused < p.duration,
           });
           setCelebrating(true);
           roomEffect(roomRoot.current, "celebrate");
@@ -985,6 +1007,39 @@ export function StudyRoom(p: Props) {
   const selected = chosen
     .map((id) => p.tasks.find((t) => t.id === id && !t.done))
     .filter((t): t is Task => Boolean(t));
+  const tinyStep = useTinyStep(
+    Boolean(
+      C.supportive.enabled &&
+      connection?.ai &&
+      !resting &&
+      !connection.quota?.resting,
+    ),
+    () => setResting(true),
+  );
+  const stepTask: StepTask = p.started
+    ? { title: p.task, id: p.taskId || undefined }
+    : selected[0] || { title: p.task || draft, id: p.taskId || undefined };
+  const askForStep = () => {
+    closingTween.current?.kill();
+    setPane(null);
+    setError("");
+    p.onAgentMode(false);
+    void tinyStep.ask(stepTask);
+  };
+  const startSmall = (task: StepTask) => {
+    if (p.started) return;
+    tinyStep.dismiss();
+    setPane(null);
+    p.onAgentMode(false);
+    p.onDuration(C.supportive.starterMinutes);
+    const savedTask = p.tasks.find((t) => t.id === task.id && !t.done);
+    p.onTask(
+      savedTask?.title || task.title || "Quiet focus",
+      true,
+      savedTask?.id,
+    );
+    baseline.current = p.tasks.filter((t) => t.done).length;
+  };
   const totalSits = summary?.totalSits || p.sessions.length;
   const keepsakes = [
     {
@@ -1013,7 +1068,7 @@ export function StudyRoom(p: Props) {
       ".room-tool-panel,.room-agent-panel",
     );
     const closing = pane;
-    if (!node || (p.reduced && !dockEnabled)) {
+    if (!node || (motionReduced && !dockEnabled)) {
       setPane(null);
       return;
     }
@@ -1022,9 +1077,9 @@ export function StudyRoom(p: Props) {
       closingTween.current = gsap.to(node, {
         opacity: 0,
         x: dockEnabled ? 0 : -14,
-        y: dockEnabled && !p.reduced ? 6 : 0,
-        scale: dockEnabled ? (p.reduced ? 1 : 0.96) : 0.985,
-        duration: dockEnabled ? (p.reduced ? 0.15 : 0.2) : 0.18,
+        y: dockEnabled && !motionReduced ? 6 : 0,
+        scale: dockEnabled ? (motionReduced ? 1 : 0.96) : 0.985,
+        duration: dockEnabled ? (motionReduced ? 0.15 : 0.2) : 0.18,
         ease: "power2.in",
         overwrite: true,
         onComplete: () => {
@@ -1088,14 +1143,17 @@ export function StudyRoom(p: Props) {
               <div className="dock-focus-row">
                 <strong>TIME</strong>
                 <div className="dock-time-chips">
-                  {[15, 25, 45, 60, 90].map((minutes) => (
+                  {(C.supportive.enabled
+                    ? [5, 15, 25, 45, 60, 90]
+                    : [15, 25, 45, 60, 90]
+                  ).map((minutes) => (
                     <button
                       type="button"
                       key={minutes}
                       aria-pressed={Number(focusTime) === minutes}
                       onClick={() => setFocusTime(String(minutes))}
                     >
-                      {minutes}
+                      {minutes === 5 ? "Just 5 minutes" : minutes}
                     </button>
                   ))}
                   <label className="dock-custom-time">
@@ -1122,6 +1180,16 @@ export function StudyRoom(p: Props) {
               >
                 Edit tasks &amp; finished tasks
               </button>
+              {C.supportive.enabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="room-stuck-button"
+                  onClick={askForStep}
+                >
+                  I’m stuck
+                </Button>
+              )}
               <button type="submit" className="room-focus-launch sr-only">
                 Focus
               </button>
@@ -1155,7 +1223,10 @@ export function StudyRoom(p: Props) {
               role="group"
               aria-label="Suggested focus times"
             >
-              {[15, 25, 30, 45, 60, 90].map((minutes) => (
+              {(C.supportive.enabled
+                ? [5, 15, 25, 30, 45, 60, 90]
+                : [15, 25, 30, 45, 60, 90]
+              ).map((minutes) => (
                 <Button
                   key={minutes}
                   type="button"
@@ -1163,7 +1234,7 @@ export function StudyRoom(p: Props) {
                   aria-pressed={Number(focusTime) === minutes}
                   onClick={() => setFocusTime(String(minutes))}
                 >
-                  {minutes} min
+                  {minutes === 5 ? "Just 5 minutes" : `${minutes} min`}
                 </Button>
               ))}
             </div>
@@ -1279,6 +1350,15 @@ export function StudyRoom(p: Props) {
       case "tasks":
         return (
           <>
+            {C.supportive.enabled && (
+              <Button
+                variant="ghost"
+                className="room-stuck-button"
+                onClick={askForStep}
+              >
+                I’m stuck
+              </Button>
+            )}
             <Button
               variant="ghost"
               className="room-finished-link"
@@ -1689,13 +1769,60 @@ export function StudyRoom(p: Props) {
                 />
               </label>
             ) : null}
+            {C.supportive.enabled && (
+              <>
+                <label className="room-setting">
+                  <span>Quiet mode</span>
+                  <Switch
+                    aria-label="Quiet mode"
+                    checked={polish.settings.quiet}
+                    onCheckedChange={(quiet) => polish.update({ quiet })}
+                  />
+                </label>
+                <label className="room-field">
+                  Completion sound
+                  <select
+                    aria-label="Completion sound"
+                    value={polish.settings.cue}
+                    disabled={quietMode}
+                    onChange={(e) =>
+                      polish.update({
+                        cue: e.target.value as "chime" | "voice" | "silent",
+                      })
+                    }
+                  >
+                    <option value="chime">Soft chime</option>
+                    <option value="voice">Todo’s voice</option>
+                    <option value="silent">Silent</option>
+                  </select>
+                </label>
+                <label className="room-setting">
+                  <span>Water &amp; stretch nudge</span>
+                  <Switch
+                    aria-label="Water and stretch nudge"
+                    checked={polish.settings.nudges}
+                    onCheckedChange={(nudges) => polish.update({ nudges })}
+                  />
+                </label>
+              </>
+            )}
             <label className="room-setting">
               <span>Gentler motion</span>
-              <Switch checked={p.reduced} onCheckedChange={p.onReduced} />
+              <Switch
+                aria-label="Gentler motion"
+                checked={motionReduced}
+                disabled={quietMode}
+                onCheckedChange={p.onReduced}
+              />
             </label>
             <label className="room-setting">
               <span>Little sound effects</span>
-              <Switch checked={p.sound} onCheckedChange={p.onSound} />
+              <Switch
+                aria-label="Little sound effects"
+                checked={p.sound}
+                disabled={quietMode}
+                onCheckedChange={p.onSound}
+              />
             </label>
             <label className="room-field">
               Room light
@@ -1932,12 +2059,14 @@ export function StudyRoom(p: Props) {
   return (
     <section
       ref={roomRoot}
-      className={`cozy-room ${p.active ? "cozy-room-active" : ""} ${p.reduced ? "cozy-room-reduced" : ""}`}
+      className={`cozy-room ${p.active ? "cozy-room-active" : ""} ${motionReduced ? "cozy-room-reduced" : ""}`}
       aria-label="Your shared Todo workspace"
       aria-hidden={!p.active}
       inert={!p.active}
       data-dock={dockEnabled}
       data-visible-polish={C.visiblePolish.enabled}
+      data-support={C.supportive.enabled}
+      data-quiet-mode={quietMode}
       style={
         {
           "--glass-tint": polish.settings.glass,
@@ -1958,7 +2087,9 @@ export function StudyRoom(p: Props) {
       data-shared-table={table.members.length > 0}
       data-table-size={table.members.length}
       data-resting={quietBreak}
-      data-panel-open={(Boolean(pane) || chatOpen) && !quietRoom}
+      data-panel-open={
+        (Boolean(pane) || chatOpen || Boolean(tinyStep.idea)) && !quietRoom
+      }
       data-season={
         new Date().getMonth() < 2 || new Date().getMonth() === 11
           ? "winter"
@@ -1982,7 +2113,12 @@ export function StudyRoom(p: Props) {
         games={breakGames}
         active={p.active && arrived}
         available={
-          !pane && !quietFocus && !agentView && !celebrating && !breakReturn
+          !tinyStep.idea &&
+          !pane &&
+          !quietFocus &&
+          !agentView &&
+          !celebrating &&
+          !breakReturn
         }
       />
       <div
@@ -1992,7 +2128,7 @@ export function StudyRoom(p: Props) {
       >
         <div className="room-rest-transition" aria-hidden="true" />
         {table.config.games && (
-          <BreakGames games={breakGames} reduced={p.reduced} />
+          <BreakGames games={breakGames} reduced={motionReduced} />
         )}
         {table.members.length > 0 && table.config.voice && (
           <PersistentMic voice={tableVoice} state={voiceState} />
@@ -2027,13 +2163,13 @@ export function StudyRoom(p: Props) {
                   voice={tableVoice}
                   voiceState={voiceState}
                   session={tableSession}
-                  reduced={p.reduced}
+                  reduced={motionReduced}
                 />
               ) : undefined
             }
             pose={pose}
             female={p.female}
-            reduced={p.reduced}
+            reduced={motionReduced}
             active={p.active && loaded}
             sky={
               tone === "morning" ? "day" : tone === "rain" ? "evening" : "night"
@@ -2131,7 +2267,27 @@ export function StudyRoom(p: Props) {
             ) : null}
           </div>
         </div>
-        <div className="cinema-panel-shade" aria-hidden="true" />
+        <div
+          className="cinema-panel-shade"
+          aria-hidden="true"
+          onClick={() => {
+            if (!pane) tinyStep.dismiss();
+          }}
+        />
+        {C.supportive.enabled && !pane && !quietRoom && tinyStep.idea && (
+          <TinyStepBubble
+            helper={tinyStep}
+            canStart={!p.started}
+            onStart={startSmall}
+          />
+        )}
+        {C.supportive.enabled && (
+          <FocusNudge
+            enabled={p.active && polish.settings.nudges}
+            running={quietFocus}
+            timerId={p.timerId}
+          />
+        )}
         {quietFocus ? (
           <div
             className="cinema-focus-pill"
@@ -2309,7 +2465,7 @@ export function StudyRoom(p: Props) {
         {dockEnabled ? (
           <RoomDock
             active={pane === "tasks" || pane === "finished" ? "focus" : pane}
-            reduced={p.reduced}
+            reduced={motionReduced}
             focus={quietFocus}
             hidden={quietFocus || quietBreak || celebrating}
             agent={p.agentMode}
@@ -2340,7 +2496,7 @@ export function StudyRoom(p: Props) {
         {p.active && soundscape !== "off" ? (
           <RoomSoundPlayer
             recording={soundscape}
-            paused={celebrating || Boolean(breakReturn)}
+            paused={roomMuted || celebrating || Boolean(breakReturn)}
             volume={0.5}
             onStop={() => setSoundscape("off")}
           />
@@ -2587,12 +2743,12 @@ export function StudyRoom(p: Props) {
         <BreakReturn
           key={breakReturn}
           silent={
-            polish.settings.muted ||
+            roomMuted ||
             polish.settings.volume === 0 ||
             polish.settings.cue === "silent"
           }
           female={p.female}
-          reduced={p.reduced}
+          reduced={motionReduced}
           onCovered={restoreAfterBreak}
           onComplete={finishBreakReturn}
         />
@@ -2600,10 +2756,11 @@ export function StudyRoom(p: Props) {
       <CompletionCelebration
         open={celebrating}
         female={p.female}
-        reduced={p.reduced}
-        sound={!polish.settings.muted}
+        reduced={motionReduced}
+        sound={!roomMuted}
         cue={polish.settings.cue}
         volume={polish.settings.volume}
+        early={completionStats.early}
         minutes={completionStats.minutes}
         tasksDone={Math.max(0, completionStats.tasks)}
         busy={busy}
@@ -2615,7 +2772,7 @@ export function StudyRoom(p: Props) {
           ready={loaded}
           progress={loadProgress}
           female={p.female}
-          reduced={p.reduced}
+          reduced={motionReduced}
           complete={arrived}
           error={loadError}
           onComplete={finishArrival}

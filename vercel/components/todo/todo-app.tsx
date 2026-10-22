@@ -49,6 +49,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { Welcome, type WelcomeHandle, type Panel } from "./welcome";
 import { StudyRoom } from "./study-room";
+import { SUPPORT, elapsedFocusSeconds, isAwayReturn } from "@/lib/todo/support";
 import { AccountPanel, type Identity, type Profile } from "./account-panel";
 import type { AuthController } from "@/lib/auth/use-todo-auth";
 import {
@@ -103,6 +104,7 @@ export default function TodoApp({
   >("account");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [returning, setReturning] = useState(false);
+  const [awayReturn, setAwayReturn] = useState(false);
   const [profileError, setProfileError] = useState("");
   const timerStorageKey =
     auth.provider === "chatgpt"
@@ -173,6 +175,26 @@ export default function TodoApp({
       cancelled = true;
     };
   }, [load, identity, auth.ready, auth.newAccount]);
+  useEffect(() => {
+    if (!SUPPORT.enabled || !identity?.id) return;
+    const key = `todo.last-seen.v1.${identity.id}`;
+    const remember = () => {
+      try {
+        if (!document.hidden && isAwayReturn(Number(localStorage.getItem(key))))
+          setAwayReturn(true);
+        localStorage.setItem(key, String(Date.now()));
+      } catch {
+        /* Greeting never depends on storage availability. */
+      }
+    };
+    remember();
+    document.addEventListener("visibilitychange", remember);
+    window.addEventListener("pagehide", remember);
+    return () => {
+      document.removeEventListener("visibilitychange", remember);
+      window.removeEventListener("pagehide", remember);
+    };
+  }, [identity?.id]);
   const [systemReduced, setSystemReduced] = useState(false);
   useEffect(() => {
     const media = matchMedia("(prefers-reduced-motion: reduce)");
@@ -263,7 +285,7 @@ export default function TodoApp({
         const prefs = JSON.parse(
           localStorage.getItem("todo.room.polish.v1") || "{}",
         );
-        if (prefs.muted) return;
+        if (prefs.muted || (SUPPORT.enabled && prefs.quiet)) return;
         if (typeof prefs.volume === "number")
           volume = Math.max(0, Math.min(1, prefs.volume));
       } catch {}
@@ -289,10 +311,10 @@ export default function TodoApp({
   const saveSession = useCallback(async (value: Timer) => {
     if (completed.current.has(value.id)) return true;
     completed.current.add(value.id);
-    const remaining = value.deadline
-      ? Math.max(0, Math.ceil((value.deadline - Date.now()) / 1000))
-      : value.remaining;
-    const seconds = Math.max(1, value.duration - remaining);
+    const seconds = Math.max(
+      1,
+      elapsedFocusSeconds(value.duration, value.remaining, value.deadline),
+    );
     try {
       const result = await api<FocusSession>("/api/sessions", "POST", {
         task: value.task,
@@ -480,7 +502,9 @@ export default function TodoApp({
         blocked={Boolean(panel) || accountOpen}
         greeting={
           identity
-            ? `${returning ? "Welcome back" : "Hey"}${profile?.name || identity.name ? `, ${profile?.name || identity.name?.split(" ")[0]}` : ""}.`
+            ? awayReturn
+              ? "Good to see you."
+              : `${returning ? "Welcome back" : "Hey"}${profile?.name || identity.name ? `, ${profile?.name || identity.name?.split(" ")[0]}` : ""}.`
             : "Hey, you."
         }
         signedIn={Boolean(identity)}
@@ -540,6 +564,7 @@ export default function TodoApp({
         focusMinutes={minutes}
         timerId={timer.id}
         startedAt={timer.startedAt}
+        deadline={timer.deadline}
         focusCompletions={focusCompletions}
         onBreak={(breakMinutes) => {
           const seconds = breakMinutes * 60;
@@ -569,7 +594,7 @@ export default function TodoApp({
           }));
         }}
         female={female}
-        reduced={reduced}
+        reduced={reduced || systemReduced}
         clock={clock}
         running={Boolean(timer.deadline)}
         started={timer.started}
@@ -689,7 +714,7 @@ export default function TodoApp({
           </div>
           {!timer.started && timer.phase === "focus" ? (
             <div className="duration-picker" aria-label="Focus duration">
-              {[15, 25, 45].map((m) => (
+              {(SUPPORT.enabled ? [5, 15, 25, 45] : [15, 25, 45]).map((m) => (
                 <Button
                   key={m}
                   variant={minutes === m ? "default" : "ghost"}
