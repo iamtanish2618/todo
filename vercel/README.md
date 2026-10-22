@@ -107,6 +107,6 @@ these changes.
 Validated: the owner's actual signed-in Chrome session receives the TLS relay;
 an anonymous production request receives no relay. Nine native backend/config
 tests and twelve shared protocol/relay/recovery checks passed. The prior live
-forced-TLS synthetic audio check passed again during investigation. An actual
-Chrome-to-Edge friend test is pending; do not equate these checks with confirmed
-physical microphone playback on both users' devices.
+forced-TLS synthetic audio check passed again during investigation. The owner confirmed actual two-way microphone playback after both users refreshed,
+rejoined and unmuted: Chrome on the owner’s Mac and Microsoft Edge on the
+friend’s Lenovo laptop. This confirms that live test, not universal network compatibility.
