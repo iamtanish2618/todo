@@ -219,3 +219,6 @@
 
 .cozy-room[data-support="true"] .dock-focus-actions {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.45fr);gap:10px;flex:0 0 auto;padding:12px 3px 3px;border-top:1px solid #9a7f6026}
 .cozy-room[data-support="true"] .dock-focus-actions > .room-stuck-button {width:100%;min-height:52px;justify-content:center;font-size:14px!important}
+.cozy-room[data-support="true"] .dock-focus-actions > .room-focus-launch {
+  background:#3d3029;color:#fff7e9;border:1px solid #3d3029;border-radius:999px;
+}
