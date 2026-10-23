@@ -77,7 +77,7 @@ export function TableChat({
   useSyncExternalStore(games.subscribe, games.getSnapshot, games.getSnapshot);
   const joined = table.state === "joined" || table.state === "reconnecting";
   const visible = table.conversation
-    .filter((m) => m.from !== table.id && now - m.at < 10000 && !focusing)
+    .filter((m) => m.from !== table.id && now - m.at < 10000 && (!focusing || m.kind === "message"))
     .slice(-3);
   useEffect(() => {
     setNow(Date.now());
