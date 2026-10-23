@@ -81,6 +81,7 @@
     .magnetic-surface,
     .room-chat-send > svg,
     .room-chat-tool,
+    .room-focus-launch,
     .room-scene-world
   ) {
   transform: none !important;
